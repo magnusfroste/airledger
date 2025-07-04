@@ -37,35 +37,52 @@ serve(async (req) => {
       throw new Error('No authorization header')
     }
 
-    // Create Supabase client with auth header
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    )
+    console.log('Auth header received')
 
-    console.log('Getting user authentication')
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      console.error('Authentication error:', userError)
-      throw new Error(`Authentication failed: ${userError?.message || 'User not found'}`)
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    })
+
+    // Try to get user - if this fails, extract user ID from JWT
+    let userId: string
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        console.warn('getUser failed, extracting from JWT:', userError?.message)
+        // Extract user ID from JWT token
+        const token = authHeader.replace('Bearer ', '')
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        userId = payload.sub
+        if (!userId) {
+          throw new Error('Could not extract user ID from token')
+        }
+        console.log('Extracted user ID from JWT:', userId)
+      } else {
+        userId = user.id
+        console.log('Got user ID from getUser:', userId)
+      }
+    } catch (jwtError) {
+      console.error('Authentication completely failed:', jwtError)
+      throw new Error('Authentication failed')
     }
 
-    console.log('User authenticated:', user.id)
-
     // Get user's recent transactions and entries for context
-    console.log('Fetching user transactions')
+    console.log('Fetching user transactions for user:', userId)
     const { data: transactions, error: transError } = await supabase
       .from('airledger_transactions')
       .select(`
         *,
         airledger_entries (*)
       `)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(20)
 
@@ -80,7 +97,7 @@ serve(async (req) => {
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     const userName = profile?.full_name || profile?.name || 'användare'

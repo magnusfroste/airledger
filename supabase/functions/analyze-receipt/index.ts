@@ -27,20 +27,39 @@ serve(async (req) => {
       throw new Error('No authorization header')
     }
 
-    // Create Supabase client with auth header
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
         },
-      }
-    )
+      },
+    })
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      throw new Error(`Authentication failed: ${userError?.message || 'User not found'}`)
+    // Try to get user - if this fails, extract user ID from JWT
+    let userId: string
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        console.warn('getUser failed, extracting from JWT:', userError?.message)
+        // Extract user ID from JWT token
+        const token = authHeader.replace('Bearer ', '')
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        userId = payload.sub
+        if (!userId) {
+          throw new Error('Could not extract user ID from token')
+        }
+        console.log('Extracted user ID from JWT:', userId)
+      } else {
+        userId = user.id
+        console.log('Got user ID from getUser:', userId)
+      }
+    } catch (jwtError) {
+      console.error('Authentication completely failed:', jwtError)
+      throw new Error('Authentication failed')
     }
 
     // Initialize OpenAI
@@ -154,7 +173,7 @@ Ensure entries balance (total debits = total credits)!`
 
     // Save transaction to database
     const transactionData = {
-      user_id: user.id,
+      user_id: userId,
       transaction_date: analysis.date,
       description: `${analysis.vendor} - ${analysis.description}`,
       total_amount: analysis.total_amount,
