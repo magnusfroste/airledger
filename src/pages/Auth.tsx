@@ -17,6 +17,7 @@ const Auth = () => {
   const [fullName, setFullName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isCreatingDemo, setIsCreatingDemo] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -28,6 +29,44 @@ const Auth = () => {
       }
     });
   }, [navigate]);
+
+  const handleDemoLogin = async () => {
+    setIsCreatingDemo(true);
+    setError("");
+
+    try {
+      // First create the demo user
+      const { data, error: demoError } = await supabase.functions.invoke('create-demo-user');
+
+      if (demoError) {
+        throw demoError;
+      }
+
+      console.log('Demo user creation result:', data);
+
+      // Then sign in with the demo credentials
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: 'demo@airledger.se',
+        password: '123456',
+      });
+
+      if (signInError) {
+        throw signInError;
+      }
+
+      toast({
+        title: "Demo-inloggning lyckad!",
+        description: "Du är nu inloggad som demo-användare med exempeldata.",
+      });
+      
+      navigate("/");
+    } catch (error: any) {
+      console.error("Demo login error:", error);
+      setError(error.message || "Kunde inte skapa/logga in demo-användare.");
+    } finally {
+      setIsCreatingDemo(false);
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,7 +201,7 @@ const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isCreatingDemo}
                     />
                   </div>
                   <div className="space-y-2">
@@ -174,13 +213,13 @@ const Auth = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isCreatingDemo}
                     />
                   </div>
                   <Button 
                     type="submit" 
                     className="w-full h-12" 
-                    disabled={isLoading}
+                    disabled={isLoading || isCreatingDemo}
                   >
                     {isLoading ? (
                       <>
@@ -189,6 +228,35 @@ const Auth = () => {
                       </>
                     ) : (
                       "Logga in"
+                    )}
+                  </Button>
+                  
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border/20" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">eller</span>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    className="w-full h-12"
+                    onClick={handleDemoLogin}
+                    disabled={isLoading || isCreatingDemo}
+                  >
+                    {isCreatingDemo ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Skapar demo...
+                      </>
+                    ) : (
+                      <>
+                        <Bot className="mr-2 h-4 w-4" />
+                        Demo-inloggning
+                      </>
                     )}
                   </Button>
                 </form>
@@ -205,7 +273,7 @@ const Auth = () => {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isCreatingDemo}
                     />
                   </div>
                   <div className="space-y-2">
@@ -217,7 +285,7 @@ const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isCreatingDemo}
                     />
                   </div>
                   <div className="space-y-2">
@@ -229,7 +297,7 @@ const Auth = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isCreatingDemo}
                     />
                   </div>
                   <div className="space-y-2">
@@ -241,13 +309,13 @@ const Auth = () => {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isCreatingDemo}
                     />
                   </div>
                   <Button 
                     type="submit" 
                     className="w-full h-12" 
-                    disabled={isLoading}
+                    disabled={isLoading || isCreatingDemo}
                   >
                     {isLoading ? (
                       <>
