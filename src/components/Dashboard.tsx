@@ -1,14 +1,52 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Camera, TrendingUp, FileText, Plus, Bell } from "lucide-react";
+import { 
+  MessageCircle, 
+  Camera, 
+  TrendingUp, 
+  TrendingDown,
+  FileText, 
+  Plus, 
+  DollarSign,
+  CreditCard,
+  AlertCircle,
+  Receipt
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
-import heroImage from "@/assets/hero-image.jpg";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+interface DashboardStats {
+  revenue: number;
+  expenses: number;
+  checkingBalance: number;
+  unpaidInvoices: number;
+}
+
+interface RecentTransaction {
+  id: string;
+  description: string;
+  total_amount: number;
+  transaction_date: string;
+  transaction_type: string;
+  vendor?: string;
+}
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [stats, setStats] = useState<DashboardStats>({
+    revenue: 0,
+    expenses: 0,
+    checkingBalance: 0,
+    unpaidInvoices: 0
+  });
+  const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [greeting] = useState(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "God morgon";
@@ -18,162 +56,324 @@ const Dashboard = () => {
 
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Användare';
 
-  const recentTransactions = [
-    { id: 1, description: "ICA Maxi Stockholm", amount: -487.50, date: "2024-01-03", category: "Livsmedelsinköp" },
-    { id: 2, description: "Telia AB", amount: -299.00, date: "2024-01-02", category: "Telefonräkning" },
-    { id: 3, description: "Kund ABC AB", amount: 15000.00, date: "2024-01-02", category: "Försäljning" },
-  ];
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
-  const quickStats = [
-    { label: "Månadsresultat", value: "+12,450 kr", trend: "up", color: "success" },
-    { label: "Utestående fakturor", value: "3 fakturor", trend: "neutral", color: "warning" },
-    { label: "Kvitton att granska", value: "7 stycken", trend: "neutral", color: "primary" },
-  ];
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch all transactions and entries in parallel
+      const [transactionsResult, entriesResult] = await Promise.all([
+        supabase
+          .from('airledger_transactions')
+          .select('*')
+          .order('transaction_date', { ascending: false }),
+        supabase
+          .from('airledger_entries')
+          .select('*')
+      ]);
+
+      if (transactionsResult.error) throw transactionsResult.error;
+      if (entriesResult.error) throw entriesResult.error;
+
+      const transactions = transactionsResult.data || [];
+      const entries = entriesResult.data || [];
+
+      // Calculate stats
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+
+      // Revenue - posted income transactions this month
+      const revenue = transactions
+        .filter(t => {
+          const transactionDate = new Date(t.transaction_date);
+          return t.transaction_type === 'income' && 
+                 t.status === 'posted' &&
+                 transactionDate.getMonth() === currentMonth &&
+                 transactionDate.getFullYear() === currentYear;
+        })
+        .reduce((sum, t) => sum + t.total_amount, 0);
+
+      // Expenses - posted expense transactions this month
+      const expenses = transactions
+        .filter(t => {
+          const transactionDate = new Date(t.transaction_date);
+          return t.transaction_type === 'expense' && 
+                 t.status === 'posted' &&
+                 transactionDate.getMonth() === currentMonth &&
+                 transactionDate.getFullYear() === currentYear;
+        })
+        .reduce((sum, t) => sum + t.total_amount, 0);
+
+      // Checking account balance (1930) - credit minus debit
+      const checkingBalance = entries
+        .filter(e => e.account_code === '1930')
+        .reduce((sum, e) => sum + (e.credit_amount || 0) - (e.debit_amount || 0), 0);
+
+      // Unpaid invoices - draft income transactions or accounts payable (2640)
+      const unpaidInvoicesAmount = transactions
+        .filter(t => t.transaction_type === 'income' && t.status === 'draft')
+        .reduce((sum, t) => sum + t.total_amount, 0);
+
+      const unpaidPayables = entries
+        .filter(e => e.account_code === '2640')
+        .reduce((sum, e) => sum + (e.credit_amount || 0) - (e.debit_amount || 0), 0);
+
+      setStats({
+        revenue,
+        expenses: Math.abs(expenses),
+        checkingBalance,
+        unpaidInvoices: unpaidInvoicesAmount + unpaidPayables
+      });
+
+      // Get recent transactions (last 5)
+      const recent = transactions
+        .slice(0, 5)
+        .map(t => ({
+          id: t.id,
+          description: t.description,
+          total_amount: t.total_amount,
+          transaction_date: t.transaction_date,
+          transaction_type: t.transaction_type,
+          vendor: typeof t.analysis_data === 'object' && t.analysis_data !== null && 'vendor' in t.analysis_data 
+            ? String(t.analysis_data.vendor) 
+            : undefined
+        }));
+
+      setRecentTransactions(recent);
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      toast({
+        title: "Fel vid laddning",
+        description: "Kunde inte hämta dashboard-data. Försök igen.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('sv-SE', {
+      style: 'currency',
+      currency: 'SEK',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('sv-SE', {
+      day: 'numeric',
+      month: 'short'
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-gray-600">Laddar dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/60">
-        <div className="container flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground font-bold text-lg">
-              AL
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">
+                {greeting}, {userName}! 👋
+              </h1>
+              <p className="text-gray-600 mt-1">Här är din ekonomiska översikt</p>
             </div>
-            <h1 className="text-xl font-semibold text-foreground">Air Ledger</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm">
-              <Bell className="h-4 w-4" />
-            </Button>
-            <div className="h-8 w-8 rounded-full bg-gradient-primary" />
-          </div>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-success/5">
-        <div className="container px-4 py-8">
-          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">{greeting}, {userName}! 👋</p>
-                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                  Ditt företags ekonomi
-                  <span className="block text-primary">alltid uppdaterad</span>
-                </h2>
-                <p className="text-lg text-muted-foreground">
-                  AI-driven bokföring som gör vardagen enklare för svenska småföretag
-                </p>
-              </div>
-              
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button variant="success" size="lg" className="flex-1 sm:flex-none" asChild>
-                  <Link to="/transactions">
-                    <Plus className="h-4 w-4" />
-                    Ny transaktion
-                  </Link>
-                </Button>
-                <Button variant="professional" size="lg" className="flex-1 sm:flex-none" asChild>
-                  <Link to="/chat">
-                    <MessageCircle className="h-4 w-4" />
-                    Chatta med AI
-                  </Link>
-                </Button>
-              </div>
-            </div>
-            
-            <div className="relative">
-              <img 
-                src={heroImage} 
-                alt="Air Ledger Dashboard" 
-                className="w-full rounded-2xl shadow-large border border-border/20"
-              />
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-primary/10 to-transparent" />
+            <div className="flex items-center space-x-3">
+              <Button asChild>
+                <Link to="/chat">
+                  <Camera className="h-4 w-4 mr-2" />
+                  Fotografera kvitto
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Quick Stats */}
-      <section className="container px-4 py-8">
-        <div className="grid gap-4 md:grid-cols-3">
-          {quickStats.map((stat, index) => (
-            <Card key={index} className="border-border/50 bg-gradient-surface shadow-soft">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">{stat.label}</p>
-                    <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                  </div>
-                  <div className={`h-12 w-12 rounded-full bg-${stat.color}/10 flex items-center justify-center`}>
-                    <TrendingUp className={`h-6 w-6 text-${stat.color}`} />
-                  </div>
+      {/* Stats Cards */}
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Revenue */}
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Försäljning denna månad</p>
+                  <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.revenue)}</p>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Recent Transactions */}
-      <section className="container px-4 py-8">
-        <Card className="border-border/50 bg-surface shadow-soft">
+          {/* Expenses */}
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Kostnader denna månad</p>
+                  <p className="text-2xl font-bold text-red-600">{formatCurrency(stats.expenses)}</p>
+                </div>
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <TrendingDown className="h-6 w-6 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Checking Balance */}
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Saldo checkkonto</p>
+                  <p className="text-2xl font-bold text-blue-600">{formatCurrency(stats.checkingBalance)}</p>
+                  <p className="text-xs text-gray-500 mt-1">Konto 1930</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <CreditCard className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Unpaid Invoices */}
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Obetalda fakturor</p>
+                  <p className="text-2xl font-bold text-orange-600">{formatCurrency(stats.unpaidInvoices)}</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                  <AlertCircle className="h-6 w-6 text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Net Result Card */}
+        <div className="mb-8">
+          <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white border-0">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100">Nettoresultat denna månad</p>
+                  <p className="text-3xl font-bold">
+                    {formatCurrency(stats.revenue - stats.expenses)}
+                  </p>
+                </div>
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                  <DollarSign className="h-8 w-8 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Transactions */}
+        <Card className="bg-white border border-gray-200">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xl text-foreground">Senaste transaktioner</CardTitle>
-              <Button variant="ghost" size="sm" asChild>
+              <CardTitle className="text-lg font-semibold text-gray-900">Senaste transaktioner</CardTitle>
+              <Button variant="outline" size="sm" asChild>
                 <Link to="/transactions">
-                  <FileText className="h-4 w-4" />
+                  <FileText className="h-4 w-4 mr-2" />
                   Visa alla
                 </Link>
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {recentTransactions.map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between p-4 rounded-lg bg-background border border-border/30">
-                <div className="space-y-1">
-                  <p className="font-medium text-foreground">{transaction.description}</p>
-                  <p className="text-sm text-muted-foreground">{transaction.date}</p>
-                </div>
-                <div className="text-right space-y-1">
-                  <p className={`font-semibold ${transaction.amount > 0 ? 'text-success' : 'text-foreground'}`}>
-                    {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('sv-SE')} kr
-                  </p>
-                  <Badge variant="outline" className="text-xs">
-                    {transaction.category}
-                  </Badge>
-                </div>
+          <CardContent>
+            {recentTransactions.length > 0 ? (
+              <div className="space-y-4">
+                {recentTransactions.map((transaction) => (
+                  <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        transaction.transaction_type === 'income' ? 'bg-green-100' : 'bg-red-100'
+                      }`}>
+                        <Receipt className={`h-5 w-5 ${
+                          transaction.transaction_type === 'income' ? 'text-green-600' : 'text-red-600'
+                        }`} />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{transaction.description}</p>
+                        <p className="text-sm text-gray-500">
+                          {formatDate(transaction.transaction_date)}
+                          {transaction.vendor && ` • ${transaction.vendor}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-semibold ${
+                        transaction.transaction_type === 'income' ? 'text-green-600' : 'text-gray-900'
+                      }`}>
+                        {transaction.transaction_type === 'income' ? '+' : ''}
+                        {formatCurrency(transaction.total_amount)}
+                      </p>
+                      <Badge variant="outline" className="text-xs mt-1">
+                        {transaction.transaction_type === 'income' ? 'Intäkt' : 'Kostnad'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Receipt className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p>Inga transaktioner att visa</p>
+                <p className="text-sm mt-1">Börja med att ladda upp ditt första kvitto!</p>
+              </div>
+            )}
           </CardContent>
         </Card>
-      </section>
 
-      {/* Quick Actions */}
-      <section className="container px-4 py-8">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Snabbåtgärder</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Button variant="floating" className="h-20 flex-col gap-2" asChild>
-            <Link to="/chat">
-              <Camera className="h-6 w-6" />
-              <span>Fotografera kvitto</span>
-            </Link>
-          </Button>
-          <Button variant="floating" className="h-20 flex-col gap-2" asChild>
-            <Link to="/chat">
-              <MessageCircle className="h-6 w-6" />
-              <span>Fråga AI-assistenten</span>
-            </Link>
-          </Button>
-          <Button variant="floating" className="h-20 flex-col gap-2" asChild>
-            <Link to="/transactions">
-              <FileText className="h-6 w-6" />
-              <span>Skapa faktura</span>
-            </Link>
-          </Button>
+        {/* Quick Actions */}
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Snabbåtgärder</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Button variant="outline" className="h-20 flex-col space-y-2" asChild>
+              <Link to="/chat">
+                <Camera className="h-6 w-6" />
+                <span>Fotografera kvitto</span>
+              </Link>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col space-y-2" asChild>
+              <Link to="/chat">
+                <MessageCircle className="h-6 w-6" />
+                <span>Fråga AI-assistenten</span>
+              </Link>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col space-y-2" asChild>
+              <Link to="/transactions">
+                <FileText className="h-6 w-6" />
+                <span>Visa transaktioner</span>
+              </Link>
+            </Button>
+          </div>
         </div>
-      </section>
+      </div>
     </div>
   );
 };
