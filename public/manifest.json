@@ -1,0 +1,44 @@
+{
+  "name": "Air Ledger - Småföretagsbokföring",
+  "short_name": "Air Ledger",
+  "description": "AI-driven bookkeeping for Swedish small businesses",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf9f7",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png", 
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"],
+  "lang": "sv-SE",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Chat med AI",
+      "short_name": "Chat",
+      "description": "Chatta med AI-assistenten",
+      "url": "/chat",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ladda upp kvitto",
+      "short_name": "Kvitto",
+      "description": "Fotografera och analysera kvitton",
+      "url": "/upload",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
