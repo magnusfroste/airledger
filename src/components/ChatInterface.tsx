@@ -139,78 +139,68 @@ const ChatInterface = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/60">
-        <div className="container flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground">
-              <Bot className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">AI-Assistent</h1>
-              <p className="text-sm text-muted-foreground">Redo att hjälpa</p>
-            </div>
-          </div>
-          <Badge variant="outline" className="bg-success-light text-success">
-            <div className="w-2 h-2 bg-success rounded-full mr-2" />
-            Online
-          </Badge>
-        </div>
-      </header>
-
       {/* Chat Messages */}
-      <div className="container px-4 py-6 flex-1">
-        <Card className="h-[calc(100vh-200px)] border-border/50 bg-surface shadow-soft">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg text-foreground flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
-              Chatt med AI-Assistent
-            </CardTitle>
+      <div className="container px-6 py-6 flex-1 max-w-4xl mx-auto">
+        <Card className="h-[calc(100vh-120px)] border-0 bg-transparent shadow-none">
+          <CardHeader className="pb-6 px-0">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground">
+                <Bot className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-xl font-medium text-foreground">
+                  Bokföringsassistent
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  AI-driven hjälp för din bokföring
+                </p>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="flex flex-col h-full">
+          <CardContent className="flex flex-col h-full px-0">
             {/* Messages Container */}
-            <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+            <div className="flex-1 overflow-y-auto space-y-6 mb-6">
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex gap-4 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {message.sender === 'ai' && (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground flex-shrink-0">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground flex-shrink-0 mt-1">
                       <Bot className="h-4 w-4" />
                     </div>
                   )}
                   
-                   <div
-                     className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                       message.sender === 'user'
-                         ? 'bg-gradient-primary text-primary-foreground'
-                         : 'bg-background border border-border/50'
-                     }`}
-                   >
-                     {message.images && message.images.length > 0 && (
-                       <div className="grid grid-cols-2 gap-2 mb-3">
-                         {message.images.map((image) => (
-                           <img
-                             key={image.id}
-                             src={image.preview}
-                             alt="Uploaded document"
-                             className="w-full h-20 object-cover rounded-md border border-border/30"
-                           />
-                         ))}
-                       </div>
-                     )}
-                     <p className="text-sm leading-relaxed">{message.content}</p>
-                     <p className="text-xs opacity-70 mt-2">
-                       {message.timestamp.toLocaleTimeString('sv-SE', { 
-                         hour: '2-digit', 
-                         minute: '2-digit' 
-                       })}
-                     </p>
-                   </div>
+                  <div
+                    className={`max-w-[75%] ${
+                      message.sender === 'user'
+                        ? 'bg-primary text-primary-foreground rounded-3xl rounded-br-lg'
+                        : 'bg-muted rounded-3xl rounded-bl-lg'
+                    } px-5 py-4`}
+                  >
+                    {message.images && message.images.length > 0 && (
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        {message.images.map((image) => (
+                          <img
+                            key={image.id}
+                            src={image.preview}
+                            alt="Uploaded document"
+                            className="w-full h-24 object-cover rounded-xl"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                    <p className="text-xs opacity-60 mt-3">
+                      {message.timestamp.toLocaleTimeString('sv-SE', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </p>
+                  </div>
 
                   {message.sender === 'user' && (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-secondary-foreground flex-shrink-0">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground flex-shrink-0 mt-1">
                       <User className="h-4 w-4" />
                     </div>
                   )}
@@ -218,11 +208,11 @@ const ChatInterface = () => {
               ))}
               
               {isLoading && (
-                <div className="flex gap-3 justify-start">
+                <div className="flex gap-4 justify-start">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground">
                     <Bot className="h-4 w-4" />
                   </div>
-                  <div className="bg-background border border-border/50 rounded-2xl px-4 py-3">
+                  <div className="bg-muted rounded-3xl rounded-bl-lg px-5 py-4">
                     <div className="flex space-x-1">
                       <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
                       <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
@@ -234,26 +224,26 @@ const ChatInterface = () => {
             </div>
 
             {/* Input Area */}
-            <div className="border-t border-border/50 pt-4">
+            <div className="space-y-4">
               {/* Pending Images Preview */}
               {pendingImages.length > 0 && (
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-2">
+                <div className="bg-muted/30 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
                     <FileImage className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Bifogade bilder ({pendingImages.length})</span>
+                    <span className="text-sm text-muted-foreground font-medium">Bifogade bilder ({pendingImages.length})</span>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-3 flex-wrap">
                     {pendingImages.map((image) => (
-                      <div key={image.id} className="relative">
+                      <div key={image.id} className="relative group">
                         <img
                           src={image.preview}
                           alt="Pending upload"
-                          className="w-16 h-16 object-cover rounded-md border border-border/50"
+                          className="w-16 h-16 object-cover rounded-xl border border-border/20"
                         />
                         <Button
                           size="sm"
                           variant="destructive"
-                          className="absolute -top-1 -right-1 h-5 w-5 p-0 rounded-full"
+                          className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={() => removePendingImage(image.id)}
                         >
                           <X className="h-3 w-3" />
@@ -264,11 +254,11 @@ const ChatInterface = () => {
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex gap-3 items-end">
                 <Button
                   variant="ghost"
                   size="lg"
-                  className="px-3"
+                  className="px-3 h-12 rounded-full"
                   onClick={() => {
                     const input = document.createElement('input');
                     input.type = 'file';
@@ -282,7 +272,7 @@ const ChatInterface = () => {
                   }}
                   disabled={isLoading}
                 >
-                  <Paperclip className="h-4 w-4" />
+                  <Paperclip className="h-5 w-5" />
                 </Button>
                 
                 <div className="flex-1 relative">
@@ -290,14 +280,14 @@ const ChatInterface = () => {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Fråga om bokföring eller bifoga bilder av kvitton..."
-                    className="pr-12 bg-background border-border/50 focus:border-primary"
+                    placeholder="Meddelande..."
+                    className="pl-6 pr-14 py-6 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20"
                     disabled={isLoading}
                   />
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 p-0 rounded-full"
                     onClick={handleSendMessage}
                     disabled={(!inputValue.trim() && pendingImages.length === 0) || isLoading}
                   >
@@ -306,18 +296,14 @@ const ChatInterface = () => {
                 </div>
                 
                 <Button
-                  variant={isRecording ? "destructive" : "professional"}
+                  variant={isRecording ? "destructive" : "default"}
                   size="lg"
                   onClick={handleVoiceRecording}
-                  className={`px-4 ${isRecording ? 'animate-pulse' : ''}`}
+                  className={`px-4 h-12 rounded-full ${isRecording ? 'animate-pulse' : ''}`}
                 >
-                  {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
                 </Button>
               </div>
-              
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                AI-assistenten kommer att integreras med OpenAI för intelligent bokföringshjälp
-              </p>
             </div>
           </CardContent>
         </Card>

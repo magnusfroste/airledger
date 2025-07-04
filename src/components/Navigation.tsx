@@ -8,7 +8,6 @@ import {
   MessageCircle, 
   FileText, 
   Menu,
-  Bell,
   Settings
 } from "lucide-react";
 
@@ -49,18 +48,18 @@ const Navigation = () => {
       <Link
         to={item.href}
         onClick={() => mobile && setIsMobileMenuOpen(false)}
-        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+        className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 ${
           active 
-            ? 'bg-gradient-primary text-primary-foreground shadow-soft' 
-            : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+            ? 'bg-primary/10 text-primary font-medium' 
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
         } ${mobile ? 'w-full' : ''}`}
       >
         <Icon className="h-5 w-5" />
         <span className="font-medium">{item.label}</span>
         {item.badge && (
           <Badge 
-            variant={active ? "secondary" : "outline"}
-            className="ml-auto text-xs"
+            variant="secondary"
+            className="ml-auto text-xs h-5 px-2 bg-muted text-muted-foreground"
           >
             {item.badge}
           </Badge>
@@ -71,110 +70,51 @@ const Navigation = () => {
 
   return (
     <>
-      {/* Desktop Navigation - Hidden on mobile */}
-      <nav className="hidden md:flex fixed left-4 top-1/2 -translate-y-1/2 z-50">
-        <div className="bg-surface/95 backdrop-blur border border-border/50 rounded-2xl shadow-large p-2">
-          <div className="flex flex-col gap-1">
-            {navigationItems.map((item) => (
-              <NavLink key={item.href} item={item} />
-            ))}
-          </div>
-        </div>
-      </nav>
-
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur border-t border-border/50">
-        <div className="flex items-center justify-around p-2">
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-            
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors min-w-0 flex-1 ${
-                  active 
-                    ? 'text-primary' 
-                    : 'text-muted-foreground'
-                }`}
-              >
-                <div className="relative">
-                  <Icon className="h-5 w-5" />
-                  {item.badge && (
-                    <Badge 
-                      variant="destructive" 
-                      className="absolute -top-2 -right-2 h-4 w-4 p-0 text-xs flex items-center justify-center"
-                    >
-                      {item.badge}
-                    </Badge>
-                  )}
-                </div>
-                <span className="text-xs font-medium truncate">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* Mobile Header with Menu */}
-      <header className="md:hidden sticky top-0 z-40 w-full border-b border-border/40 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/60">
-        <div className="container flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground font-bold text-lg">
+      {/* Clean Header with Drawer Menu */}
+      <header className="sticky top-0 z-40 w-full border-b border-border/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="container flex h-14 items-center justify-between px-6 max-w-none">
+          <div className="flex items-center gap-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm">
               AL
             </div>
-            <h1 className="text-xl font-semibold text-foreground">Air Ledger</h1>
+            <h1 className="text-lg font-medium text-foreground">Air Ledger</h1>
           </div>
           
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm">
-              <Bell className="h-4 w-4" />
-            </Button>
-            
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <Menu className="h-4 w-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80">
-                <div className="flex flex-col gap-6 pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-full bg-gradient-primary" />
-                    <div>
-                      <p className="font-medium text-foreground">Ditt företag</p>
-                      <p className="text-sm text-muted-foreground">Organisationsnummer: 556xxx-xxxx</p>
-                    </div>
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Menu className="h-4 w-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-80 bg-background border-l border-border/20">
+              <div className="flex flex-col gap-8 pt-8">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center">
+                    <span className="text-primary-foreground font-medium text-sm">AL</span>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                      Navigation
-                    </h3>
-                    {navigationItems.map((item) => (
-                      <NavLink key={item.href} item={item} mobile />
-                    ))}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                      Inställningar
-                    </h3>
-                    <Button variant="ghost" className="w-full justify-start">
-                      <Settings className="h-4 w-4 mr-3" />
-                      Inställningar
-                    </Button>
+                  <div>
+                    <p className="font-medium text-foreground">Ditt företag</p>
+                    <p className="text-sm text-muted-foreground">556xxx-xxxx</p>
                   </div>
                 </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+                
+                <div className="space-y-1">
+                  {navigationItems.map((item) => (
+                    <NavLink key={item.href} item={item} mobile />
+                  ))}
+                </div>
+                
+                <div className="border-t border-border/20 pt-4">
+                  <Button variant="ghost" className="w-full justify-start h-10 px-3">
+                    <Settings className="h-4 w-4 mr-3" />
+                    Inställningar
+                  </Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </header>
-
-      {/* Add bottom padding to main content on mobile to account for bottom nav */}
-      <div className="md:hidden h-20" />
     </>
   );
 };
