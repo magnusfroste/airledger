@@ -91,7 +91,11 @@ serve(async (req) => {
       messages: [
         {
           role: "system",
-          content: `You are a Swedish bookkeeping assistant. Analyze the receipt image and extract key information to propose bookkeeping transactions.
+          content: `You are a Swedish bookkeeping assistant. Analyze the receipt/invoice image and extract key information to propose bookkeeping transactions.
+
+IMPORTANT: Try to determine if this is a RECEIPT (already paid) or INVOICE (unpaid) by looking for visual clues:
+- RECEIPTS often show: "BETALT", "TACK FÖR KÖPET", transaction time, card payment confirmation
+- INVOICES often show: "FÖRFALLODATUM", "ATT BETALA", "FAKTURA", bankgiro/postgiro numbers
 
 Return a JSON object with this exact structure:
 {
@@ -99,7 +103,10 @@ Return a JSON object with this exact structure:
   "date": "YYYY-MM-DD",
   "total_amount": 123.45,
   "description": "Brief description",
+  "document_type": "receipt|invoice",
+  "document_type_confidence": 85,
   "transaction_type": "expense",
+  "suggested_payment_method": "bank|cash|card|unpaid",
   "entries": [
     {
       "account_code": "6000",
@@ -109,11 +116,11 @@ Return a JSON object with this exact structure:
       "description": "Kontorsmaterial från leverantör"
     },
     {
-      "account_code": "2640",
-      "account_name": "Leverantörsskulder",
+      "account_code": "1930",
+      "account_name": "Checkkonto",
       "debit_amount": 0,
       "credit_amount": 123.45,
-      "description": "Skuld till leverantör"
+      "description": "Betalning via bank/kort"
     }
   ],
   "confidence": 85
@@ -211,63 +218,14 @@ Ensure entries balance (total debits = total credits)!`
       throw new Error('Bookkeeping entries do not balance')
     }
 
-    // Save transaction to database
-    const transactionData = {
-      user_id: userId,
-      transaction_date: analysis.date,
-      description: `${analysis.vendor} - ${analysis.description}`,
-      total_amount: analysis.total_amount,
-      transaction_type: analysis.transaction_type,
-      status: 'draft',
-      analysis_data: analysis
-    }
-
-    console.log('Saving transaction to database...')
-
-    const { data: transaction, error: transactionError } = await supabase
-      .from('airledger_transactions')
-      .insert(transactionData)
-      .select()
-      .single()
-
-    if (transactionError) {
-      console.error('Error saving transaction:', transactionError)
-      throw new Error('Failed to save transaction: ' + transactionError.message)
-    }
-
-    console.log('Transaction saved successfully:', transaction.id)
-
-    // Save entries
-    const entriesData = analysis.entries.map((entry: any) => ({
-      transaction_id: transaction.id,
-      account_code: entry.account_code,
-      account_name: entry.account_name,
-      debit_amount: entry.debit_amount || 0,
-      credit_amount: entry.credit_amount || 0,
-      description: entry.description
-    }))
-
-    console.log('Saving entries to database...')
-
-    const { error: entriesError } = await supabase
-      .from('airledger_entries')
-      .insert(entriesData)
-
-    if (entriesError) {
-      console.error('Error saving entries:', entriesError)
-      throw new Error('Failed to save transaction entries: ' + entriesError.message)
-    }
-
     console.log('=== ANALYZE RECEIPT FUNCTION COMPLETED SUCCESSFULLY ===')
 
+    // Return analysis for user confirmation - don't save yet
     return new Response(
       JSON.stringify({
         success: true,
-        transaction: {
-          ...transaction,
-          entries: entriesData
-        },
-        analysis: analysis
+        analysis: analysis,
+        user_id: userId
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

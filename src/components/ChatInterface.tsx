@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, FileImage, CheckCircle, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import TransactionConfirmDialog from "@/components/TransactionConfirmDialog";
 
 interface Message {
   id: string;
@@ -45,6 +46,8 @@ const ChatInterface = () => {
     file: File;
     preview: string;
   }>>([]);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
   const { toast } = useToast();
 
   const handleImageUpload = (files: FileList) => {
@@ -128,13 +131,16 @@ const ChatInterface = () => {
               throw new Error(error.message || 'Failed to analyze receipt');
             }
 
-            if (data?.success && data?.transaction) {
-              const transaction = data.transaction;
+            if (data?.success && data?.analysis) {
               const analysis = data.analysis;
+              
+              // Show confirmation dialog instead of auto-saving
+              setPendingAnalysis(analysis);
+              setConfirmDialogOpen(true);
               
               const aiResponse: Message = {
                 id: (Date.now() + Math.random()).toString(),
-                content: `🎯 **Kvittoanalys klar!**\n\n**${analysis.vendor}** - ${analysis.date}\n**Belopp:** ${analysis.total_amount} kr\n\n**Föreslagna bokföringsposter:**\n${transaction.entries.map((entry: any) => `• ${entry.account_code} ${entry.account_name}: ${entry.debit_amount > 0 ? `Debet ${entry.debit_amount} kr` : `Kredit ${entry.credit_amount} kr`}`).join('\n')}\n\n✅ Transaktionen har sparats som ett utkast i systemet.`,
+                content: `🎯 **Kvittoanalys klar!**\n\n**${analysis.vendor}** - ${analysis.date}\n**Belopp:** ${analysis.total_amount} kr\n**Dokumenttyp:** ${analysis.document_type === 'receipt' ? 'Kvitto' : 'Faktura'} (${analysis.document_type_confidence}% säkerhet)\n\n**Föreslaget betalningssätt:** ${analysis.suggested_payment_method}\n\n📋 Klicka "Bekräfta bokföring" för att granska och spara transaktionen.`,
                 sender: 'ai',
                 timestamp: new Date(),
                 type: 'text'
@@ -144,7 +150,7 @@ const ChatInterface = () => {
               
               toast({
                 title: "Kvitto analyserat!",
-                description: `Transaktion för ${analysis.vendor} sparad som utkast`,
+                description: `${analysis.vendor} - Väntar på bekräftelse`,
               });
             } else {
               throw new Error('Invalid response from analysis');
@@ -251,6 +257,36 @@ const ChatInterface = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleTransactionConfirm = async (analysis: any, entries: any[], paymentMethod: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('save-transaction', {
+        body: { 
+          analysis,
+          entries,
+          paymentMethod
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to save transaction');
+      }
+
+      if (data?.success && data?.transaction) {
+        const aiResponse: Message = {
+          id: (Date.now() + Math.random()).toString(),
+          content: `✅ **Transaktion sparad!**\n\n**${analysis.vendor}** - ${analysis.date}\n**Belopp:** ${analysis.total_amount} kr\n**Betalning:** ${paymentMethod}\n\n**Bokföringsposter:**\n${entries.map((entry: any) => `• ${entry.account_code} ${entry.account_name}: ${entry.debit_amount > 0 ? `Debet ${entry.debit_amount} kr` : `Kredit ${entry.credit_amount} kr`}`).join('\n')}\n\n📋 Transaktionen är nu sparad som ett utkast i systemet.`,
+          sender: 'ai',
+          timestamp: new Date(),
+          type: 'text'
+        };
+        
+        setMessages(prev => [...prev, aiResponse]);
+      }
+    } catch (error) {
+      throw error;
     }
   };
 
@@ -408,6 +444,14 @@ const ChatInterface = () => {
           </div>
         </div>
       </div>
+
+      {/* Transaction Confirmation Dialog */}
+      <TransactionConfirmDialog
+        open={confirmDialogOpen}
+        onOpenChange={setConfirmDialogOpen}
+        analysis={pendingAnalysis}
+        onConfirm={handleTransactionConfirm}
+      />
     </div>
   );
 };
