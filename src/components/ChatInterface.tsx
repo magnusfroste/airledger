@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, FileImage } from "lucide-react";
+import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, FileImage, CheckCircle, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -75,6 +76,20 @@ const ChatInterface = () => {
     });
   };
 
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        // Remove the data:image/jpeg;base64, prefix
+        const base64Data = base64.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() && pendingImages.length === 0) return;
 
@@ -93,23 +108,91 @@ const ChatInterface = () => {
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue("");
+    const currentPendingImages = [...pendingImages];
     setPendingImages([]);
     setIsLoading(true);
 
-    // Simulate AI response (will be replaced with actual OpenAI integration)
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        content: userMessage.type === 'image' 
-          ? "Jag kan se dina bilder! Snart kommer jag att kunna analysera kvitton, fakturor och kontoutdrag med OpenAI Vision API för att extrahera viktig information automatiskt."
-          : "Tack för din fråga! Jag kommer snart att kunna hjälpa dig med bokföringsrelaterade frågor med hjälp av OpenAI:s API. För tillfället är jag i testläge.",
+    try {
+      if (currentPendingImages.length > 0) {
+        // Process images with OpenAI
+        for (const image of currentPendingImages) {
+          try {
+            const imageBase64 = await convertFileToBase64(image.file);
+            
+            const { data, error } = await supabase.functions.invoke('analyze-receipt', {
+              body: { imageBase64 }
+            });
+
+            if (error) {
+              console.error('Error analyzing receipt:', error);
+              throw new Error(error.message || 'Failed to analyze receipt');
+            }
+
+            if (data?.success && data?.transaction) {
+              const transaction = data.transaction;
+              const analysis = data.analysis;
+              
+              const aiResponse: Message = {
+                id: (Date.now() + Math.random()).toString(),
+                content: `🎯 **Kvittoanalys klar!**\n\n**${analysis.vendor}** - ${analysis.date}\n**Belopp:** ${analysis.total_amount} kr\n\n**Föreslagna bokföringsposter:**\n${transaction.entries.map((entry: any) => `• ${entry.account_code} ${entry.account_name}: ${entry.debit_amount > 0 ? `Debet ${entry.debit_amount} kr` : `Kredit ${entry.credit_amount} kr`}`).join('\n')}\n\n✅ Transaktionen har sparats som ett utkast i systemet.`,
+                sender: 'ai',
+                timestamp: new Date(),
+                type: 'text'
+              };
+              
+              setMessages(prev => [...prev, aiResponse]);
+              
+              toast({
+                title: "Kvitto analyserat!",
+                description: `Transaktion för ${analysis.vendor} sparad som utkast`,
+              });
+            } else {
+              throw new Error('Invalid response from analysis');
+            }
+          } catch (imageError) {
+            console.error('Error processing image:', imageError);
+            const errorResponse: Message = {
+              id: (Date.now() + Math.random()).toString(),
+              content: `❌ **Fel vid analys av kvitto**\n\nJag kunde inte analysera bilden. Kontrollera att det är ett tydligt kvitto och försök igen.\n\nFelmeddelande: ${imageError.message}`,
+              sender: 'ai',
+              timestamp: new Date(),
+              type: 'text'
+            };
+            setMessages(prev => [...prev, errorResponse]);
+            
+            toast({
+              title: "Analysfel",
+              description: "Kunde inte analysera kvittot. Försök igen.",
+              variant: "destructive",
+            });
+          }
+        }
+      } else {
+        // Handle text-only messages with simple response
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          content: "Hej! Jag kan hjälpa dig med bokföring. Ladda upp bilder på kvitton så analyserar jag dem och föreslår bokföringsposter automatiskt. Du kan också ställa frågor om bokföring och jag hjälper dig så gott jag kan!",
+          sender: 'ai',
+          timestamp: new Date(),
+          type: 'text'
+        };
+        setMessages(prev => [...prev, aiResponse]);
+      }
+    } catch (error) {
+      console.error('Error in handleSendMessage:', error);
+      const errorResponse: Message = {
+        id: (Date.now() + Math.random()).toString(),
+        content: `❌ **Ett fel uppstod**\n\nJag kunde inte behandla din förfrågan just nu. Försök igen om en stund.\n\nFelmeddelande: ${error.message}`,
         sender: 'ai',
         timestamp: new Date(),
         type: 'text'
       };
-      setMessages(prev => [...prev, aiResponse]);
+      setMessages(prev => [...prev, errorResponse]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+      // Clean up image URLs
+      currentPendingImages.forEach(img => URL.revokeObjectURL(img.preview));
+    }
   };
 
   const handleVoiceRecording = () => {

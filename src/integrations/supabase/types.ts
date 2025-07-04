@@ -134,6 +134,92 @@ export type Database = {
         }
         Relationships: []
       }
+      airledger_entries: {
+        Row: {
+          account_code: string
+          account_name: string
+          created_at: string
+          credit_amount: number | null
+          debit_amount: number | null
+          description: string | null
+          id: string
+          transaction_id: string
+        }
+        Insert: {
+          account_code: string
+          account_name: string
+          created_at?: string
+          credit_amount?: number | null
+          debit_amount?: number | null
+          description?: string | null
+          id?: string
+          transaction_id: string
+        }
+        Update: {
+          account_code?: string
+          account_name?: string
+          created_at?: string
+          credit_amount?: number | null
+          debit_amount?: number | null
+          description?: string | null
+          id?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "airledger_entries_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "airledger_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      airledger_transactions: {
+        Row: {
+          analysis_data: Json | null
+          created_at: string
+          description: string
+          id: string
+          image_url: string | null
+          reference_number: string | null
+          status: Database["public"]["Enums"]["transaction_status"]
+          total_amount: number
+          transaction_date: string
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis_data?: Json | null
+          created_at?: string
+          description: string
+          id?: string
+          image_url?: string | null
+          reference_number?: string | null
+          status?: Database["public"]["Enums"]["transaction_status"]
+          total_amount: number
+          transaction_date: string
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis_data?: Json | null
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string | null
+          reference_number?: string | null
+          status?: Database["public"]["Enums"]["transaction_status"]
+          total_amount?: number
+          transaction_date?: string
+          transaction_type?: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       content_clicks: {
         Row: {
           advertisement_id: string | null
@@ -489,6 +575,8 @@ export type Database = {
     Enums: {
       ad_status: "active" | "inactive" | "pending"
       ad_type: "image" | "html"
+      transaction_status: "draft" | "posted" | "reconciled"
+      transaction_type: "income" | "expense" | "transfer"
       user_type: "content_provider" | "advertiser"
     }
     CompositeTypes: {
@@ -607,6 +695,8 @@ export const Constants = {
     Enums: {
       ad_status: ["active", "inactive", "pending"],
       ad_type: ["image", "html"],
+      transaction_status: ["draft", "posted", "reconciled"],
+      transaction_type: ["income", "expense", "transfer"],
       user_type: ["content_provider", "advertiser"],
     },
   },
