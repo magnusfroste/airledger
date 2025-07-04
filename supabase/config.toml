@@ -5,3 +5,15 @@ verify_jwt = true
 
 [functions.chat-assistant]
 verify_jwt = true
+
+[functions.save-transaction]
+verify_jwt = true
+
+[functions.save-opening-balance]
+verify_jwt = true
+
+[functions.save-invoice]
+verify_jwt = true
+
+[functions.voice-to-text]
+verify_jwt = true

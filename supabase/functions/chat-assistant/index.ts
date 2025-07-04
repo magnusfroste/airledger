@@ -213,6 +213,13 @@ När användaren nämner ingående balanser eller saldo på konton:
 3. Förklara att systemet automatiskt bestämmer om det är debet eller kredit baserat på kontotyp
 4. Använd funktionen save-opening-balance för att spara
 
+UTGÅENDE FAKTUROR:
+När användaren nämner att de har fakturerat en kund:
+1. Identifiera kundnamn, belopp och beskrivning av tjänst/vara
+2. Fråga efter fakturanummer och förfallodatum (valfritt)
+3. Använd funktionen save-invoice för att spara
+4. Bokföring sker automatiskt: Debet 1510 Kundfordringar, Kredit 3000 Försäljning
+
 KOMMUNIKATIONSSTIL:
 - Var vänlig, professionell och hjälpsam
 - Använd svenska
@@ -273,6 +280,39 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
               required: ["accountCode", "accountName", "amount"]
             }
           }
+        },
+        {
+          type: "function",
+          function: {
+            name: "save_invoice",
+            description: "Spara en utgående faktura (när användaren fakturerar en kund)",
+            parameters: {
+              type: "object",
+              properties: {
+                customerName: {
+                  type: "string",
+                  description: "Kundens namn eller företag"
+                },
+                amount: {
+                  type: "number",
+                  description: "Fakturabelopp"
+                },
+                description: {
+                  type: "string",
+                  description: "Beskrivning av vara/tjänst"
+                },
+                invoiceNumber: {
+                  type: "string",
+                  description: "Fakturanummer (valfritt)"
+                },
+                dueDate: {
+                  type: "string",
+                  description: "Förfallodatum (valfritt)"
+                }
+              },
+              required: ["customerName", "amount", "description"]
+            }
+          }
         }
       ],
       tool_choice: "auto"
@@ -310,6 +350,35 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
           } catch (parseError) {
             console.error('Error parsing function arguments:', parseError)
             aiResponse += `\n\n❌ Ett fel uppstod när jag försökte tolka kontoinformationen.`
+          }
+        } else if (toolCall.function.name === 'save_invoice') {
+          try {
+            const args = JSON.parse(toolCall.function.arguments)
+            console.log('Saving invoice:', args)
+            
+            // Call the save-invoice function
+            const { data: invoiceData, error: invoiceError } = await supabase.functions.invoke('save-invoice', {
+              body: {
+                customerName: args.customerName,
+                amount: args.amount,
+                description: args.description,
+                invoiceNumber: args.invoiceNumber,
+                dueDate: args.dueDate
+              }
+            })
+
+            if (invoiceError) {
+              console.error('Error saving invoice:', invoiceError)
+              aiResponse += `\n\n❌ Ett fel uppstod när jag försökte spara fakturan: ${invoiceError.message}`
+            } else if (invoiceData?.success) {
+              console.log('Invoice saved successfully')
+              aiResponse += `\n\n✅ Utmärkt! Jag har bokfört fakturan till ${args.customerName} på ${args.amount} kr.\n\n**Bokföring:**\n• Debet: 1510 Kundfordringar ${args.amount} kr\n• Kredit: 3000 Försäljning ${args.amount} kr`
+            } else {
+              aiResponse += `\n\n❌ Ett okänt fel uppstod när jag försökte spara fakturan.`
+            }
+          } catch (parseError) {
+            console.error('Error parsing invoice arguments:', parseError)
+            aiResponse += `\n\n❌ Ett fel uppstod när jag försökte tolka fakturinformationen.`
           }
         }
       }

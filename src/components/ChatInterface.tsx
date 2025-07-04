@@ -7,6 +7,7 @@ import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, Fil
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import TransactionConfirmDialog from "@/components/TransactionConfirmDialog";
+import VoiceInstructions from "@/components/VoiceInstructions";
 
 interface Message {
   id: string;
@@ -511,15 +512,18 @@ const ChatInterface = () => {
                   className="pl-6 pr-14 py-6 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20"
                   disabled={isLoading}
                 />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 p-0 rounded-full"
-                  onClick={handleSendMessage}
-                  disabled={(!inputValue.trim() && pendingImages.length === 0) || isLoading}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+                <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  <VoiceInstructions />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-10 w-10 p-0 rounded-full"
+                    onClick={handleSendMessage}
+                    disabled={(!inputValue.trim() && pendingImages.length === 0) || isLoading}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               
               <Button
