@@ -3,17 +3,41 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Home, 
   MessageCircle, 
   FileText, 
   Menu,
-  Settings
+  Settings,
+  LogOut,
+  User
 } from "lucide-react";
 
 const Navigation = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      setIsMobileMenuOpen(false);
+      toast({
+        title: "Utloggad",
+        description: "Du har loggats ut framgångsrikt.",
+      });
+    } catch (error) {
+      console.error("Sign out error:", error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte logga ut. Försök igen.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const navigationItems = [
     { 
@@ -90,11 +114,13 @@ const Navigation = () => {
               <div className="flex flex-col gap-8 pt-8">
                 <div className="flex items-center gap-4">
                   <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center">
-                    <span className="text-primary-foreground font-medium text-sm">AL</span>
+                    <User className="h-5 w-5 text-primary-foreground" />
                   </div>
-                  <div>
-                    <p className="font-medium text-foreground">Ditt företag</p>
-                    <p className="text-sm text-muted-foreground">556xxx-xxxx</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">
+                      {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Användare'}
+                    </p>
+                    <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
                   </div>
                 </div>
                 
@@ -104,10 +130,18 @@ const Navigation = () => {
                   ))}
                 </div>
                 
-                <div className="border-t border-border/20 pt-4">
+                <div className="border-t border-border/20 pt-4 space-y-1">
                   <Button variant="ghost" className="w-full justify-start h-10 px-3">
                     <Settings className="h-4 w-4 mr-3" />
                     Inställningar
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start h-10 px-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={handleSignOut}
+                  >
+                    <LogOut className="h-4 w-4 mr-3" />
+                    Logga ut
                   </Button>
                 </div>
               </div>

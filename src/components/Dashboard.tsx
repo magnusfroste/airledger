@@ -3,15 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Camera, TrendingUp, FileText, Plus, Bell } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-image.jpg";
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const [greeting] = useState(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "God morgon";
     if (hour < 17) return "God middag";
     return "God kväll";
   });
+
+  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Användare';
 
   const recentTransactions = [
     { id: 1, description: "ICA Maxi Stockholm", amount: -487.50, date: "2024-01-03", category: "Livsmedelsinköp" },
@@ -51,7 +56,7 @@ const Dashboard = () => {
           <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
             <div className="space-y-6">
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">{greeting}! 👋</p>
+                <p className="text-sm text-muted-foreground">{greeting}, {userName}! 👋</p>
                 <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                   Ditt företags ekonomi
                   <span className="block text-primary">alltid uppdaterad</span>
@@ -62,13 +67,17 @@ const Dashboard = () => {
               </div>
               
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button variant="success" size="lg" className="flex-1 sm:flex-none">
-                  <Plus className="h-4 w-4" />
-                  Ny transaktion
+                <Button variant="success" size="lg" className="flex-1 sm:flex-none" asChild>
+                  <Link to="/transactions">
+                    <Plus className="h-4 w-4" />
+                    Ny transaktion
+                  </Link>
                 </Button>
-                <Button variant="professional" size="lg" className="flex-1 sm:flex-none">
-                  <MessageCircle className="h-4 w-4" />
-                  Chatta med AI
+                <Button variant="professional" size="lg" className="flex-1 sm:flex-none" asChild>
+                  <Link to="/chat">
+                    <MessageCircle className="h-4 w-4" />
+                    Chatta med AI
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -112,9 +121,11 @@ const Dashboard = () => {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xl text-foreground">Senaste transaktioner</CardTitle>
-              <Button variant="ghost" size="sm">
-                <FileText className="h-4 w-4" />
-                Visa alla
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/transactions">
+                  <FileText className="h-4 w-4" />
+                  Visa alla
+                </Link>
               </Button>
             </div>
           </CardHeader>
@@ -143,17 +154,23 @@ const Dashboard = () => {
       <section className="container px-4 py-8">
         <h3 className="text-lg font-semibold text-foreground mb-4">Snabbåtgärder</h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Button variant="floating" className="h-20 flex-col gap-2">
-            <Camera className="h-6 w-6" />
-            <span>Fotografera kvitto</span>
+          <Button variant="floating" className="h-20 flex-col gap-2" asChild>
+            <Link to="/chat">
+              <Camera className="h-6 w-6" />
+              <span>Fotografera kvitto</span>
+            </Link>
           </Button>
-          <Button variant="floating" className="h-20 flex-col gap-2">
-            <MessageCircle className="h-6 w-6" />
-            <span>Fråga AI-assistenten</span>
+          <Button variant="floating" className="h-20 flex-col gap-2" asChild>
+            <Link to="/chat">
+              <MessageCircle className="h-6 w-6" />
+              <span>Fråga AI-assistenten</span>
+            </Link>
           </Button>
-          <Button variant="floating" className="h-20 flex-col gap-2">
-            <FileText className="h-6 w-6" />
-            <span>Skapa faktura</span>
+          <Button variant="floating" className="h-20 flex-col gap-2" asChild>
+            <Link to="/transactions">
+              <FileText className="h-6 w-6" />
+              <span>Skapa faktura</span>
+            </Link>
           </Button>
         </div>
       </section>
