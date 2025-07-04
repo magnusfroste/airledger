@@ -86,6 +86,14 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(20)
 
+    // Get user's opening balances
+    console.log('Fetching opening balances for user:', userId)
+    const { data: openingBalances, error: openingError } = await supabase
+      .from('airledger_opening')
+      .select('*')
+      .eq('user_id', userId)
+      .order('account_code', { ascending: true })
+
     if (transError) {
       console.error('Error fetching transactions:', transError)
     } else {
@@ -104,6 +112,24 @@ serve(async (req) => {
 
     // Prepare context about user's bookkeeping data
     let bookkeepingContext = ''
+    
+    // Add opening balances context
+    let openingBalancesContext = ''
+    if (openingBalances && openingBalances.length > 0) {
+      openingBalancesContext = `
+INGÅENDE BALANSER:
+${openingBalances.map(ob => `
+- ${ob.account_code} ${ob.account_name}: ${ob.opening_balance} kr (${ob.balance_type === 'debit' ? 'Debet' : 'Kredit'})
+`).join('')}
+`
+    } else {
+      openingBalancesContext = `
+INGÅENDE BALANSER:
+- Inga ingående balanser registrerade än
+- Hjälp användaren att registrera ingående balanser genom att tala in dem
+`
+    }
+    
     if (transactions && transactions.length > 0) {
       const totalTransactions = transactions.length
       const totalAmount = transactions.reduce((sum, t) => sum + Number(t.total_amount), 0)
@@ -111,6 +137,9 @@ serve(async (req) => {
       
       bookkeepingContext = `
 BOKFÖRINGSDATA FÖR ${userName.toUpperCase()}:
+${openingBalancesContext}
+
+TRANSAKTIONER:
 - Totalt antal transaktioner: ${totalTransactions}
 - Total omsättning: ${totalAmount.toFixed(2)} kr
 
@@ -123,6 +152,9 @@ ${recentTransactions.map(t => `
     } else {
       bookkeepingContext = `
 BOKFÖRINGSDATA FÖR ${userName.toUpperCase()}:
+${openingBalancesContext}
+
+TRANSAKTIONER:
 - Inga transaktioner registrerade än
 - Rekommenderar att börja med att ladda upp kvitton för automatisk analys
 `
@@ -145,21 +177,41 @@ BOKFÖRINGSDATA FÖR ${userName.toUpperCase()}:
 DINA HUVUDUPPGIFTER:
 1. Konversera naturligt och ställ följdfrågor för att förstå användarens behov
 2. Hjälp med bokföring baserat på användarens faktiska data
-3. Ge praktiska råd om svensk bokföring och BAS-kontoplanen
-4. Uppmuntra användning av kvittoanalys-funktionen
-5. Var proaktiv - föreslå nästa steg och ställ relevanta frågor
+3. Ge praktiska råd om svensk bokföring och BAS-kontoplanen 2024
+4. Hjälp användaren registrera ingående balanser genom att tala in dem
+5. Uppmuntra användning av kvittoanalys-funktionen
+6. Var proaktiv - föreslå nästa steg och ställ relevanta frågor
 
 BOKFÖRINGSKONTEXTEN:
 ${bookkeepingContext}
 
-SVENSKA BOKFÖRINGSREGLER:
-- Använd BAS 2024 kontoplan
-- Bokföringsposter måste balansera (debet = kredit)
-- Vanliga konton:
-  * 1000-serien: Kassa/Bank
-  * 2640: Leverantörsskulder  
-  * 6000-serien: Rörelsekostnader
-  * 3000-serien: Intäkter
+BAS KONTOPLAN 2024 - DEBET/KREDIT REGLER:
+- 1000-1999: TILLGÅNGAR (Assets)
+  * Normal balans: DEBET-sidan
+  * Ökning: Debet, Minskning: Kredit
+  * Ex: 1930 Checkkonto, 1510 Kundfordringar, 1200 Inventarier
+
+- 2000-2999: SKULDER (Liabilities) 
+  * Normal balans: KREDIT-sidan
+  * Ökning: Kredit, Minskning: Debet
+  * Ex: 2640 Leverantörsskulder, 2440 Skatteskulder, 2018 Banklån
+
+- 3000-3999: INTÄKTER (Revenue)
+  * Normal balans: KREDIT-sidan
+  * Ökning: Kredit, Minskning: Debet
+  * Ex: 3000 Försäljning, 3740 Öres- och kronutjämning
+
+- 4000-4999 & 6000-6999: KOSTNADER (Expenses)
+  * Normal balans: DEBET-sidan
+  * Ökning: Debet, Minskning: Kredit
+  * Ex: 6000 Lokalhyra, 4000 Inköp av varor, 6570 Kontorsmaterial
+
+INGÅENDE BALANSER:
+När användaren nämner ingående balanser eller saldo på konton:
+1. Fråga vilket konto (kontonummer och namn)
+2. Fråga beloppet
+3. Förklara att systemet automatiskt bestämmer om det är debet eller kredit baserat på kontotyp
+4. Använd funktionen save-opening-balance för att spara
 
 KOMMUNIKATIONSSTIL:
 - Var vänlig, professionell och hjälpsam
@@ -167,8 +219,9 @@ KOMMUNIKATIONSSTIL:
 - Ställ konkreta följdfrågor
 - Ge specifika råd baserat på användarens situation
 - Uppmuntra att ladda upp kvitton för automatisk analys
+- Hjälp användaren förstå skillnaden mellan debet och kredit
 
-Om användaren frågar om sina transaktioner eller bokföring, använd den data som finns i kontexten ovan.`
+Om användaren frågar om sina transaktioner, ingående balanser eller bokföring, använd den data som finns i kontexten ovan.`
       }
     ]
 
@@ -194,10 +247,73 @@ Om användaren frågar om sina transaktioner eller bokföring, använd den data 
       model: "gpt-4o-mini",
       messages: messages,
       max_tokens: 500,
-      temperature: 0.7
+      temperature: 0.7,
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "save_opening_balance",
+            description: "Spara en ingående balans för ett konto",
+            parameters: {
+              type: "object",
+              properties: {
+                accountCode: {
+                  type: "string",
+                  description: "Kontonummer enligt BAS 2024 (ex: 1930, 2640)"
+                },
+                accountName: {
+                  type: "string", 
+                  description: "Kontonamn (ex: Checkkonto, Leverantörsskulder)"
+                },
+                amount: {
+                  type: "number",
+                  description: "Belopp för ingående balans"
+                }
+              },
+              required: ["accountCode", "accountName", "amount"]
+            }
+          }
+        }
+      ],
+      tool_choice: "auto"
     })
 
-    const aiResponse = response.choices[0].message.content
+    let aiResponse = response.choices[0].message.content
+    const toolCalls = response.choices[0].message.tool_calls
+
+    // Handle function calls
+    if (toolCalls && toolCalls.length > 0) {
+      for (const toolCall of toolCalls) {
+        if (toolCall.function.name === 'save_opening_balance') {
+          try {
+            const args = JSON.parse(toolCall.function.arguments)
+            console.log('Saving opening balance:', args)
+            
+            // Call the save-opening-balance function
+            const { data: saveData, error: saveError } = await supabase.functions.invoke('save-opening-balance', {
+              body: {
+                accountCode: args.accountCode,
+                accountName: args.accountName,
+                amount: args.amount
+              }
+            })
+
+            if (saveError) {
+              console.error('Error saving opening balance:', saveError)
+              aiResponse += `\n\n❌ Ett fel uppstod när jag försökte spara den ingående balansen: ${saveError.message}`
+            } else if (saveData?.success) {
+              console.log('Opening balance saved successfully')
+              aiResponse += `\n\n✅ Perfekt! Jag har sparat den ingående balansen för ${args.accountCode} ${args.accountName} med ${args.amount} kr.`
+            } else {
+              aiResponse += `\n\n❌ Ett okänt fel uppstod när jag försökte spara den ingående balansen.`
+            }
+          } catch (parseError) {
+            console.error('Error parsing function arguments:', parseError)
+            aiResponse += `\n\n❌ Ett fel uppstod när jag försökte tolka kontoinformationen.`
+          }
+        }
+      }
+    }
 
     console.log('AI response generated successfully')
 

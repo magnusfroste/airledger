@@ -175,6 +175,39 @@ export type Database = {
           },
         ]
       }
+      airledger_opening: {
+        Row: {
+          account_code: string
+          account_name: string
+          balance_type: string
+          created_at: string
+          id: string
+          opening_balance: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_code: string
+          account_name: string
+          balance_type: string
+          created_at?: string
+          id?: string
+          opening_balance?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_code?: string
+          account_name?: string
+          balance_type?: string
+          created_at?: string
+          id?: string
+          opening_balance?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       airledger_transactions: {
         Row: {
           analysis_data: Json | null
