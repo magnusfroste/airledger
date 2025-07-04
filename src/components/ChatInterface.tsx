@@ -31,7 +31,7 @@ const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Hej! Jag är din AI-assistent för bokföring. Hur kan jag hjälpa dig idag? Du kan chatta med mig eller ladda upp bilder på kvitton, fakturor och kontoutdrag.',
+      content: 'Hej och välkommen! 👋 Jag är din AI-assistent för bokföring. Jag kan hjälpa dig med allt från kvittoanalys till att svara på frågor om din bokföring.\n\n**Vad kan jag hjälpa dig med?**\n• 📊 Ladda upp kvitton för automatisk analys och kontering\n• 💬 Svara på frågor om din bokföring och transaktioner\n• 📋 Ge råd om svensk bokföring och BAS-kontoplanen\n• 🤝 Diskutera dina bokföringsbehov\n\nVad undrar du över idag?',
       sender: 'ai',
       timestamp: new Date(),
       type: 'text'
@@ -168,15 +168,49 @@ const ChatInterface = () => {
           }
         }
       } else {
-        // Handle text-only messages with simple response
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          content: "Hej! Jag kan hjälpa dig med bokföring. Ladda upp bilder på kvitton så analyserar jag dem och föreslår bokföringsposter automatiskt. Du kan också ställa frågor om bokföring och jag hjälper dig så gott jag kan!",
-          sender: 'ai',
-          timestamp: new Date(),
-          type: 'text'
-        };
-        setMessages(prev => [...prev, aiResponse]);
+        // Handle text-only messages with AI assistant
+        try {
+          // Prepare conversation history (last 10 messages for context)
+          const conversationHistory = messages.slice(-10).map(msg => ({
+            sender: msg.sender,
+            content: msg.content
+          }));
+
+          const { data, error } = await supabase.functions.invoke('chat-assistant', {
+            body: { 
+              message: inputValue,
+              conversationHistory: conversationHistory
+            }
+          });
+
+          if (error) {
+            console.error('Error calling chat assistant:', error);
+            throw new Error(error.message || 'Failed to get AI response');
+          }
+
+          if (data?.success && data?.response) {
+            const aiResponse: Message = {
+              id: (Date.now() + 1).toString(),
+              content: data.response,
+              sender: 'ai',
+              timestamp: new Date(),
+              type: 'text'
+            };
+            setMessages(prev => [...prev, aiResponse]);
+          } else {
+            throw new Error('Invalid response from chat assistant');
+          }
+        } catch (chatError) {
+          console.error('Error in text chat:', chatError);
+          const errorResponse: Message = {
+            id: (Date.now() + 1).toString(),
+            content: `Ursäkta, jag har tekniska problem just nu. Försök igen om en stund eller ladda upp ett kvitto så kan jag analysera det åt dig!\n\nFel: ${chatError.message}`,
+            sender: 'ai',
+            timestamp: new Date(),
+            type: 'text'
+          };
+          setMessages(prev => [...prev, errorResponse]);
+        }
       }
     } catch (error) {
       console.error('Error in handleSendMessage:', error);
