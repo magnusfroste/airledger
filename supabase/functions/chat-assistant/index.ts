@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import OpenAI from 'https://esm.sh/openai@4.20.1'
@@ -30,14 +31,20 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured')
     }
 
-    // Get authenticated user
+    // Get the Authorization header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error('No authorization header')
+    }
+
+    // Create Supabase client with auth header
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { 
-        global: { 
-          headers: { Authorization: req.headers.get('Authorization')! } 
-        } 
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
       }
     )
 
@@ -45,7 +52,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
       console.error('Authentication error:', userError)
-      throw new Error('Authentication required')
+      throw new Error(`Authentication failed: ${userError?.message || 'User not found'}`)
     }
 
     console.log('User authenticated:', user.id)
