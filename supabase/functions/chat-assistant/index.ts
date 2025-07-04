@@ -14,10 +14,20 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Chat assistant function called')
     const { message, conversationHistory } = await req.json()
 
     if (!message) {
       throw new Error('Message is required')
+    }
+
+    console.log('Message received:', message)
+
+    // Check if OpenAI API key is available
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiApiKey) {
+      console.error('OPENAI_API_KEY not found in environment')
+      throw new Error('OpenAI API key not configured')
     }
 
     // Get authenticated user
@@ -31,12 +41,17 @@ serve(async (req) => {
       }
     )
 
+    console.log('Getting user authentication')
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
+      console.error('Authentication error:', userError)
       throw new Error('Authentication required')
     }
 
+    console.log('User authenticated:', user.id)
+
     // Get user's recent transactions and entries for context
+    console.log('Fetching user transactions')
     const { data: transactions, error: transError } = await supabase
       .from('airledger_transactions')
       .select(`
@@ -49,9 +64,12 @@ serve(async (req) => {
 
     if (transError) {
       console.error('Error fetching transactions:', transError)
+    } else {
+      console.log('Found transactions:', transactions?.length || 0)
     }
 
     // Get user profile
+    console.log('Fetching user profile')
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
@@ -87,8 +105,9 @@ BOKFÖRINGSDATA FÖR ${userName.toUpperCase()}:
     }
 
     // Initialize OpenAI
+    console.log('Initializing OpenAI client')
     const openai = new OpenAI({
-      apiKey: Deno.env.get('OPENAI_API_KEY'),
+      apiKey: openaiApiKey,
     })
 
     console.log('Processing chat message with OpenAI...')
@@ -131,6 +150,7 @@ Om användaren frågar om sina transaktioner eller bokföring, använd den data 
 
     // Add conversation history if provided
     if (conversationHistory && conversationHistory.length > 0) {
+      console.log('Adding conversation history:', conversationHistory.length, 'messages')
       conversationHistory.forEach((msg: any) => {
         messages.push({
           role: msg.sender === 'user' ? 'user' : 'assistant',
@@ -145,6 +165,7 @@ Om användaren frågar om sina transaktioner eller bokföring, använd den data 
       content: message
     })
 
+    console.log('Calling OpenAI API')
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: messages,
