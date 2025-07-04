@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Home, MessageCircle, FileText, Menu, Settings, LogOut, User, Info } from "lucide-react";
+import { Home, MessageCircle, FileText, Menu, Settings, LogOut, User, Info, BarChart3 } from "lucide-react";
 import VoiceInstructions from "@/components/VoiceInstructions";
 
 const Navigation = () => {
@@ -50,6 +50,12 @@ const Navigation = () => {
       label: "Transaktioner", 
       icon: FileText,
       badge: "3"
+    },
+    { 
+      href: "/reports", 
+      label: "Rapporter", 
+      icon: BarChart3,
+      badge: null
     },
   ];
 
