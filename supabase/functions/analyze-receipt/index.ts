@@ -1,4 +1,3 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import OpenAI from 'https://esm.sh/openai@4.20.1'
@@ -15,7 +14,10 @@ serve(async (req) => {
   }
 
   try {
+    console.log('=== ANALYZE RECEIPT FUNCTION STARTED ===')
+    
     const { imageBase64 } = await req.json()
+    console.log('Image data received, length:', imageBase64?.length || 0)
 
     if (!imageBase64) {
       throw new Error('Image data is required')
@@ -23,14 +25,25 @@ serve(async (req) => {
 
     // Get the Authorization header
     const authHeader = req.headers.get('Authorization')
+    console.log('Auth header present:', !!authHeader)
+    
     if (!authHeader) {
       throw new Error('No authorization header')
+    }
+
+    // Check OpenAI API key
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+    console.log('OpenAI API key present:', !!openaiApiKey)
+    
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not configured')
     }
 
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
     
+    console.log('Creating Supabase client...')
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: {
         headers: {
@@ -41,6 +54,8 @@ serve(async (req) => {
 
     // Try to get user - if this fails, extract user ID from JWT
     let userId: string
+    console.log('Attempting authentication...')
+    
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       if (userError || !user) {
@@ -63,11 +78,12 @@ serve(async (req) => {
     }
 
     // Initialize OpenAI
+    console.log('Initializing OpenAI...')
     const openai = new OpenAI({
-      apiKey: Deno.env.get('OPENAI_API_KEY'),
+      apiKey: openaiApiKey,
     })
 
-    console.log('Analyzing receipt with OpenAI Vision...')
+    console.log('Calling OpenAI Vision API...')
 
     // Analyze receipt with OpenAI Vision
     const response = await openai.chat.completions.create({
@@ -146,25 +162,36 @@ Ensure entries balance (total debits = total credits)!`
       temperature: 0.1
     })
 
+    console.log('OpenAI API call successful')
     const analysisText = response.choices[0].message.content
-    console.log('OpenAI analysis result:', analysisText)
+    console.log('Analysis result length:', analysisText?.length || 0)
 
     let analysis
     try {
       analysis = JSON.parse(analysisText || '{}')
+      console.log('Parsed analysis:', JSON.stringify(analysis, null, 2))
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError)
+      console.error('Raw response:', analysisText)
       throw new Error('Failed to parse receipt analysis')
     }
 
     // Validate required fields
     if (!analysis.vendor || !analysis.date || !analysis.total_amount || !analysis.entries) {
+      console.error('Missing required fields:', {
+        vendor: !!analysis.vendor,
+        date: !!analysis.date,
+        total_amount: !!analysis.total_amount,
+        entries: !!analysis.entries
+      })
       throw new Error('Incomplete analysis data from OpenAI')
     }
 
     // Validate that entries balance
     const totalDebits = analysis.entries.reduce((sum: number, entry: any) => sum + (entry.debit_amount || 0), 0)
     const totalCredits = analysis.entries.reduce((sum: number, entry: any) => sum + (entry.credit_amount || 0), 0)
+    
+    console.log('Balance check:', { totalDebits, totalCredits })
     
     if (Math.abs(totalDebits - totalCredits) > 0.01) {
       console.error('Entries do not balance:', { totalDebits, totalCredits })
@@ -182,7 +209,7 @@ Ensure entries balance (total debits = total credits)!`
       analysis_data: analysis
     }
 
-    console.log('Saving transaction:', transactionData)
+    console.log('Saving transaction to database...')
 
     const { data: transaction, error: transactionError } = await supabase
       .from('airledger_transactions')
@@ -192,8 +219,10 @@ Ensure entries balance (total debits = total credits)!`
 
     if (transactionError) {
       console.error('Error saving transaction:', transactionError)
-      throw new Error('Failed to save transaction')
+      throw new Error('Failed to save transaction: ' + transactionError.message)
     }
+
+    console.log('Transaction saved successfully:', transaction.id)
 
     // Save entries
     const entriesData = analysis.entries.map((entry: any) => ({
@@ -205,7 +234,7 @@ Ensure entries balance (total debits = total credits)!`
       description: entry.description
     }))
 
-    console.log('Saving entries:', entriesData)
+    console.log('Saving entries to database...')
 
     const { error: entriesError } = await supabase
       .from('airledger_entries')
@@ -213,10 +242,10 @@ Ensure entries balance (total debits = total credits)!`
 
     if (entriesError) {
       console.error('Error saving entries:', entriesError)
-      throw new Error('Failed to save transaction entries')
+      throw new Error('Failed to save transaction entries: ' + entriesError.message)
     }
 
-    console.log('Successfully analyzed receipt and saved transaction')
+    console.log('=== ANALYZE RECEIPT FUNCTION COMPLETED SUCCESSFULLY ===')
 
     return new Response(
       JSON.stringify({
@@ -233,7 +262,11 @@ Ensure entries balance (total debits = total credits)!`
     )
 
   } catch (error) {
-    console.error('Error in analyze-receipt function:', error)
+    console.error('=== ERROR IN ANALYZE RECEIPT FUNCTION ===')
+    console.error('Error details:', error)
+    console.error('Error message:', error.message)
+    console.error('Error stack:', error.stack)
+    
     return new Response(
       JSON.stringify({ 
         error: error.message || 'An unexpected error occurred',
