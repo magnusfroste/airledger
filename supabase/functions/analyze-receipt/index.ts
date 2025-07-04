@@ -165,15 +165,28 @@ Ensure entries balance (total debits = total credits)!`
     console.log('OpenAI API call successful')
     const analysisText = response.choices[0].message.content
     console.log('Analysis result length:', analysisText?.length || 0)
+    console.log('RAW OpenAI response:', analysisText)
 
     let analysis
     try {
-      analysis = JSON.parse(analysisText || '{}')
+      // Clean the response - sometimes OpenAI adds markdown formatting
+      let cleanedText = analysisText || '{}'
+      
+      // Remove markdown code blocks if present
+      if (cleanedText.includes('```json')) {
+        cleanedText = cleanedText.replace(/```json\s*/, '').replace(/\s*```$/, '')
+      } else if (cleanedText.includes('```')) {
+        cleanedText = cleanedText.replace(/```\s*/, '').replace(/\s*```$/, '')
+      }
+      
+      console.log('Cleaned text for parsing:', cleanedText)
+      analysis = JSON.parse(cleanedText)
       console.log('Parsed analysis:', JSON.stringify(analysis, null, 2))
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError)
       console.error('Raw response:', analysisText)
-      throw new Error('Failed to parse receipt analysis')
+      console.error('Cleaned response:', cleanedText)
+      throw new Error('Failed to parse receipt analysis - OpenAI returned invalid JSON')
     }
 
     // Validate required fields
