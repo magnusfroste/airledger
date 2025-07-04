@@ -1,7 +1,7 @@
-import TransactionReview from "@/components/TransactionReview";
+import TransactionsList from "@/components/TransactionsList";
 
 const Transactions = () => {
-  return <TransactionReview />;
+  return <TransactionsList />;
 };
 
 export default Transactions;
