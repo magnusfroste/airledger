@@ -102,6 +102,9 @@ Return a JSON object with this exact structure:
   "vendor": "Company name",
   "date": "YYYY-MM-DD",
   "total_amount": 123.45,
+  "net_amount": 98.76,
+  "vat_amount": 24.69,
+  "vat_rate": 25,
   "description": "Brief description",
   "document_type": "receipt|invoice",
   "document_type_confidence": 85,
@@ -111,9 +114,16 @@ Return a JSON object with this exact structure:
     {
       "account_code": "6000",
       "account_name": "Kontorsmaterial",
-      "debit_amount": 123.45,
+      "debit_amount": 98.76,
       "credit_amount": 0,
-      "description": "Kontorsmaterial från leverantör"
+      "description": "Kontorsmaterial från leverantör (exkl. moms)"
+    },
+    {
+      "account_code": "2641",
+      "account_name": "Ingående moms",
+      "debit_amount": 24.69,
+      "credit_amount": 0,
+      "description": "Ingående moms 25%"
     },
     {
       "account_code": "1930",
@@ -125,6 +135,14 @@ Return a JSON object with this exact structure:
   ],
   "confidence": 85
 }
+
+IMPORTANT: Always extract VAT information from Swedish receipts/invoices:
+- Look for "MOMS", "MVA", "VAT" on the document
+- Swedish VAT rates: 25% (standard), 12% (food/transport), 6% (books/newspapers), 0% (exports)
+- Calculate net_amount = total_amount / (1 + vat_rate/100)
+- Calculate vat_amount = total_amount - net_amount
+- Use account 2641 for "Ingående moms" (input VAT)
+- If no VAT visible, assume 25% and calculate backwards from total
 
 Use Swedish accounting plan (BAS 2024) account codes:
 - 1000-1999: Tillgångar (Assets)
