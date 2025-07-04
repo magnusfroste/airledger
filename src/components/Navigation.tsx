@@ -5,15 +5,8 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Home, 
-  MessageCircle, 
-  FileText, 
-  Menu,
-  Settings,
-  LogOut,
-  User
-} from "lucide-react";
+import { Home, MessageCircle, FileText, Menu, Settings, LogOut, User, Info } from "lucide-react";
+import VoiceInstructions from "@/components/VoiceInstructions";
 
 const Navigation = () => {
   const location = useLocation();
@@ -131,6 +124,13 @@ const Navigation = () => {
                 </div>
                 
                 <div className="border-t border-border/20 pt-4 space-y-1">
+                  <div className="flex items-center justify-start px-3 h-10">
+                    <Info className="h-4 w-4 mr-3" />
+                    <span className="text-sm font-medium">Hjälp med AI-chat</span>
+                    <div className="ml-auto">
+                      <VoiceInstructions />
+                    </div>
+                  </div>
                   <Button variant="ghost" className="w-full justify-start h-10 px-3">
                     <Settings className="h-4 w-4 mr-3" />
                     Inställningar
