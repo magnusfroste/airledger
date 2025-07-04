@@ -62,6 +62,11 @@ const Auth = () => {
     }
   };
 
+  const handleDemoLogin = () => {
+    setEmail("demo@airledger.se");
+    setPassword("123456");
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -190,6 +195,28 @@ const Auth = () => {
                     ) : (
                       "Logga in"
                     )}
+                  </Button>
+                  
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">
+                        eller
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12"
+                    onClick={handleDemoLogin}
+                    disabled={isLoading}
+                  >
+                    <Bot className="mr-2 h-4 w-4" />
+                    Testa med demo-konto
                   </Button>
                 </form>
               </TabsContent>
