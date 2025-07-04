@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle } from "lucide-react";
+import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, FileImage } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Message {
@@ -11,14 +11,26 @@ interface Message {
   content: string;
   sender: 'user' | 'ai';
   timestamp: Date;
-  type?: 'text' | 'voice';
+  type?: 'text' | 'voice' | 'image';
+  images?: Array<{
+    id: string;
+    file: File;
+    preview: string;
+    analysis?: {
+      type: 'receipt' | 'invoice' | 'bank_statement';
+      amount?: number;
+      vendor?: string;
+      date?: string;
+      description?: string;
+    };
+  }>;
 }
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Hej! Jag är din AI-assistent för bokföring. Hur kan jag hjälpa dig idag?',
+      content: 'Hej! Jag är din AI-assistent för bokföring. Hur kan jag hjälpa dig idag? Du kan chatta med mig eller ladda upp bilder på kvitton, fakturor och kontoutdrag.',
       sender: 'ai',
       timestamp: new Date(),
       type: 'text'
@@ -27,28 +39,70 @@ const ChatInterface = () => {
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingImages, setPendingImages] = useState<Array<{
+    id: string;
+    file: File;
+    preview: string;
+  }>>([]);
   const { toast } = useToast();
 
+  const handleImageUpload = (files: FileList) => {
+    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+    
+    if (imageFiles.length !== files.length) {
+      toast({
+        title: "Endast bilder tillåtna",
+        description: "Vänligen välj endast bildfiler (JPG, PNG, etc.)",
+        variant: "destructive",
+      });
+    }
+
+    imageFiles.forEach(file => {
+      const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      const preview = URL.createObjectURL(file);
+      
+      setPendingImages(prev => [...prev, { id, file, preview }]);
+    });
+  };
+
+  const removePendingImage = (imageId: string) => {
+    setPendingImages(prev => {
+      const image = prev.find(img => img.id === imageId);
+      if (image) {
+        URL.revokeObjectURL(image.preview);
+      }
+      return prev.filter(img => img.id !== imageId);
+    });
+  };
+
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() && pendingImages.length === 0) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: inputValue,
+      content: inputValue || (pendingImages.length > 0 ? "Bifogade bilder för analys" : ""),
       sender: 'user',
       timestamp: new Date(),
-      type: 'text'
+      type: pendingImages.length > 0 ? 'image' : 'text',
+      images: pendingImages.length > 0 ? pendingImages.map(img => ({
+        id: img.id,
+        file: img.file,
+        preview: img.preview
+      })) : undefined
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue("");
+    setPendingImages([]);
     setIsLoading(true);
 
     // Simulate AI response (will be replaced with actual OpenAI integration)
     setTimeout(() => {
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
-        content: "Tack för din fråga! Jag kommer snart att kunna hjälpa dig med bokföringsrelaterade frågor med hjälp av OpenAI:s API. För tillfället är jag i testläge.",
+        content: userMessage.type === 'image' 
+          ? "Jag kan se dina bilder! Snart kommer jag att kunna analysera kvitton, fakturor och kontoutdrag med OpenAI Vision API för att extrahera viktig information automatiskt."
+          : "Tack för din fråga! Jag kommer snart att kunna hjälpa dig med bokföringsrelaterade frågor med hjälp av OpenAI:s API. För tillfället är jag i testläge.",
         sender: 'ai',
         timestamp: new Date(),
         type: 'text'
@@ -127,21 +181,33 @@ const ChatInterface = () => {
                     </div>
                   )}
                   
-                  <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                      message.sender === 'user'
-                        ? 'bg-gradient-primary text-primary-foreground'
-                        : 'bg-background border border-border/50'
-                    }`}
-                  >
-                    <p className="text-sm leading-relaxed">{message.content}</p>
-                    <p className="text-xs opacity-70 mt-2">
-                      {message.timestamp.toLocaleTimeString('sv-SE', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </p>
-                  </div>
+                   <div
+                     className={`max-w-[70%] rounded-2xl px-4 py-3 ${
+                       message.sender === 'user'
+                         ? 'bg-gradient-primary text-primary-foreground'
+                         : 'bg-background border border-border/50'
+                     }`}
+                   >
+                     {message.images && message.images.length > 0 && (
+                       <div className="grid grid-cols-2 gap-2 mb-3">
+                         {message.images.map((image) => (
+                           <img
+                             key={image.id}
+                             src={image.preview}
+                             alt="Uploaded document"
+                             className="w-full h-20 object-cover rounded-md border border-border/30"
+                           />
+                         ))}
+                       </div>
+                     )}
+                     <p className="text-sm leading-relaxed">{message.content}</p>
+                     <p className="text-xs opacity-70 mt-2">
+                       {message.timestamp.toLocaleTimeString('sv-SE', { 
+                         hour: '2-digit', 
+                         minute: '2-digit' 
+                       })}
+                     </p>
+                   </div>
 
                   {message.sender === 'user' && (
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-secondary-foreground flex-shrink-0">
@@ -169,13 +235,62 @@ const ChatInterface = () => {
 
             {/* Input Area */}
             <div className="border-t border-border/50 pt-4">
+              {/* Pending Images Preview */}
+              {pendingImages.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileImage className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Bifogade bilder ({pendingImages.length})</span>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {pendingImages.map((image) => (
+                      <div key={image.id} className="relative">
+                        <img
+                          src={image.preview}
+                          alt="Pending upload"
+                          className="w-16 h-16 object-cover rounded-md border border-border/50"
+                        />
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="absolute -top-1 -right-1 h-5 w-5 p-0 rounded-full"
+                          onClick={() => removePendingImage(image.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className="px-3"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.multiple = true;
+                    input.onchange = (e) => {
+                      const files = (e.target as HTMLInputElement).files;
+                      if (files) handleImageUpload(files);
+                    };
+                    input.click();
+                  }}
+                  disabled={isLoading}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+                
                 <div className="flex-1 relative">
                   <Input
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Fråga om bokföring, skatter, eller annan ekonomisk hjälp..."
+                    placeholder="Fråga om bokföring eller bifoga bilder av kvitton..."
                     className="pr-12 bg-background border-border/50 focus:border-primary"
                     disabled={isLoading}
                   />
@@ -184,7 +299,7 @@ const ChatInterface = () => {
                     variant="ghost"
                     className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
                     onClick={handleSendMessage}
-                    disabled={!inputValue.trim() || isLoading}
+                    disabled={(!inputValue.trim() && pendingImages.length === 0) || isLoading}
                   >
                     <Send className="h-4 w-4" />
                   </Button>

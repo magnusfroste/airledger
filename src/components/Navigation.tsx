@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Home, 
   MessageCircle, 
-  Camera, 
   FileText, 
   Menu,
   Bell,
@@ -29,12 +28,6 @@ const Navigation = () => {
       label: "AI-Chat", 
       icon: MessageCircle,
       badge: null
-    },
-    { 
-      href: "/upload", 
-      label: "Ladda upp", 
-      icon: Camera,
-      badge: "7"
     },
     { 
       href: "/transactions", 
