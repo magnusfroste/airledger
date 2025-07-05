@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +49,106 @@ const ChatInterface = () => {
   }>>([]);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Load or create conversation on mount
+  useEffect(() => {
+    const initializeConversation = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Try to find existing conversation
+        const { data: conversations, error: fetchError } = await supabase
+          .from('airledger_conversations')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        let currentConversationId = null;
+
+        if (fetchError) {
+          console.error('Error fetching conversations:', fetchError);
+          return;
+        }
+
+        if (conversations && conversations.length > 0) {
+          // Use existing conversation
+          currentConversationId = conversations[0].id;
+        } else {
+          // Create new conversation
+          const { data: newConversation, error: createError } = await supabase
+            .from('airledger_conversations')
+            .insert({
+              user_id: user.id,
+              title: 'Chat Session'
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Error creating conversation:', createError);
+            return;
+          }
+          
+          currentConversationId = newConversation.id;
+        }
+
+        setConversationId(currentConversationId);
+
+        // Load existing messages for this conversation
+        if (currentConversationId) {
+          const { data: existingMessages, error: messagesError } = await supabase
+            .from('airledger_messages')
+            .select('*')
+            .eq('conversation_id', currentConversationId)
+            .order('created_at', { ascending: true });
+
+          if (messagesError) {
+            console.error('Error loading messages:', messagesError);
+            return;
+          }
+
+          if (existingMessages && existingMessages.length > 0) {
+            const loadedMessages: Message[] = existingMessages.map(msg => ({
+              id: msg.id,
+              content: msg.content,
+              sender: msg.sender as 'user' | 'ai',
+              timestamp: new Date(msg.created_at),
+              type: (msg.message_type as 'text' | 'voice' | 'image') || 'text'
+            }));
+
+            // Keep welcome message and add loaded messages
+            setMessages(prev => [prev[0], ...loadedMessages]);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing conversation:', error);
+      }
+    };
+
+    initializeConversation();
+  }, []);
+
+  // Save message to database
+  const saveMessageToDatabase = async (message: Message) => {
+    if (!conversationId) return;
+
+    try {
+      await supabase
+        .from('airledger_messages')
+        .insert({
+          conversation_id: conversationId,
+          content: message.content,
+          sender: message.sender,
+          message_type: message.type || 'text'
+        });
+    } catch (error) {
+      console.error('Error saving message:', error);
+    }
+  };
 
   const handleImageUpload = (files: FileList) => {
     const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
@@ -111,6 +210,9 @@ const ChatInterface = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    
+    // Save user message to database
+    await saveMessageToDatabase(userMessage);
     setInputValue("");
     const currentPendingImages = [...pendingImages];
     setPendingImages([]);
@@ -149,6 +251,9 @@ const ChatInterface = () => {
               
               setMessages(prev => [...prev, aiResponse]);
               
+              // Save AI response to database
+              await saveMessageToDatabase(aiResponse);
+              
               toast({
                 title: "Kvitto analyserat!",
                 description: `${analysis.vendor} - Väntar på bekräftelse`,
@@ -166,6 +271,9 @@ const ChatInterface = () => {
               type: 'text'
             };
             setMessages(prev => [...prev, errorResponse]);
+            
+            // Save error message to database
+            await saveMessageToDatabase(errorResponse);
             
             toast({
               title: "Analysfel",
@@ -204,6 +312,9 @@ const ChatInterface = () => {
               type: 'text'
             };
             setMessages(prev => [...prev, aiResponse]);
+            
+            // Save AI response to database  
+            await saveMessageToDatabase(aiResponse);
           } else {
             throw new Error('Invalid response from chat assistant');
           }
@@ -217,6 +328,9 @@ const ChatInterface = () => {
             type: 'text'
           };
           setMessages(prev => [...prev, errorResponse]);
+          
+          // Save error message to database
+          await saveMessageToDatabase(errorResponse);
         }
       }
     } catch (error) {
@@ -229,6 +343,9 @@ const ChatInterface = () => {
         type: 'text'
       };
       setMessages(prev => [...prev, errorResponse]);
+      
+      // Save error message to database
+      await saveMessageToDatabase(errorResponse);
     } finally {
       setIsLoading(false);
       // Clean up image URLs
@@ -374,6 +491,9 @@ const ChatInterface = () => {
         };
         
         setMessages(prev => [...prev, aiResponse]);
+        
+        // Save AI response to database
+        await saveMessageToDatabase(aiResponse);
       }
     } catch (error) {
       throw error;
