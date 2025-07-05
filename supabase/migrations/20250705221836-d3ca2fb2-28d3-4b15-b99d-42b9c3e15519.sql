@@ -1,0 +1,36 @@
+-- Lägg till saknade långfristiga skulder (23xx) inklusive 2393
+
+INSERT INTO public.airledger_chart_of_accounts (account_code, account_name, account_type, account_category, normal_balance) VALUES
+
+-- Långfristiga skulder 23xx som saknas
+('2310', 'Obligations- och förlagslån', 'liability', 'long_term_debt', 'credit'),
+('2320', 'Konvertibla lån och liknande', 'liability', 'long_term_debt', 'credit'),
+('2321', 'Konvertibla lån', 'liability', 'long_term_debt', 'credit'),
+('2322', 'Lån förenade med optionsrätt', 'liability', 'long_term_debt', 'credit'),
+('2323', 'Vinstandelslån', 'liability', 'long_term_debt', 'credit'),
+('2324', 'Kapitalandelslån', 'liability', 'long_term_debt', 'credit'),
+('2330', 'Checkräkningskredit', 'liability', 'long_term_debt', 'credit'),
+('2331', 'Checkräkningskredit 1', 'liability', 'long_term_debt', 'credit'),
+('2332', 'Checkräkningskredit 2', 'liability', 'long_term_debt', 'credit'),
+('2340', 'Byggnadskreditiv', 'liability', 'long_term_debt', 'credit'),
+('2350', 'Andra långfristiga skulder till kreditinstitut', 'liability', 'long_term_debt', 'credit'),
+('2351', 'Fastighetslån, långfristig del', 'liability', 'long_term_debt', 'credit'),
+('2355', 'Långfristiga lån i utländsk valuta från kreditinstitut', 'liability', 'long_term_debt', 'credit'),
+('2359', 'Övriga långfristiga lån från kreditinstitut', 'liability', 'long_term_debt', 'credit'),
+('2360', 'Långfristiga skulder till koncernföretag', 'liability', 'long_term_debt', 'credit'),
+('2361', 'Långfristiga skulder till moderföretag', 'liability', 'long_term_debt', 'credit'),
+('2362', 'Långfristiga skulder till dotterföretag', 'liability', 'long_term_debt', 'credit'),
+('2363', 'Långfristiga skulder till andra koncernföretag', 'liability', 'long_term_debt', 'credit'),
+('2370', 'Långfristiga skulder till intresseföretag, gemensamt styrda företag och övriga företag som det finns ett ägarintresse i', 'liability', 'long_term_debt', 'credit'),
+('2371', 'Långfristiga skulder till intresseföretag', 'liability', 'long_term_debt', 'credit'),
+('2372', 'Långfristiga skulder till gemensamt styrda företag', 'liability', 'long_term_debt', 'credit'),
+('2373', 'Långfristiga skulder till övriga företag som det finns ett ägarintresse i', 'liability', 'long_term_debt', 'credit'),
+('2390', 'Övriga långfristiga skulder', 'liability', 'long_term_debt', 'credit'),
+('2391', 'Avbetalningskontrakt, långfristig del', 'liability', 'long_term_debt', 'credit'),
+('2392', 'Villkorliga långfristiga skulder', 'liability', 'long_term_debt', 'credit'),
+('2393', 'Lån från närstående personer, långfristig del', 'liability', 'long_term_debt', 'credit'),
+('2394', 'Långfristiga leverantörskrediter', 'liability', 'long_term_debt', 'credit'),
+('2395', 'Andra långfristiga lån i utländsk valuta', 'liability', 'long_term_debt', 'credit'),
+('2396', 'Derivat', 'liability', 'long_term_debt', 'credit'),
+('2397', 'Mottagna depositioner, långfristiga', 'liability', 'long_term_debt', 'credit'),
+('2399', 'Övriga långfristiga skulder', 'liability', 'long_term_debt', 'credit');
