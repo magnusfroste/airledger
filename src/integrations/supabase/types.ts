@@ -134,6 +134,42 @@ export type Database = {
         }
         Relationships: []
       }
+      airledger_chart_of_accounts: {
+        Row: {
+          account_category: string
+          account_code: string
+          account_name: string
+          account_type: string
+          created_at: string
+          id: string
+          is_active: boolean
+          normal_balance: string
+          updated_at: string
+        }
+        Insert: {
+          account_category: string
+          account_code: string
+          account_name: string
+          account_type: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          normal_balance: string
+          updated_at?: string
+        }
+        Update: {
+          account_category?: string
+          account_code?: string
+          account_name?: string
+          account_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          normal_balance?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       airledger_entries: {
         Row: {
           account_code: string

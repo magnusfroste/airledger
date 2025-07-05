@@ -9,6 +9,7 @@ import { Plus, Edit, Trash2, Calculator, TrendingUp, TrendingDown } from "lucide
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { AccountSelector } from "@/components/AccountSelector";
 
 interface OpeningBalance {
   id: string;
@@ -69,29 +70,42 @@ const OpeningBalances = () => {
     if (!user || !formData.account_code || !formData.account_name) {
       toast({
         title: "Obligatoriska fält",
-        description: "Fyll i kontonummer och kontonamn.",
+        description: "Välj ett konto från listan.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      // Determine balance type based on account code (BAS 2024)
-      const accountCodeNum = parseInt(formData.account_code);
+      // Get account info from chart of accounts to determine balance type
+      const { data: accountData, error: accountError } = await supabase
+        .from('airledger_chart_of_accounts')
+        .select('normal_balance')
+        .eq('account_code', formData.account_code)
+        .single();
+
+      if (accountError) {
+        console.error('Error fetching account info:', accountError);
+      }
+
+      // Determine balance type - use chart of accounts data if available, otherwise fall back to old logic
       let balanceType: 'debit' | 'credit' = 'debit';
       
-      if (accountCodeNum >= 1000 && accountCodeNum <= 1999) {
-        // Tillgångar (Assets) - normal balance is debit
-        balanceType = formData.opening_balance >= 0 ? 'debit' : 'credit';
-      } else if (accountCodeNum >= 2000 && accountCodeNum <= 2999) {
-        // Skulder (Liabilities) - normal balance is credit
-        balanceType = formData.opening_balance >= 0 ? 'credit' : 'debit';
-      } else if (accountCodeNum >= 3000 && accountCodeNum <= 3999) {
-        // Intäkter (Revenue) - normal balance is credit
-        balanceType = formData.opening_balance >= 0 ? 'credit' : 'debit';
-      } else if (accountCodeNum >= 4000 && accountCodeNum <= 4999 || accountCodeNum >= 6000 && accountCodeNum <= 6999) {
-        // Kostnader (Expenses) - normal balance is debit
-        balanceType = formData.opening_balance >= 0 ? 'debit' : 'credit';
+      if (accountData?.normal_balance) {
+        balanceType = formData.opening_balance >= 0 ? accountData.normal_balance as 'debit' | 'credit' : 
+                     (accountData.normal_balance === 'debit' ? 'credit' : 'debit');
+      } else {
+        // Fallback logic for compatibility
+        const accountCodeNum = parseInt(formData.account_code);
+        if (accountCodeNum >= 1000 && accountCodeNum <= 1999) {
+          balanceType = formData.opening_balance >= 0 ? 'debit' : 'credit';
+        } else if (accountCodeNum >= 2000 && accountCodeNum <= 2999) {
+          balanceType = formData.opening_balance >= 0 ? 'credit' : 'debit';
+        } else if (accountCodeNum >= 3000 && accountCodeNum <= 3999) {
+          balanceType = formData.opening_balance >= 0 ? 'credit' : 'debit';
+        } else if (accountCodeNum >= 4000 && accountCodeNum <= 4999 || accountCodeNum >= 6000 && accountCodeNum <= 6999) {
+          balanceType = formData.opening_balance >= 0 ? 'debit' : 'credit';
+        }
       }
 
       const balanceData = {
@@ -263,21 +277,13 @@ const OpeningBalances = () => {
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="account_code">Kontonummer</Label>
-                <Input
-                  id="account_code"
+                <Label>Välj konto</Label>
+                <AccountSelector
                   value={formData.account_code}
-                  onChange={(e) => setFormData({ ...formData, account_code: e.target.value })}
-                  placeholder="t.ex. 1930"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="account_name">Kontonamn</Label>
-                <Input
-                  id="account_name"
-                  value={formData.account_name}
-                  onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
-                  placeholder="t.ex. Checkkonto"
+                  onValueChange={(accountCode, accountName) => 
+                    setFormData({ ...formData, account_code: accountCode, account_name: accountName })
+                  }
+                  placeholder="Sök och välj konto från BAS 2024..."
                 />
               </div>
               <div className="space-y-2">
@@ -290,7 +296,7 @@ const OpeningBalances = () => {
                   placeholder="0"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Systemet bestämmer automatiskt debet/kredit baserat på kontotyp
+                  Systemet bestämmer automatiskt debet/kredit baserat på kontotyp enligt BAS 2024
                 </p>
               </div>
               <div className="flex gap-2 pt-4">
