@@ -285,6 +285,16 @@ När användaren nämner att de har fakturerat en kund:
 4. Använd funktionen save-invoice för att spara
 5. Bokföring sker automatiskt med tre poster: Debet 1510 Kundfordringar (inkl moms), Kredit 3000 Försäljning (exkl moms), Kredit 2640 Utgående moms
 
+BETALNINGAR/INBETALNINGAR:
+När användaren nämner att de har fått betalning från en kund:
+1. Identifiera kundnamn och belopp
+2. Detta är INTE en ny faktura - det är en betalning av befintlig faktura
+3. Använd funktionen save-payment för att registrera betalningen
+4. Bokföring sker automatiskt med två poster: Debet 1930 Checkkonto, Kredit 1510 Kundfordringar
+5. Skillnad mellan "fakturera" och "få betalning":
+   - "Jag har fakturerat X" = Skapa ny faktura (save-invoice)
+   - "X har betalat" / "Jag har fått betalning från X" = Registrera betalning (save-payment)
+
 KOMMUNIKATIONSSTIL:
 - Var vänlig, professionell och hjälpsam
 - Använd svenska
@@ -382,6 +392,31 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
               required: ["customerName", "amount", "description"]
             }
           }
+        },
+        {
+          type: "function",
+          function: {
+            name: "save_payment",
+            description: "Registrera en betalning från kund när användaren nämner att de har fått betalning. ANVÄND DENNA FUNKTION när användaren säger att en kund har betalat eller att de har fått betalning.",
+            parameters: {
+              type: "object",
+              properties: {
+                customerName: {
+                  type: "string",
+                  description: "Kundens namn eller företag som har betalat"
+                },
+                amount: {
+                  type: "number",
+                  description: "Betalningsbelopp i kronor"
+                },
+                description: {
+                  type: "string",
+                  description: "Beskrivning av betalningen (t.ex. 'Betalning från X')"
+                }
+              },
+              required: ["customerName", "amount", "description"]
+            }
+          }
         }
       ],
       tool_choice: "auto"
@@ -461,6 +496,39 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
           } catch (parseError) {
             console.error('Error parsing invoice arguments:', parseError)
             aiResponse += `\n\n❌ Ett fel uppstod när jag försökte tolka fakturinformationen.`
+          }
+        } else if (toolCall.function.name === 'save_payment') {
+          try {
+            const args = JSON.parse(toolCall.function.arguments)
+            console.log('Saving payment:', args)
+            
+            // Call the save-payment function
+            const { data: paymentData, error: paymentError } = await supabase.functions.invoke('save-payment', {
+              body: {
+                customerName: args.customerName,
+                amount: args.amount,
+                description: args.description
+              }
+            })
+
+            if (paymentError) {
+              console.error('Error saving payment:', paymentError)
+              aiResponse += `\n\n❌ Ett fel uppstod när jag försökte spara betalningen: ${paymentError.message}`
+            } else if (paymentData?.success) {
+              console.log('Payment saved successfully')
+              
+              aiResponse += `\n\n✅ Perfekt! Jag har registrerat betalningen från ${args.customerName}.\n\n` +
+                `**Belopp:** ${args.amount} kr\n\n` +
+                `**Bokföringsposter:**\n` +
+                `• Debet: 1930 Checkkonto ${args.amount} kr\n` +
+                `• Kredit: 1510 Kundfordringar ${args.amount} kr\n\n` +
+                `Kundfordringen har nu minskat och pengarna finns på ditt bankkonto.`
+            } else {
+              aiResponse += `\n\n❌ Ett okänt fel uppstod när jag försökte spara betalningen.`
+            }
+          } catch (parseError) {
+            console.error('Error parsing payment arguments:', parseError)
+            aiResponse += `\n\n❌ Ett fel uppstod när jag försökte tolka betalningsinformationen.`
           }
         }
       }
