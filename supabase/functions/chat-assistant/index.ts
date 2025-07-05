@@ -321,8 +321,8 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: messages,
-      max_tokens: 500,
-      temperature: 0.7,
+      max_tokens: 800,
+      temperature: 0.3,
       tools: [
         {
           type: "function",
@@ -353,7 +353,7 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
           type: "function",
           function: {
             name: "save_invoice",
-            description: "Spara en utgående faktura (när användaren fakturerar en kund)",
+            description: "Spara en utgående faktura när användaren nämner att de har fakturerat någon. ANVÄND DENNA FUNKTION när användaren säger att de har fakturerat en kund.",
             parameters: {
               type: "object",
               properties: {
@@ -363,11 +363,11 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
                 },
                 amount: {
                   type: "number",
-                  description: "Fakturabelopp"
+                  description: "Fakturabelopp i kronor"
                 },
                 description: {
                   type: "string",
-                  description: "Beskrivning av vara/tjänst"
+                  description: "Beskrivning av vara/tjänst som fakturerats"
                 },
                 invoiceNumber: {
                   type: "string",
@@ -375,7 +375,7 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
                 },
                 dueDate: {
                   type: "string",
-                  description: "Förfallodatum (valfritt)"
+                  description: "Förfallodatum i format YYYY-MM-DD (valfritt)"
                 }
               },
               required: ["customerName", "amount", "description"]
@@ -385,6 +385,9 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
       ],
       tool_choice: "auto"
     })
+
+    console.log('OpenAI response received')
+    console.log('Tool calls:', response.choices[0].message.tool_calls?.length || 0)
 
     let aiResponse = response.choices[0].message.content
     const toolCalls = response.choices[0].message.tool_calls
