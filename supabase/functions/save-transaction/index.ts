@@ -70,7 +70,7 @@ serve(async (req) => {
       description: `${analysis.vendor} - ${analysis.description}`,
       total_amount: analysis.total_amount,
       transaction_type: analysis.transaction_type,
-      status: 'draft',
+      status: 'posted',
       analysis_data: {
         ...analysis,
         confirmed_payment_method: paymentMethod

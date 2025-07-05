@@ -97,7 +97,7 @@ serve(async (req) => {
       description: `Faktura till ${customerName}: ${description}`,
       total_amount: totalAmountInclVat,
       transaction_type: 'income',
-      status: 'draft',
+      status: 'posted',
       reference_number: invoiceNumber || null,
       analysis_data: {
         customer_name: customerName,
