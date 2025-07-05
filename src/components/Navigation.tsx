@@ -106,7 +106,14 @@ const Navigation = () => {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm">
               AL
             </div>
-            <h1 className="text-lg font-medium text-foreground">Air Ledger</h1>
+            <div className="flex flex-col">
+              <h1 className="text-lg font-medium text-foreground">Air Ledger</h1>
+              {location.pathname === '/chat' && (
+                <p className="text-xs text-muted-foreground">
+                  💬 Säg "Jag har fakturerat 25 000 kr" eller ladda upp kvitto
+                </p>
+              )}
+            </div>
           </div>
           
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
