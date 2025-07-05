@@ -46,8 +46,8 @@ const VoiceInstructions = () => {
       </Button>
 
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto my-4">
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-start justify-center pt-20 p-4 overflow-y-auto">
+          <Card className="w-full max-w-2xl my-4">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-lg font-semibold">
                 🗣️ Så här pratar du med AI-assistenten
