@@ -108,65 +108,56 @@ const Navigation = () => {
             </div>
             <div className="flex flex-col">
               <h1 className="text-lg font-medium text-foreground">Air Ledger</h1>
-              {location.pathname === '/chat' && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Info className="h-3 w-3" />
-                  Säg "Jag har fakturerat 25 000 kr" eller ladda upp kvitto
-                </p>
-              )}
             </div>
           </div>
           
-          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <Menu className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-80 bg-background border-l border-border/20">
-              <div className="flex flex-col gap-8 pt-8">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center">
-                    <User className="h-5 w-5 text-primary-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">
-                      {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Användare'}
-                    </p>
-                    <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-1">
-                  {navigationItems.map((item) => (
-                    <NavLink key={item.href} item={item} mobile />
-                  ))}
-                </div>
-                
-                <div className="border-t border-border/20 pt-4 space-y-1">
-                  <div className="flex items-center justify-start px-3 h-10">
-                    <Info className="h-4 w-4 mr-3" />
-                    <span className="text-sm font-medium">Hjälp med AI-chat</span>
-                    <div className="ml-auto">
-                      <VoiceInstructions />
+          <div className="flex items-center gap-2">
+            {location.pathname === '/chat' && <VoiceInstructions />}
+            
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-80 bg-background border-l border-border/20">
+                <div className="flex flex-col gap-8 pt-8">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center">
+                      <User className="h-5 w-5 text-primary-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">
+                        {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Användare'}
+                      </p>
+                      <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
                     </div>
                   </div>
-                  <Button variant="ghost" className="w-full justify-start h-10 px-3">
-                    <Settings className="h-4 w-4 mr-3" />
-                    Inställningar
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start h-10 px-3 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={handleSignOut}
-                  >
-                    <LogOut className="h-4 w-4 mr-3" />
-                    Logga ut
-                  </Button>
+                  
+                  <div className="space-y-1">
+                    {navigationItems.map((item) => (
+                      <NavLink key={item.href} item={item} mobile />
+                    ))}
+                  </div>
+                  
+                  <div className="border-t border-border/20 pt-4 space-y-1">
+                    <Button variant="ghost" className="w-full justify-start h-10 px-3">
+                      <Settings className="h-4 w-4 mr-3" />
+                      Inställningar
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start h-10 px-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={handleSignOut}
+                    >
+                      <LogOut className="h-4 w-4 mr-3" />
+                      Logga ut
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </header>
     </>
