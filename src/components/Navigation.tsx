@@ -109,8 +109,9 @@ const Navigation = () => {
             <div className="flex flex-col">
               <h1 className="text-lg font-medium text-foreground">Air Ledger</h1>
               {location.pathname === '/chat' && (
-                <p className="text-xs text-muted-foreground">
-                  💬 Säg "Jag har fakturerat 25 000 kr" eller ladda upp kvitto
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Säg "Jag har fakturerat 25 000 kr" eller ladda upp kvitto
                 </p>
               )}
             </div>
