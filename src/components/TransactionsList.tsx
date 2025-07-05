@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Receipt, FileText, ChevronRight, Calendar, Building } from "lucide-react";
+import { Search, Receipt, FileText, ChevronRight, Calendar, Building, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -135,6 +135,41 @@ const TransactionsList = () => {
     });
   };
 
+  const deleteTransaction = async (transactionId: string) => {
+    try {
+      // First delete all entries for this transaction
+      const { error: entriesError } = await supabase
+        .from('airledger_entries')
+        .delete()
+        .eq('transaction_id', transactionId);
+
+      if (entriesError) throw entriesError;
+
+      // Then delete the transaction itself
+      const { error: transactionError } = await supabase
+        .from('airledger_transactions')
+        .delete()
+        .eq('id', transactionId);
+
+      if (transactionError) throw transactionError;
+
+      // Update local state
+      setTransactions(transactions.filter(t => t.id !== transactionId));
+      
+      toast({
+        title: "Transaktion borttagen",
+        description: "Transaktionen har tagits bort permanent.",
+      });
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      toast({
+        title: "Fel vid borttagning",
+        description: "Kunde inte ta bort transaktionen. Försök igen.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -227,6 +262,17 @@ const TransactionsList = () => {
                         {transaction.transaction_type === 'income' ? '+' : ''}
                         {formatAmount(transaction.total_amount)}
                       </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTransaction(transaction.id);
+                        }}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                       <ChevronRight className={`h-5 w-5 text-gray-400 transition-transform ${
                         expandedTransaction === transaction.id ? 'rotate-90' : ''
                       }`} />
