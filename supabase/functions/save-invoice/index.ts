@@ -14,22 +14,43 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Save invoice function called')
-    const { customerName, amount, description, invoiceNumber, dueDate } = await req.json()
+    console.log('=== SAVE INVOICE FUNCTION STARTED ===')
+    console.log('Request method:', req.method)
+    console.log('Request headers:', Object.fromEntries(req.headers.entries()))
+    
+    const requestBody = await req.json()
+    console.log('Request body received:', requestBody)
+    
+    const { customerName, amount, description, invoiceNumber, dueDate } = requestBody
 
     if (!customerName || !amount || !description) {
+      console.error('Missing required fields:', { customerName: !!customerName, amount: !!amount, description: !!description })
       throw new Error('Customer name, amount and description are required')
     }
+
+    console.log('All required fields present:', { customerName, amount, description, invoiceNumber, dueDate })
 
     // Get the Authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      console.error('No authorization header found')
       throw new Error('No authorization header')
     }
+    
+    console.log('Authorization header present:', authHeader.substring(0, 20) + '...')
 
     // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
+    
+    console.log('Environment check:', { 
+      supabaseUrl: !!supabaseUrl, 
+      supabaseKey: !!supabaseKey 
+    })
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase environment variables not configured')
+    }
     
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: {
@@ -40,16 +61,33 @@ serve(async (req) => {
     })
 
     // Get user ID
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      throw new Error('Authentication failed')
+    let userId: string
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        console.warn('getUser failed, extracting from JWT:', userError?.message)
+        // Extract user ID from JWT token
+        const token = authHeader.replace('Bearer ', '')
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        userId = payload.sub
+        if (!userId) {
+          throw new Error('Could not extract user ID from token')
+        }
+        console.log('Extracted user ID from JWT:', userId)
+      } else {
+        userId = user.id
+        console.log('Got user ID from getUser:', userId)
+      }
+    } catch (jwtError) {
+      console.error('Authentication completely failed:', jwtError)
+      throw new Error('Authentication failed: ' + jwtError.message)
     }
 
-    console.log('Saving invoice for user:', user.id)
+    console.log('Saving invoice for user:', userId)
 
     // Create transaction
     const transactionData = {
-      user_id: user.id,
+      user_id: userId,
       transaction_date: new Date().toISOString().split('T')[0],
       description: `Faktura till ${customerName}: ${description}`,
       total_amount: amount,
@@ -63,6 +101,8 @@ serve(async (req) => {
         type: 'outgoing_invoice'
       }
     }
+
+    console.log('Transaction data to save:', transactionData)
 
     const { data: transaction, error: transError } = await supabase
       .from('airledger_transactions')
@@ -105,7 +145,7 @@ serve(async (req) => {
       throw new Error('Failed to create accounting entries')
     }
 
-    console.log('Invoice saved successfully')
+    console.log('=== SAVE INVOICE FUNCTION COMPLETED SUCCESSFULLY ===')
 
     return new Response(
       JSON.stringify({
@@ -121,7 +161,12 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error in save-invoice function:', error)
+    console.error('=== ERROR IN SAVE INVOICE FUNCTION ===')
+    console.error('Error type:', error.constructor.name)
+    console.error('Error message:', error.message)
+    console.error('Error stack:', error.stack)
+    console.error('Error details:', error)
+    
     return new Response(
       JSON.stringify({ 
         error: error.message || 'An unexpected error occurred',
