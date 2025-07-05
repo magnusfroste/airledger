@@ -280,9 +280,10 @@ När användaren nämner ingående balanser eller saldo på konton:
 UTGÅENDE FAKTUROR:
 När användaren nämner att de har fakturerat en kund:
 1. Identifiera kundnamn, belopp och beskrivning av tjänst/vara
-2. Fråga efter fakturanummer och förfallodatum (valfritt)
-3. Använd funktionen save-invoice för att spara
-4. Bokföring sker automatiskt: Debet 1510 Kundfordringar, Kredit 3000 Försäljning
+2. Belopp som användaren anger behandlas som EXKLUSIVE moms - 25% moms läggs automatiskt på
+3. Fråga efter fakturanummer och förfallodatum (valfritt)
+4. Använd funktionen save-invoice för att spara
+5. Bokföring sker automatiskt med tre poster: Debet 1510 Kundfordringar (inkl moms), Kredit 3000 Försäljning (exkl moms), Kredit 2640 Utgående moms
 
 KOMMUNIKATIONSSTIL:
 - Var vänlig, professionell och hjälpsam
@@ -443,7 +444,17 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
               aiResponse += `\n\n❌ Ett fel uppstod när jag försökte spara fakturan: ${invoiceError.message}`
             } else if (invoiceData?.success) {
               console.log('Invoice saved successfully')
-              aiResponse += `\n\n✅ Utmärkt! Jag har bokfört fakturan till ${args.customerName} på ${args.amount} kr.\n\n**Bokföring:**\n• Debet: 1510 Kundfordringar ${args.amount} kr\n• Kredit: 3000 Försäljning ${args.amount} kr`
+              const transaction = invoiceData.transaction
+              const analysisData = transaction.analysis_data
+              
+              aiResponse += `\n\n✅ Perfekt! Jag har bokfört fakturan till ${args.customerName}.\n\n` +
+                `**Belopp exkl. moms:** ${analysisData.amount_excl_vat} kr\n` +
+                `**Moms (25%):** ${analysisData.vat_amount} kr\n` +
+                `**Totalt inkl. moms:** ${analysisData.total_amount_incl_vat} kr\n\n` +
+                `**Bokföringsposter:**\n` +
+                `• Debet: 1510 Kundfordringar ${analysisData.total_amount_incl_vat} kr\n` +
+                `• Kredit: 3000 Försäljning ${analysisData.amount_excl_vat} kr\n` +
+                `• Kredit: 2640 Utgående moms ${analysisData.vat_amount} kr`
             } else {
               aiResponse += `\n\n❌ Ett okänt fel uppstod när jag försökte spara fakturan.`
             }

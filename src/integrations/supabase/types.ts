@@ -170,6 +170,30 @@ export type Database = {
         }
         Relationships: []
       }
+      airledger_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       airledger_entries: {
         Row: {
           account_code: string
@@ -207,6 +231,41 @@ export type Database = {
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "airledger_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      airledger_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          message_type: string | null
+          sender: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          message_type?: string | null
+          sender: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          message_type?: string | null
+          sender?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "airledger_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "airledger_conversations"
             referencedColumns: ["id"]
           },
         ]

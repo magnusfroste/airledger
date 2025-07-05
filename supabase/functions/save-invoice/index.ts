@@ -85,12 +85,17 @@ serve(async (req) => {
 
     console.log('Saving invoice for user:', userId)
 
+    // Calculate amounts - assume user amount is excluding VAT, add 25% VAT
+    const amountExclVat = amount
+    const vatAmount = Math.round(amount * 0.25 * 100) / 100 // 25% VAT, rounded to 2 decimals
+    const totalAmountInclVat = amountExclVat + vatAmount
+
     // Create transaction
     const transactionData = {
       user_id: userId,
       transaction_date: new Date().toISOString().split('T')[0],
       description: `Faktura till ${customerName}: ${description}`,
-      total_amount: amount,
+      total_amount: totalAmountInclVat,
       transaction_type: 'income',
       status: 'draft',
       reference_number: invoiceNumber || null,
@@ -98,7 +103,10 @@ serve(async (req) => {
         customer_name: customerName,
         invoice_number: invoiceNumber,
         due_date: dueDate,
-        type: 'outgoing_invoice'
+        type: 'outgoing_invoice',
+        amount_excl_vat: amountExclVat,
+        vat_amount: vatAmount,
+        total_amount_incl_vat: totalAmountInclVat
       }
     }
 
@@ -115,13 +123,13 @@ serve(async (req) => {
       throw new Error('Failed to create transaction')
     }
 
-    // Create accounting entries
+    // Create accounting entries with VAT
     const entries = [
       {
         transaction_id: transaction.id,
         account_code: '1510',
         account_name: 'Kundfordringar',
-        debit_amount: amount,
+        debit_amount: totalAmountInclVat, // Total amount including VAT
         credit_amount: 0,
         description: `Faktura till ${customerName}`
       },
@@ -130,8 +138,16 @@ serve(async (req) => {
         account_code: '3000',
         account_name: 'Försäljning',
         debit_amount: 0,
-        credit_amount: amount,
+        credit_amount: amountExclVat, // Sales amount excluding VAT
         description: description
+      },
+      {
+        transaction_id: transaction.id,
+        account_code: '2640',
+        account_name: 'Utgående moms',
+        debit_amount: 0,
+        credit_amount: vatAmount, // VAT amount
+        description: `Moms 25% på ${description}`
       }
     ]
 
