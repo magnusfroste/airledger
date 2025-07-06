@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Receipt, FileText, ChevronRight, Calendar, Building, Trash2 } from "lucide-react";
+import { Search, Receipt, FileText, ChevronRight, Calendar, Building, Trash2, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import TransactionEditDialog from "./TransactionEditDialog";
 
 interface TransactionEntry {
   id: string;
@@ -34,6 +35,7 @@ const TransactionsList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -267,6 +269,17 @@ const TransactionsList = () => {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
+                          setEditingTransaction(transaction);
+                        }}
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           deleteTransaction(transaction.id);
                         }}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -357,6 +370,14 @@ const TransactionsList = () => {
           )}
         </div>
       </div>
+
+      {/* Edit Dialog */}
+      <TransactionEditDialog
+        open={!!editingTransaction}
+        onOpenChange={(open) => !open && setEditingTransaction(null)}
+        transaction={editingTransaction}
+        onTransactionUpdated={fetchTransactions}
+      />
     </div>
   );
 };
