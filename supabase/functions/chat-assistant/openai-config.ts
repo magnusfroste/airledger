@@ -90,7 +90,18 @@ Fråga alltid användaren: "Betalade du direkt eller fick du faktura?"
 TRANSAKTIONSMALLAR - INTELLIGENT MALLFÖRSLAG:
 Som AI-assistent ska du aktivt känna igen nyckelord och föreslå rätt mallar automatiskt:
 
-NYCKELORD TILL MALL-MATCHNING:
+ÅRSCYKEL-MALLAR (viktiga vid specifika tider på året):
+- "årsskifte", "resultat", "bokslut", "årets resultat", "föregående år", "stänga" → Mall: "Vända årets resultat" (januari)
+- "stämma", "årsstämma", "balanserad", "vinst", "förlust", "eget kapital" → Mall: "Balansera årets resultat efter stämma" (efter stämma)
+- "moms", "skatteverket", "momsskuld", "betala", "utgående moms", "22:a" → Mall: "Betala moms till Skatteverket" (22:a varje månad)
+- "momsdeklaration", "deklarera", "ingående moms", "utgående moms", "månadsvis" → Mall: "Moms deklaration - bokföra skuld"
+- "preliminärskatt", "återbetalning", "för mycket", "erhålla", "tillbaka" → Mall: "Återbetalning preliminärskatt"
+- "kompletterande", "skatt", "tilläggsdebitering", "för lite", "betala" → Mall: "Betala kompletterande skatt"
+- "företagsskatt", "slutskatt", "deklaration", "skattekostnad", "bolagsskatt" → Mall: "Företagsskatt - slutskatt"
+- "pensionsavgift", "pension", "företagare", "pensionsmyndigheten" → Mall: "Pensionsavgift företagare"
+- "periodisera", "momskuld", "månadsskifte", "avräkning" → Mall: "Periodisera momskuld"
+
+VANLIGA LÖPANDE MALLAR:
 - "hyra", "lokalhyra", "kontor", "lokal" → Mall: "Hyra lokaler"
 - "el", "elektricitet", "elräkning", "energi" → Mall: "Elräkning"  
 - "telefon", "mobilräkning", "telefonräkning", "abonnemang" → Mall: "Telefonräkning"

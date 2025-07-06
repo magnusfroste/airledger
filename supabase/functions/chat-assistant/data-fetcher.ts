@@ -48,8 +48,10 @@ export async function fetchUserData(userId: string, supabase: any): Promise<User
   console.log('Fetching transaction templates');
   const { data: templates, error: templatesError } = await supabase
     .from('airledger_transaction_templates')
-    .select('*')
-    .order('template_name');
+    .select('template_name, description, category, keywords, usage_count, last_used_at, is_system_template, template_entries')
+    .or(`is_system_template.eq.true,user_id.eq.${userId}`)
+    .eq('auto_suggest', true)
+    .order('usage_count', { ascending: false });
 
   if (templatesError) {
     console.error('Error fetching templates:', templatesError);
