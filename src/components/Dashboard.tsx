@@ -85,16 +85,10 @@ const Dashboard = () => {
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
 
-      // Revenue - posted income transactions this month
-      const revenue = transactions
-        .filter(t => {
-          const transactionDate = new Date(t.transaction_date);
-          return t.transaction_type === 'income' && 
-                 t.status === 'posted' &&
-                 transactionDate.getMonth() === currentMonth &&
-                 transactionDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, t) => sum + t.total_amount, 0);
+      // Revenue - only from sales (3000 account), not payments
+      // Calculate from entries to avoid double-counting invoices and payments
+      const salesEntries = entries.filter(e => e.account_code === '3000');
+      const revenue = salesEntries.reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
       // Expenses - posted expense transactions this month
       const expenses = transactions
@@ -107,25 +101,29 @@ const Dashboard = () => {
         })
         .reduce((sum, t) => sum + t.total_amount, 0);
 
-      // Checking account balance (1930) - credit minus debit
-      const checkingBalance = entries
+      // Checking account balance (1930) - include opening balance + transactions
+      const checkingOpeningBalance = await supabase
+        .from('airledger_opening')
+        .select('opening_balance')
+        .eq('account_code', '1930')
+        .single();
+      
+      const checkingTransactions = entries
         .filter(e => e.account_code === '1930')
-        .reduce((sum, e) => sum + (e.credit_amount || 0) - (e.debit_amount || 0), 0);
+        .reduce((sum, e) => sum + (e.debit_amount || 0) - (e.credit_amount || 0), 0);
+      
+      const checkingBalance = (checkingOpeningBalance.data?.opening_balance || 0) + checkingTransactions;
 
-      // Unpaid invoices - draft income transactions or accounts payable (2640)
-      const unpaidInvoicesAmount = transactions
-        .filter(t => t.transaction_type === 'income' && t.status === 'draft')
-        .reduce((sum, t) => sum + t.total_amount, 0);
-
-      const unpaidPayables = entries
-        .filter(e => e.account_code === '2640')
-        .reduce((sum, e) => sum + (e.credit_amount || 0) - (e.debit_amount || 0), 0);
+      // Unpaid invoices - customer receivables (1510) minus any advance payments
+      const customerReceivables = entries
+        .filter(e => e.account_code === '1510')
+        .reduce((sum, e) => sum + (e.debit_amount || 0) - (e.credit_amount || 0), 0);
 
       setStats({
         revenue,
         expenses: Math.abs(expenses),
         checkingBalance,
-        unpaidInvoices: unpaidInvoicesAmount + unpaidPayables
+        unpaidInvoices: Math.max(customerReceivables, 0)
       });
 
       // Get recent transactions (last 5)
