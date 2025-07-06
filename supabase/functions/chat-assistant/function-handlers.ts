@@ -42,7 +42,8 @@ export async function handleFunctionCall(
           amount: args.amount,
           description: args.description,
           invoiceNumber: args.invoiceNumber,
-          dueDate: args.dueDate
+          dueDate: args.dueDate,
+          transactionDate: args.transactionDate
         }
       });
 
@@ -77,7 +78,8 @@ export async function handleFunctionCall(
         body: {
           customerName: args.customerName,
           amount: args.amount,
-          description: args.description
+          description: args.description,
+          transactionDate: args.transactionDate
         }
       });
 

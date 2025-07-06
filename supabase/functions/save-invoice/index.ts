@@ -21,7 +21,7 @@ serve(async (req) => {
     const requestBody = await req.json()
     console.log('Request body received:', requestBody)
     
-    const { customerName, amount, description, invoiceNumber, dueDate } = requestBody
+    const { customerName, amount, description, invoiceNumber, dueDate, transactionDate } = requestBody
 
     if (!customerName || !amount || !description) {
       console.error('Missing required fields:', { customerName: !!customerName, amount: !!amount, description: !!description })
@@ -93,7 +93,7 @@ serve(async (req) => {
     // Create transaction
     const transactionData = {
       user_id: userId,
-      transaction_date: new Date().toISOString().split('T')[0],
+      transaction_date: transactionDate || new Date().toISOString().split('T')[0],
       description: `Faktura till ${customerName}: ${description}`,
       total_amount: totalAmountInclVat,
       transaction_type: 'income',

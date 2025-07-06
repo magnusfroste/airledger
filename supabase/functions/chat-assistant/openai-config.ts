@@ -154,6 +154,10 @@ export const FUNCTION_DEFINITIONS = [
           dueDate: {
             type: "string",
             description: "Förfallodatum i format YYYY-MM-DD (valfritt)"
+          },
+          transactionDate: {
+            type: "string",
+            description: "Fakturadatum i format YYYY-MM-DD (valfritt, använder dagens datum som standard)"
           }
         },
         required: ["customerName", "amount", "description"]
@@ -179,6 +183,10 @@ export const FUNCTION_DEFINITIONS = [
           description: {
             type: "string",
             description: "Beskrivning av betalningen (t.ex. 'Betalning från X')"
+          },
+          transactionDate: {
+            type: "string",
+            description: "Betalningsdatum i format YYYY-MM-DD (valfritt, använder dagens datum som standard)"
           }
         },
         required: ["customerName", "amount", "description"]

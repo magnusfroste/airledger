@@ -15,7 +15,7 @@ serve(async (req) => {
   try {
     console.log('=== SAVE PAYMENT FUNCTION STARTED ===')
     
-    const { customerName, amount, description } = await req.json()
+    const { customerName, amount, description, transactionDate } = await req.json()
     console.log('Received payment data:', { 
       customerName,
       amount,
@@ -65,7 +65,7 @@ serve(async (req) => {
     // Create payment transaction
     const transactionData = {
       user_id: userId,
-      transaction_date: new Date().toISOString().split('T')[0], // Today's date
+      transaction_date: transactionDate || new Date().toISOString().split('T')[0],
       description: `Betalning från ${customerName}`,
       total_amount: amount,
       transaction_type: 'income',
