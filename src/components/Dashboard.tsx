@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line } from "recharts";
 import { 
   MessageCircle, 
   Camera, 
@@ -12,7 +15,8 @@ import {
   DollarSign,
   CreditCard,
   AlertCircle,
-  Receipt
+  Receipt,
+  Calendar
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
@@ -24,6 +28,18 @@ interface DashboardStats {
   expenses: number;
   checkingBalance: number;
   unpaidInvoices: number;
+}
+
+interface YearlyStats {
+  revenue: number;
+  expenses: number;
+  netResult: number;
+  monthlyBreakdown: Array<{
+    month: string;
+    revenue: number;
+    expenses: number;
+    netResult: number;
+  }>;
 }
 
 interface RecentTransaction {
@@ -43,6 +59,12 @@ const Dashboard = () => {
     expenses: 0,
     checkingBalance: 0,
     unpaidInvoices: 0
+  });
+  const [yearlyStats, setYearlyStats] = useState<YearlyStats>({
+    revenue: 0,
+    expenses: 0,
+    netResult: 0,
+    monthlyBreakdown: []
   });
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,13 +107,19 @@ const Dashboard = () => {
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
 
+      // MONTHLY DATA
       // Revenue - only from sales (3000 account), not payments
-      // Calculate from entries to avoid double-counting invoices and payments
-      const salesEntries = entries.filter(e => e.account_code === '3000');
-      const revenue = salesEntries.reduce((sum, e) => sum + (e.credit_amount || 0), 0);
+      const monthlyRevenue = entries
+        .filter(e => {
+          const entryDate = new Date(e.created_at);
+          return e.account_code === '3000' && 
+                 entryDate.getMonth() === currentMonth && 
+                 entryDate.getFullYear() === currentYear;
+        })
+        .reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
       // Expenses - posted expense transactions this month
-      const expenses = transactions
+      const monthlyExpenses = transactions
         .filter(t => {
           const transactionDate = new Date(t.transaction_date);
           return t.transaction_type === 'expense' && 
@@ -120,10 +148,69 @@ const Dashboard = () => {
         .reduce((sum, e) => sum + (e.debit_amount || 0) - (e.credit_amount || 0), 0);
 
       setStats({
-        revenue,
-        expenses: Math.abs(expenses),
+        revenue: monthlyRevenue,
+        expenses: Math.abs(monthlyExpenses),
         checkingBalance,
         unpaidInvoices: Math.max(customerReceivables, 0)
+      });
+
+      // YEARLY DATA
+      // Calculate yearly totals and monthly breakdown
+      const yearlyRevenue = entries
+        .filter(e => {
+          const entryDate = new Date(e.created_at);
+          return e.account_code === '3000' && entryDate.getFullYear() === currentYear;
+        })
+        .reduce((sum, e) => sum + (e.credit_amount || 0), 0);
+
+      const yearlyExpenses = transactions
+        .filter(t => {
+          const transactionDate = new Date(t.transaction_date);
+          return t.transaction_type === 'expense' && 
+                 t.status === 'posted' &&
+                 transactionDate.getFullYear() === currentYear;
+        })
+        .reduce((sum, t) => sum + t.total_amount, 0);
+
+      // Create monthly breakdown for charts
+      const monthNames = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'
+      ];
+
+      const monthlyBreakdown = monthNames.map((month, index) => {
+        const monthRevenue = entries
+          .filter(e => {
+            const entryDate = new Date(e.created_at);
+            return e.account_code === '3000' && 
+                   entryDate.getMonth() === index && 
+                   entryDate.getFullYear() === currentYear;
+          })
+          .reduce((sum, e) => sum + (e.credit_amount || 0), 0);
+
+        const monthExpenses = transactions
+          .filter(t => {
+            const transactionDate = new Date(t.transaction_date);
+            return t.transaction_type === 'expense' && 
+                   t.status === 'posted' &&
+                   transactionDate.getMonth() === index &&
+                   transactionDate.getFullYear() === currentYear;
+          })
+          .reduce((sum, t) => sum + t.total_amount, 0);
+
+        return {
+          month,
+          revenue: monthRevenue,
+          expenses: Math.abs(monthExpenses),
+          netResult: monthRevenue - Math.abs(monthExpenses)
+        };
+      });
+
+      setYearlyStats({
+        revenue: yearlyRevenue,
+        expenses: Math.abs(yearlyExpenses),
+        netResult: yearlyRevenue - Math.abs(yearlyExpenses),
+        monthlyBreakdown
       });
 
       // Get recent transactions (last 5)
@@ -205,92 +292,235 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Main Content with Tabs */}
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Revenue */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Försäljning denna månad</p>
-                  <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.revenue)}</p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="month" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-8">
+            <TabsTrigger value="month" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Denna månad
+            </TabsTrigger>
+            <TabsTrigger value="year" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Hela året {new Date().getFullYear()}
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Expenses */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Kostnader denna månad</p>
-                  <p className="text-2xl font-bold text-red-600">{formatCurrency(stats.expenses)}</p>
-                </div>
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                  <TrendingDown className="h-6 w-6 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Monthly View */}
+          <TabsContent value="month" className="space-y-8">
+            {/* Monthly Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Revenue */}
+              <Card className="bg-white border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Försäljning denna månad</p>
+                      <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.revenue)}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <TrendingUp className="h-6 w-6 text-green-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Checking Balance */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Saldo checkkonto</p>
-                  <p className="text-2xl font-bold text-blue-600">{formatCurrency(stats.checkingBalance)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Konto 1930</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <CreditCard className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              {/* Expenses */}
+              <Card className="bg-white border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Kostnader denna månad</p>
+                      <p className="text-2xl font-bold text-red-600">{formatCurrency(stats.expenses)}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                      <TrendingDown className="h-6 w-6 text-red-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Unpaid Invoices */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Obetalda fakturor</p>
-                  <p className="text-2xl font-bold text-orange-600">{formatCurrency(stats.unpaidInvoices)}</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                  <AlertCircle className="h-6 w-6 text-orange-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              {/* Checking Balance */}
+              <Card className="bg-white border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Saldo checkkonto</p>
+                      <p className="text-2xl font-bold text-blue-600">{formatCurrency(stats.checkingBalance)}</p>
+                      <p className="text-xs text-gray-500 mt-1">Konto 1930</p>
+                    </div>
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <CreditCard className="h-6 w-6 text-blue-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-        {/* Net Result Card */}
-        <div className="mb-8">
-          <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100">Nettoresultat denna månad</p>
-                  <p className="text-3xl font-bold">
-                    {formatCurrency(stats.revenue - stats.expenses)}
-                  </p>
-                </div>
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                  <DollarSign className="h-8 w-8 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              {/* Unpaid Invoices */}
+              <Card className="bg-white border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Obetalda fakturor</p>
+                      <p className="text-2xl font-bold text-orange-600">{formatCurrency(stats.unpaidInvoices)}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                      <AlertCircle className="h-6 w-6 text-orange-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-        {/* Recent Transactions */}
-        <Card className="bg-white border border-gray-200">
+            {/* Monthly Net Result Card */}
+            <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-100">Nettoresultat denna månad</p>
+                    <p className="text-3xl font-bold">
+                      {formatCurrency(stats.revenue - stats.expenses)}
+                    </p>
+                  </div>
+                  <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                    <DollarSign className="h-8 w-8 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Yearly View */}
+          <TabsContent value="year" className="space-y-8">
+            {/* Yearly Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Yearly Revenue */}
+              <Card className="bg-white border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total försäljning {new Date().getFullYear()}</p>
+                      <p className="text-2xl font-bold text-green-600">{formatCurrency(yearlyStats.revenue)}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <TrendingUp className="h-6 w-6 text-green-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Yearly Expenses */}
+              <Card className="bg-white border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total kostnader {new Date().getFullYear()}</p>
+                      <p className="text-2xl font-bold text-red-600">{formatCurrency(yearlyStats.expenses)}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                      <TrendingDown className="h-6 w-6 text-red-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Yearly Net Result */}
+              <Card className="bg-gradient-to-r from-purple-600 to-purple-700 text-white border-0">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-purple-100">Nettoresultat {new Date().getFullYear()}</p>
+                      <p className="text-2xl font-bold">
+                        {formatCurrency(yearlyStats.netResult)}
+                      </p>
+                    </div>
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                      <DollarSign className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Monthly Breakdown Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Monthly Revenue & Expenses Bar Chart */}
+              <Card className="bg-white border border-gray-200">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-gray-900">Månatlig översikt</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      revenue: {
+                        label: "Försäljning",
+                        color: "hsl(142, 76%, 36%)",
+                      },
+                      expenses: {
+                        label: "Kostnader",
+                        color: "hsl(0, 84%, 60%)",
+                      },
+                    }}
+                  >
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={yearlyStats.monthlyBreakdown}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis tickFormatter={(value) => `${value / 1000}k`} />
+                        <ChartTooltip 
+                          content={<ChartTooltipContent />}
+                          formatter={(value: number) => formatCurrency(value)}
+                        />
+                        <Bar dataKey="revenue" fill="var(--color-revenue)" name="Försäljning" />
+                        <Bar dataKey="expenses" fill="var(--color-expenses)" name="Kostnader" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              {/* Net Result Line Chart */}
+              <Card className="bg-white border border-gray-200">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-gray-900">Nettoresultat per månad</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      netResult: {
+                        label: "Nettoresultat",
+                        color: "hsl(217, 91%, 60%)",
+                      },
+                    }}
+                  >
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={yearlyStats.monthlyBreakdown}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis tickFormatter={(value) => `${value / 1000}k`} />
+                        <ChartTooltip 
+                          content={<ChartTooltipContent />}
+                          formatter={(value: number) => formatCurrency(value)}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="netResult" 
+                          stroke="var(--color-netResult)" 
+                          strokeWidth={3}
+                          dot={{ r: 4 }}
+                          name="Nettoresultat"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Recent Transactions - Always visible */}
+        <Card className="bg-white border border-gray-200 mt-8">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-semibold text-gray-900">Senaste transaktioner</CardTitle>
