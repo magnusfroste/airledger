@@ -606,8 +606,8 @@ const ChatInterface = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Chat Messages */}
-      <div className="container px-6 py-6 flex-1 max-w-4xl mx-auto">
-        <div className="h-[calc(100vh-120px)] flex flex-col">
+      <div className="container px-6 py-4 flex-1 max-w-4xl mx-auto">
+        <div className="h-[calc(100vh-80px)] flex flex-col">
           {/* Messages Container */}
           <div className="flex-1 overflow-y-auto space-y-6 mb-6">
             {messages.slice(1).map((message) => (
