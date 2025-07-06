@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, MessageCircle, FileText, Menu, Settings, LogOut, User, Info, BarChart3, Calculator, BookOpen } from "lucide-react";
+import { Home, MessageCircle, FileText, MoreHorizontal, Settings, LogOut, User, BarChart3, Calculator, BookOpen, Menu } from "lucide-react";
 import VoiceInstructions from "@/components/VoiceInstructions";
+import FloatingActionButton from "@/components/FloatingActionButton";
 
 const Navigation = () => {
   const location = useLocation();
@@ -70,10 +71,11 @@ const Navigation = () => {
     fetchNavigationData();
   }, [user]);
 
-  const navigationItems = [
+  // Bottom tab navigation items (main 4 tabs)
+  const bottomTabItems = [
     { 
       href: "/", 
-      label: "Dashboard", 
+      label: "Hem", 
       icon: Home,
       badge: null
     },
@@ -90,15 +92,19 @@ const Navigation = () => {
       badge: transactionCount > 0 ? transactionCount.toString() : null
     },
     { 
-      href: "/templates", 
-      label: "Mallar", 
-      icon: Settings,
-      badge: null
-    },
-    { 
       href: "/reports", 
       label: "Rapporter", 
       icon: BarChart3,
+      badge: null
+    }
+  ];
+
+  // More menu items (less frequently used)
+  const moreMenuItems = [
+    { 
+      href: "/templates", 
+      label: "Mallar", 
+      icon: Settings,
       badge: null
     },
     { 
@@ -119,19 +125,50 @@ const Navigation = () => {
     return location.pathname === href;
   };
 
-  const NavLink = ({ item, mobile = false }: { item: typeof navigationItems[0], mobile?: boolean }) => {
+  // Bottom tab navigation component
+  const BottomTabLink = ({ item }: { item: typeof bottomTabItems[0] }) => {
     const Icon = item.icon;
     const active = isActive(item.href);
     
     return (
       <Link
         to={item.href}
-        onClick={() => mobile && setIsMobileMenuOpen(false)}
+        className={`flex flex-col items-center gap-1 py-2 px-3 transition-colors duration-200 ${
+          active 
+            ? 'text-primary' 
+            : 'text-muted-foreground'
+        }`}
+      >
+        <div className="relative">
+          <Icon className="h-5 w-5" />
+          {item.badge && (
+            <Badge 
+              variant="destructive"
+              className="absolute -top-2 -right-2 h-4 w-4 p-0 text-xs flex items-center justify-center"
+            >
+              {item.badge}
+            </Badge>
+          )}
+        </div>
+        <span className="text-xs font-medium">{item.label}</span>
+      </Link>
+    );
+  };
+
+  // More menu link component  
+  const MoreMenuLink = ({ item }: { item: typeof moreMenuItems[0] }) => {
+    const Icon = item.icon;
+    const active = isActive(item.href);
+    
+    return (
+      <Link
+        to={item.href}
+        onClick={() => setIsMobileMenuOpen(false)}
         className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 ${
           active 
             ? 'bg-primary/10 text-primary font-medium' 
             : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-        } ${mobile ? 'w-full' : ''}`}
+        } w-full`}
       >
         <Icon className="h-5 w-5" />
         <span className="font-medium">{item.label}</span>
@@ -149,69 +186,90 @@ const Navigation = () => {
 
   return (
     <>
-      {/* Clean Header with Drawer Menu */}
+      {/* Minimal Mobile Header */}
       <header className="sticky top-0 z-40 w-full border-b border-border/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="container flex h-14 items-center justify-between px-6 max-w-none">
-          <div className="flex items-center gap-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm">
+        <div className="flex h-12 items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-xs">
               AL
             </div>
-            <div className="flex flex-col">
-              <h1 className="text-lg font-medium text-foreground">Air Ledger</h1>
-            </div>
+            <h1 className="text-base font-medium text-foreground">Air Ledger</h1>
           </div>
           
           <div className="flex items-center gap-2">
             {location.pathname === '/chat' && <VoiceInstructions />}
-            
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <Menu className="h-4 w-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80 bg-background border-l border-border/20">
-                <div className="flex flex-col gap-8 pt-8">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center">
-                      <User className="h-5 w-5 text-primary-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">
-                        {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Användare'}
-                      </p>
-                      <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    {navigationItems.map((item) => (
-                      <NavLink key={item.href} item={item} mobile />
-                    ))}
-                  </div>
-                  
-                  <div className="border-t border-border/20 pt-4 space-y-1">
-                    <Link to="/settings" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button variant="ghost" className="w-full justify-start h-10 px-3">
-                        <Settings className="h-4 w-4 mr-3" />
-                        Inställningar
-                      </Button>
-                    </Link>
-                    <Button 
-                      variant="ghost" 
-                      className="w-full justify-start h-10 px-3 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={handleSignOut}
-                    >
-                      <LogOut className="h-4 w-4 mr-3" />
-                      Logga ut
-                    </Button>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
           </div>
         </div>
       </header>
+
+      {/* Bottom Tab Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t border-border/20">
+        <div className="flex items-center justify-around px-2 py-1">
+          {bottomTabItems.map((item) => (
+            <BottomTabLink key={item.href} item={item} />
+          ))}
+          
+          {/* More Menu Tab */}
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <button
+                className={`flex flex-col items-center gap-1 py-2 px-3 transition-colors duration-200 ${
+                  moreMenuItems.some(item => isActive(item.href)) || isActive('/settings')
+                    ? 'text-primary' 
+                    : 'text-muted-foreground'
+                }`}
+              >
+                <MoreHorizontal className="h-5 w-5" />
+                <span className="text-xs font-medium">Mer</span>
+              </button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-auto rounded-t-xl border-0">
+              <div className="flex flex-col gap-6 py-4">
+                {/* User Profile Section */}
+                <div className="flex items-center gap-4 px-4">
+                  <div className="h-12 w-12 rounded-full bg-gradient-primary flex items-center justify-center">
+                    <User className="h-6 w-6 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">
+                      {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Användare'}
+                    </p>
+                    <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                </div>
+                
+                {/* More Menu Items */}
+                <div className="space-y-1">
+                  {moreMenuItems.map((item) => (
+                    <MoreMenuLink key={item.href} item={item} />
+                  ))}
+                </div>
+                
+                {/* Settings & Sign Out */}
+                <div className="border-t border-border/20 pt-4 space-y-1">
+                  <Link to="/settings" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button variant="ghost" className="w-full justify-start h-12 px-4">
+                      <Settings className="h-5 w-5 mr-3" />
+                      Inställningar
+                    </Button>
+                  </Link>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start h-12 px-4 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={handleSignOut}
+                  >
+                    <LogOut className="h-5 w-5 mr-3" />
+                    Logga ut
+                  </Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </nav>
+
+      {/* Floating Action Button */}
+      <FloatingActionButton />
     </>
   );
 };

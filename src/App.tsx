@@ -30,19 +30,23 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/*" element={
               <ProtectedRoute>
-                <Navigation />
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/chat" element={<Chat />} />
-                  <Route path="/transactions" element={<Transactions />} />
-                  <Route path="/templates" element={<Templates />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/opening-balances" element={<OpeningBalances />} />
-                  <Route path="/general-ledger" element={<GeneralLedger />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
+                <div className="min-h-screen bg-background pb-16">
+                  <Navigation />
+                  <main className="pb-2">
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/chat" element={<Chat />} />
+                      <Route path="/transactions" element={<Transactions />} />
+                      <Route path="/templates" element={<Templates />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/reports" element={<Reports />} />
+                      <Route path="/opening-balances" element={<OpeningBalances />} />
+                      <Route path="/general-ledger" element={<GeneralLedger />} />
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </main>
+                </div>
               </ProtectedRoute>
             } />
           </Routes>
