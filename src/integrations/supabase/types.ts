@@ -310,6 +310,7 @@ export type Database = {
           description: string
           id: string
           is_recurring: boolean
+          is_system_template: boolean
           recurring_frequency: string | null
           template_entries: Json
           template_name: string
@@ -322,6 +323,7 @@ export type Database = {
           description: string
           id?: string
           is_recurring?: boolean
+          is_system_template?: boolean
           recurring_frequency?: string | null
           template_entries: Json
           template_name: string
@@ -334,6 +336,7 @@ export type Database = {
           description?: string
           id?: string
           is_recurring?: boolean
+          is_system_template?: boolean
           recurring_frequency?: string | null
           template_entries?: Json
           template_name?: string
