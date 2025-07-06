@@ -295,6 +295,39 @@ När användaren nämner att de har fått betalning från en kund:
    - "Jag har fakturerat X" = Skapa ny faktura (save-invoice)
    - "X har betalat" / "Jag har fått betalning från X" = Registrera betalning (save-payment)
 
+ALLMÄNNA TRANSAKTIONER - VANLIGA TYPER:
+
+INKOMMANDE FAKTUROR (från leverantörer):
+- "Jag har fått en faktura från X på Y kr för Z"
+- Bokföring: Debet kostnadskonto (ex 6000, 6570, 4000), Kredit 2640 Leverantörsskulder
+- Använd save_general_transaction
+
+BETALNING AV LEVERANTÖRSFAKTUROR:
+- "Jag har betalat fakturan från X på Y kr"
+- Bokföring: Debet 2640 Leverantörsskulder, Kredit 1930 Checkkonto
+- Använd save_general_transaction
+
+LÖNEUTBETALNINGAR:
+- "Jag har betalat ut lön på X kr"
+- Bokföring: Debet 7210 Löner, Kredit 1930 Checkkonto (bruttolön)
+- För preliminärskatt: Debet 7210 Löner, Kredit 2510 Skulder skatter och avgifter
+- Använd save_general_transaction
+
+VANLIGA KOSTNADSKONTON OCH BOKFÖRING:
+- 6000 Lokalhyra: "Betalat hyra" → Debet 6000, Kredit 1930
+- 6830 Bankavgifter: "Bankavgift dragits" → Debet 6830, Kredit 1930  
+- 6850 Försäkringar: "Betalat försäkring" → Debet 6850, Kredit 1930
+- 6570 Kontorsmaterial: "Köpt kontorsmaterial" → Debet 6570, Kredit 1930
+- 5410 Datakostnader: "Betalat programlicens" → Debet 5410, Kredit 1930
+- 6420 Resor: "Betalat resa" → Debet 6420, Kredit 1930
+- 6970 Representation: "Betalat middagsrepresentation" → Debet 6970, Kredit 1930
+- 4000 Inköp av varor: "Köpt varor att sälja" → Debet 4000, Kredit 1930/2640
+
+KONTANTKÖP vs FAKTURA:
+- Kontant/kort: Kredit 1930 Checkkonto (pengar lämnar banken direkt)
+- På faktura: Kredit 2640 Leverantörsskulder (skuld uppstår, betalas senare)
+Fråga alltid användaren: "Betalade du direkt eller fick du faktura?"
+
 KOMMUNIKATIONSSTIL:
 - Var vänlig, professionell och hjälpsam
 - Använd svenska
@@ -417,6 +450,61 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
               required: ["customerName", "amount", "description"]
             }
           }
+        },
+        {
+          type: "function",
+          function: {
+            name: "save_general_transaction",
+            description: "Spara en allmän transaktion för vanliga kostnader, leverantörsfakturor, löner etc. Använd denna för alla transaktioner som inte är kundbetalningar eller utgående fakturor.",
+            parameters: {
+              type: "object",
+              properties: {
+                description: {
+                  type: "string",
+                  description: "Beskrivning av transaktionen"
+                },
+                entries: {
+                  type: "array",
+                  description: "Array av bokföringsposter",
+                  items: {
+                    type: "object",
+                    properties: {
+                      accountCode: {
+                        type: "string",
+                        description: "Kontonummer enligt BAS 2024"
+                      },
+                      accountName: {
+                        type: "string",
+                        description: "Kontonamn"
+                      },
+                      debitAmount: {
+                        type: "number",
+                        description: "Debitbelopp (lämna tom för kredit)"
+                      },
+                      creditAmount: {
+                        type: "number", 
+                        description: "Kreditbelopp (lämna tom för debit)"
+                      },
+                      description: {
+                        type: "string",
+                        description: "Beskrivning för denna post (valfritt)"
+                      }
+                    },
+                    required: ["accountCode", "accountName"]
+                  }
+                },
+                transactionDate: {
+                  type: "string",
+                  description: "Transaktionsdatum i format YYYY-MM-DD (valfritt, använder dagens datum som standard)"
+                },
+                referenceNumber: {
+                  type: "string",
+                  description: "Referensnummer eller fakturanummer (valfritt)"
+                }
+              },
+              required: ["description", "entries"]
+            }
+          }
         }
       ],
       tool_choice: "auto"
@@ -529,6 +617,42 @@ Om användaren frågar om sina transaktioner, ingående balanser eller bokförin
           } catch (parseError) {
             console.error('Error parsing payment arguments:', parseError)
             aiResponse += `\n\n❌ Ett fel uppstod när jag försökte tolka betalningsinformationen.`
+          }
+        } else if (toolCall.function.name === 'save_general_transaction') {
+          try {
+            const args = JSON.parse(toolCall.function.arguments)
+            console.log('Saving general transaction:', args)
+            
+            // Call the save-general-transaction function
+            const { data: transactionData, error: transactionError } = await supabase.functions.invoke('save-general-transaction', {
+              body: {
+                description: args.description,
+                entries: args.entries,
+                transactionDate: args.transactionDate,
+                referenceNumber: args.referenceNumber
+              }
+            })
+
+            if (transactionError) {
+              console.error('Error saving general transaction:', transactionError)
+              aiResponse += `\n\n❌ Ett fel uppstod när jag försökte spara transaktionen: ${transactionError.message}`
+            } else if (transactionData?.success) {
+              console.log('General transaction saved successfully')
+              const transaction = transactionData.transaction
+              
+              aiResponse += `\n\n✅ Perfekt! Jag har bokfört transaktionen.\n\n` +
+                `**Beskrivning:** ${args.description}\n` +
+                `**Datum:** ${transaction.transaction_date}\n\n` +
+                `**Bokföringsposter:**\n` +
+                args.entries.map((entry: any) => 
+                  `• ${entry.debitAmount > 0 ? 'Debet' : 'Kredit'}: ${entry.accountCode} ${entry.accountName} ${entry.debitAmount || entry.creditAmount} kr`
+                ).join('\n')
+            } else {
+              aiResponse += `\n\n❌ Ett okänt fel uppstod när jag försökte spara transaktionen.`
+            }
+          } catch (parseError) {
+            console.error('Error parsing general transaction arguments:', parseError)
+            aiResponse += `\n\n❌ Ett fel uppstod när jag försökte tolka transaktionsinformationen.`
           }
         }
       }
