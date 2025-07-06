@@ -641,12 +641,6 @@ const ChatInterface = () => {
                     </div>
                   )}
                   <p className="text-sm leading-relaxed">{message.content}</p>
-                  <p className="text-xs opacity-60 mt-3">
-                    {message.timestamp.toLocaleTimeString('sv-SE', { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
-                    })}
-                  </p>
                 </div>
 
                 {message.sender === 'user' && (
