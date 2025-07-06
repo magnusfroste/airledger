@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, FileImage, CheckCircle, AlertCircle } from "lucide-react";
+import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, FileImage, CheckCircle, AlertCircle, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import TransactionConfirmDialog from "@/components/TransactionConfirmDialog";
@@ -50,6 +50,8 @@ const ChatInterface = () => {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
 
   // Load or create conversation on mount
@@ -467,6 +469,88 @@ const ChatInterface = () => {
     }
   };
 
+  // Camera functionality
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment', // Use back camera on mobile
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        } 
+      });
+      setCameraStream(stream);
+      setShowCamera(true);
+      
+      toast({
+        title: "Kamera startad",
+        description: "Ta ett foto av ditt kvitto",
+      });
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      toast({
+        title: "Kamerafel",
+        description: "Kunde inte komma åt kameran. Kontrollera behörigheter.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  const capturePhoto = () => {
+    if (!cameraStream) return;
+
+    const video = document.getElementById('camera-video') as HTMLVideoElement;
+    if (!video) return;
+
+    // Create canvas to capture the photo
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Draw the video frame to canvas
+    ctx.drawImage(video, 0, 0);
+    
+    // Convert canvas to blob
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      
+      // Create file from blob  
+      const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      const preview = URL.createObjectURL(file);
+      
+      setPendingImages(prev => [...prev, { id, file, preview }]);
+      
+      // Stop camera after taking photo
+      stopCamera();
+      
+      toast({
+        title: "Foto taget!",
+        description: "Bilden har lagts till för analys",
+      });
+    }, 'image/jpeg', 0.9);
+  };
+
+  // Cleanup camera stream on unmount
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
   const handleTransactionConfirm = async (analysis: any, entries: any[], paymentMethod: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('save-transaction', {
@@ -622,6 +706,16 @@ const ChatInterface = () => {
                 <Paperclip className="h-5 w-5" />
               </Button>
               
+              <Button
+                variant="ghost"
+                size="lg"
+                className="px-3 h-12 rounded-full"
+                onClick={startCamera}
+                disabled={isLoading}
+              >
+                <Camera className="h-5 w-5" />
+              </Button>
+              
               <div className="flex-1 relative">
                 <Input
                   value={inputValue}
@@ -662,6 +756,54 @@ const ChatInterface = () => {
         analysis={pendingAnalysis}
         onConfirm={handleTransactionConfirm}
       />
+
+      {/* Camera Modal */}
+      {showCamera && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-md mx-auto">
+            <div className="bg-white rounded-2xl overflow-hidden">
+              <div className="relative">
+                {cameraStream && (
+                  <video
+                    id="camera-video"
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-80 object-cover"
+                    ref={(video) => {
+                      if (video && cameraStream) {
+                        video.srcObject = cameraStream;
+                      }
+                    }}
+                  />
+                )}
+                <div className="absolute top-4 right-4">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={stopCamera}
+                    className="rounded-full h-10 w-10 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="p-6 text-center space-y-4">
+                <p className="text-sm text-gray-600">
+                  Placera kvittot i kamerans vy och tryck på fotoknappen
+                </p>
+                <Button
+                  onClick={capturePhoto}
+                  className="w-full rounded-full py-3"
+                >
+                  <Camera className="h-5 w-5 mr-2" />
+                  Ta foto
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
