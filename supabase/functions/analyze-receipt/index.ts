@@ -109,7 +109,7 @@ Return a JSON object with this exact structure:
   "document_type": "receipt|invoice",
   "document_type_confidence": 85,
   "transaction_type": "expense",
-  "suggested_payment_method": "bank|cash|card|unpaid",
+  "suggested_payment_method": "bank|cash|expense|unpaid",
   "entries": [
     {
       "account_code": "6000",
