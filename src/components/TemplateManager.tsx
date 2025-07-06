@@ -54,6 +54,7 @@ const TemplateManager = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [isDeveloper, setIsDeveloper] = useState(false);
+  const [chartOfAccounts, setChartOfAccounts] = useState<Array<{account_code: string, account_name: string}>>([]);
 
   // New template form state
   const [newTemplate, setNewTemplate] = useState({
@@ -71,7 +72,31 @@ const TemplateManager = () => {
   useEffect(() => {
     fetchTemplatesAndUsage();
     checkDeveloperStatus();
+    fetchChartOfAccounts();
   }, []);
+
+  const fetchChartOfAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('airledger_chart_of_accounts')
+        .select('account_code, account_name')
+        .eq('is_active', true)
+        .order('account_code');
+      
+      if (error) throw error;
+      setChartOfAccounts(data || []);
+    } catch (error) {
+      console.error('Error fetching chart of accounts:', error);
+    }
+  };
+
+  const handleAccountCodeChange = (index: number, accountCode: string) => {
+    const account = chartOfAccounts.find(acc => acc.account_code === accountCode);
+    const newEntries = [...newTemplate.template_entries];
+    newEntries[index].account_code = accountCode;
+    newEntries[index].account_name = account?.account_name || '';
+    setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
+  };
 
   const checkDeveloperStatus = async () => {
     if (!user) return;
@@ -337,53 +362,73 @@ const TemplateManager = () => {
                   <div>
                     <Label>Bokföringsposter</Label>
                     <div className="space-y-3 mt-2">
-                      {newTemplate.template_entries.map((entry, index) => (
-                        <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
-                          <Input
-                            placeholder="Kontonummer"
-                            value={entry.account_code}
-                            onChange={(e) => {
-                              const newEntries = [...newTemplate.template_entries];
-                              newEntries[index].account_code = e.target.value;
-                              setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
-                            }}
-                          />
-                          <Input
-                            placeholder="Kontonamn"
-                            value={entry.account_name}
-                            onChange={(e) => {
-                              const newEntries = [...newTemplate.template_entries];
-                              newEntries[index].account_name = e.target.value;
-                              setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
-                            }}
-                          />
-                          <Select
-                            value={entry.type}
-                            onValueChange={(value) => {
-                              const newEntries = [...newTemplate.template_entries];
-                              newEntries[index].type = value;
-                              setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="debit">Debet</SelectItem>
-                              <SelectItem value="credit">Kredit</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            placeholder="Beskrivning"
-                            value={entry.description}
-                            onChange={(e) => {
-                              const newEntries = [...newTemplate.template_entries];
-                              newEntries[index].description = e.target.value;
-                              setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
-                            }}
-                          />
-                        </div>
-                      ))}
+                       {newTemplate.template_entries.map((entry, index) => (
+                         <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
+                           {isDeveloper ? (
+                             <Select
+                               value={entry.account_code}
+                               onValueChange={(value) => handleAccountCodeChange(index, value)}
+                             >
+                               <SelectTrigger>
+                                 <SelectValue placeholder="Välj konto" />
+                               </SelectTrigger>
+                               <SelectContent className="max-h-60">
+                                 {chartOfAccounts.map((account) => (
+                                   <SelectItem key={account.account_code} value={account.account_code}>
+                                     {account.account_code} - {account.account_name}
+                                   </SelectItem>
+                                 ))}
+                               </SelectContent>
+                             </Select>
+                           ) : (
+                             <Input
+                               placeholder="Kontonummer"
+                               value={entry.account_code}
+                               onChange={(e) => {
+                                 const newEntries = [...newTemplate.template_entries];
+                                 newEntries[index].account_code = e.target.value;
+                                 setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
+                               }}
+                             />
+                           )}
+                           <Input
+                             placeholder="Kontonamn"
+                             value={entry.account_name}
+                             onChange={(e) => {
+                               const newEntries = [...newTemplate.template_entries];
+                               newEntries[index].account_name = e.target.value;
+                               setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
+                             }}
+                             disabled={isDeveloper}
+                             className={isDeveloper ? "bg-gray-100" : ""}
+                           />
+                           <Select
+                             value={entry.type}
+                             onValueChange={(value) => {
+                               const newEntries = [...newTemplate.template_entries];
+                               newEntries[index].type = value;
+                               setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
+                             }}
+                           >
+                             <SelectTrigger>
+                               <SelectValue />
+                             </SelectTrigger>
+                             <SelectContent>
+                               <SelectItem value="debit">Debet</SelectItem>
+                               <SelectItem value="credit">Kredit</SelectItem>
+                             </SelectContent>
+                           </Select>
+                           <Input
+                             placeholder="Beskrivning"
+                             value={entry.description}
+                             onChange={(e) => {
+                               const newEntries = [...newTemplate.template_entries];
+                               newEntries[index].description = e.target.value;
+                               setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
+                             }}
+                           />
+                         </div>
+                       ))}
                       <Button
                         type="button"
                         variant="outline"
