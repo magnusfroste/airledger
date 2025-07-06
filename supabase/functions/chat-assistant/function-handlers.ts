@@ -157,6 +157,21 @@ export async function handleFunctionCall(
         console.log('Transaction template used successfully');
         const transaction = templateData.transaction;
         
+        // Record template usage for analytics
+        try {
+          await supabase
+            .from('airledger_template_usage')
+            .insert({
+              user_id: (await supabase.auth.getUser()).data.user?.id,
+              template_id: templateData.template_id, // This will come from the updated function
+              transaction_id: transaction.id,
+              used_at: new Date().toISOString()
+            });
+        } catch (usageError) {
+          console.error('Failed to record template usage:', usageError);
+          // Don't fail the main operation if usage tracking fails
+        }
+        
         response += `\n\n✅ Perfekt! Jag har använt mallen "${args.templateName}" för att bokföra transaktionen.\n\n` +
           `**Belopp:** ${args.amount} kr\n` +
           `**Datum:** ${transaction.transaction_date}\n` +

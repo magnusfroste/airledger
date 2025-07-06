@@ -114,6 +114,7 @@ serve(async (req) => {
         success: true,
         transaction: transactionData.transaction,
         template_used: template.template_name,
+        template_id: template.id, // Add template ID for usage tracking
         message: `Transaktion skapad från mall "${template.template_name}"`
       }),
       {

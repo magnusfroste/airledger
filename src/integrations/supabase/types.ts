@@ -303,44 +303,83 @@ export type Database = {
         }
         Relationships: []
       }
+      airledger_template_usage: {
+        Row: {
+          created_at: string
+          id: string
+          template_id: string
+          transaction_id: string
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          template_id: string
+          transaction_id: string
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          template_id?: string
+          transaction_id?: string
+          used_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       airledger_transaction_templates: {
         Row: {
+          auto_suggest: boolean | null
           category: string
           created_at: string
           description: string
           id: string
           is_recurring: boolean
           is_system_template: boolean
+          keywords: string[] | null
+          last_used_at: string | null
           recurring_frequency: string | null
           template_entries: Json
           template_name: string
           updated_at: string
+          usage_count: number | null
           user_id: string
         }
         Insert: {
+          auto_suggest?: boolean | null
           category: string
           created_at?: string
           description: string
           id?: string
           is_recurring?: boolean
           is_system_template?: boolean
+          keywords?: string[] | null
+          last_used_at?: string | null
           recurring_frequency?: string | null
           template_entries: Json
           template_name: string
           updated_at?: string
+          usage_count?: number | null
           user_id: string
         }
         Update: {
+          auto_suggest?: boolean | null
           category?: string
           created_at?: string
           description?: string
           id?: string
           is_recurring?: boolean
           is_system_template?: boolean
+          keywords?: string[] | null
+          last_used_at?: string | null
           recurring_frequency?: string | null
           template_entries?: Json
           template_name?: string
           updated_at?: string
+          usage_count?: number | null
           user_id?: string
         }
         Relationships: []
