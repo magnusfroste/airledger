@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2, Calculator, TrendingUp, TrendingDown, Download, Upload, FileSpreadsheet } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Plus, Edit, Trash2, Calculator, TrendingUp, TrendingDown, Download, Upload, FileSpreadsheet, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -457,56 +458,69 @@ const OpeningBalances = () => {
   }
 
   return (
-    <div className="container px-6 py-6 max-w-6xl mx-auto animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Ingående balanser</h1>
-          <p className="text-muted-foreground mt-1">
-            Registrera och hantera dina startbalanser enligt BAS 2024
-          </p>
-        </div>
-        
-        <div className="flex gap-2">
-          {/* Export Button */}
-          <Button 
-            onClick={handleExportCSV} 
-            variant="outline" 
-            className="gap-2"
-            disabled={balances.length === 0}
-          >
-            <Download className="h-4 w-4" />
-            Exportera CSV
-          </Button>
+    <TooltipProvider>
+      <div className="container px-6 py-6 max-w-6xl mx-auto animate-fade-in">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl font-semibold text-foreground">Ingående balanser</h1>
+            <p className="text-muted-foreground mt-1">
+              Registrera och hantera dina startbalanser enligt BAS 2024
+            </p>
+          </div>
           
-          {/* Import Dialog */}
-          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Upload className="h-4 w-4" />
-                Importera CSV
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-4xl">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <FileSpreadsheet className="h-5 w-5" />
-                  Importera ingående balanser från CSV
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="csvFile">Välj CSV-fil</Label>
-                  <Input
-                    id="csvFile"
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileSelect}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    CSV-filen måste innehålla kolumnerna: account_code, account_name, opening_balance, balance_type
-                  </p>
-                </div>
+          <div className="flex gap-2">
+            {/* Export Button - Icon only */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  onClick={handleExportCSV} 
+                  variant="outline" 
+                  size="icon"
+                  disabled={balances.length === 0}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Exportera till CSV</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            {/* Import Dialog - Icon only */}
+            <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <Upload className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Importera från CSV</p>
+                </TooltipContent>
+              </Tooltip>
+              <DialogContent className="sm:max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5" />
+                    Importera ingående balanser från CSV
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="csvFile">Välj CSV-fil</Label>
+                    <Input
+                      id="csvFile"
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileSelect}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      CSV-filen måste innehålla kolumnerna: account_code, account_name, opening_balance, balance_type
+                    </p>
+                  </div>
                 
                 {importPreview.length > 0 && (
                   <div className="space-y-4">
@@ -572,6 +586,76 @@ const OpeningBalances = () => {
                   }}>
                     Avbryt
                   </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          
+          {/* CSV Info Dialog */}
+          <Dialog>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>CSV-hjälp och instruktioner</p>
+              </TooltipContent>
+            </Tooltip>
+            <DialogContent className="sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Info className="h-5 w-5" />
+                  CSV Export & Import Guide
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold mb-2">📤 Export till CSV</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Klicka på nedladdningsikonen för att exportera alla dina ingående balanser till en CSV-fil.
+                  </p>
+                  <div className="bg-muted p-3 rounded-lg text-xs">
+                    <p className="mb-1">Exporterad fil innehåller:</p>
+                    <p>• <strong>account_code</strong> - Kontokod (ex: 1910)</p>
+                    <p>• <strong>account_name</strong> - Kontonamn (ex: "Kassa")</p>
+                    <p>• <strong>opening_balance</strong> - Belopp (ex: 50000)</p>
+                    <p>• <strong>balance_type</strong> - debit eller credit</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold mb-2">📥 Import från CSV</h3>
+                  <div className="space-y-3 text-sm text-muted-foreground">
+                    <div>
+                      <p className="font-medium text-foreground mb-1">Steg 1: Skapa CSV-mall</p>
+                      <p>Exportera först dina befintliga balanser som mall, eller skapa en ny CSV-fil med kolumnrubrikerna.</p>
+                    </div>
+                    
+                    <div>
+                      <p className="font-medium text-foreground mb-1">Steg 2: Fyll i data</p>
+                      <p>Öppna CSV-filen i Excel eller liknande och lägg till dina balanser:</p>
+                      <div className="bg-muted p-3 rounded-lg text-xs mt-2 font-mono">
+                        <p>account_code,account_name,opening_balance,balance_type</p>
+                        <p>1910,"Kassa",50000,debit</p>
+                        <p>2440,"Leverantörsskulder",25000,credit</p>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <p className="font-medium text-foreground mb-1">Steg 3: Ladda upp</p>
+                      <p>Klicka på uppladdningsikonen och välj din CSV-fil. Systemet validerar automatiskt mot BAS 2024.</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg mt-3">
+                    <p className="text-xs text-orange-700">
+                      <strong>Tips:</strong> balance_type sätts automatiskt utifrån kontotyp, men du kan ange "debit" eller "credit" manuellt om behov finns.
+                    </p>
+                  </div>
                 </div>
               </div>
             </DialogContent>
@@ -760,6 +844,7 @@ const OpeningBalances = () => {
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   );
 };
 
