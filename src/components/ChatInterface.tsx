@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, FileImage, CheckCircle, AlertCircle, Camera } from "lucide-react";
+import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, FileImage, CheckCircle, AlertCircle, Camera, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import TransactionConfirmDialog from "@/components/TransactionConfirmDialog";
@@ -548,6 +548,26 @@ const ChatInterface = () => {
 
     return () => clearTimeout(timer);
   }, []);
+  const handleNewChat = () => {
+    // Reset messages to only show welcome message
+    setMessages([{
+      id: '1',
+      content: 'Hej och välkommen till Air Ledger! 👋 \n\nJag är din AI-assistent för bokföring som kan hjälpa dig med allt från kvittoanalys till att svara på frågor om din bokföring.\n\n**🤖 Vad kan jag hjälpa dig med?**\n• 📷 **Ta foto av kvitton** - Använd kameraknappen för att fotografera kvitton direkt\n• 📊 **Analysera kvitton automatiskt** - Jag läser av belopp, datum och leverantör\n• 💬 **Svara på bokföringsfrågor** - Fråga mig om svensk bokföring och BAS-kontoplanen\n• 🏷️ **Föreslå transaktionsmallar** - Beskriv transaktionen så föreslår jag rätt mall\n• 📋 **Registrera transaktioner** - Fakturor, betalningar och utgifter\n\n**💡 Snabbtips för att komma igång:**\n• Börja med att fota ett kvitto - jag visar hur det fungerar!\n• Fråga mig om mina funktioner - jag berättar gärna mer\n• Använd röstinspelning om du vill prata istället för att skriva\n• Separera "fakturera kund" från "få betalning" - det är olika saker\n\nVad undrar du över idag? 🚀',
+      sender: 'ai',
+      timestamp: new Date(),
+      type: 'text'
+    }]);
+    
+    // Clear input and pending images
+    setInputValue("");
+    setPendingImages([]);
+    
+    toast({
+      title: "Ny chat startad",
+      description: "Chatvyn har rensats för en ny konversation"
+    });
+  };
+
   const handleTransactionConfirm = async (analysis: any, entries: any[], paymentMethod: string) => {
     try {
       const {
@@ -586,6 +606,20 @@ const ChatInterface = () => {
         <div className="h-[calc(100vh-80px)] flex flex-col">
           {/* Messages Container */}
           <div className="flex-1 overflow-y-auto space-y-6 mb-6">
+            {/* New Chat Button */}
+            <div className="flex justify-end mb-4">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleNewChat}
+                className="text-muted-foreground hover:text-foreground transition-colors rounded-full px-3 py-1 h-8"
+                disabled={isLoading}
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Ny chat
+              </Button>
+            </div>
+
             {messages.slice(1).map(message => <div key={message.id} className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] ${message.sender === 'user' ? 'order-1' : 'order-2'}`}>
                   <div className={`px-5 py-4 rounded-3xl ${message.sender === 'user' ? 'bg-primary text-primary-foreground rounded-br-lg' : 'bg-muted rounded-bl-lg'}`}>
