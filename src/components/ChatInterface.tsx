@@ -657,14 +657,6 @@ const ChatInterface = () => {
                       })}
                     </div>
                   </div>
-                  <div className={`text-xs text-muted-foreground mt-1 px-2 ${
-                    message.sender === 'user' ? 'text-right' : 'text-left'
-                  }`}>
-                    {message.timestamp.toLocaleTimeString('sv-SE', { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
-                    })}
-                  </div>
                 </div>
               </div>
             ))}
