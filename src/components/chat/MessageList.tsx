@@ -33,7 +33,7 @@ interface MessageListProps {
 
 const MessageList = ({ messages, isLoading, onNewChat, messagesEndRef }: MessageListProps) => {
   return (
-    <div className="flex-1 overflow-y-auto space-y-6 mb-6">
+    <div className="flex-1 overflow-y-auto px-4 py-4">
       {/* New Chat Button */}
       <div className="flex justify-end mb-4">
         <Button 
@@ -48,38 +48,41 @@ const MessageList = ({ messages, isLoading, onNewChat, messagesEndRef }: Message
         </Button>
       </div>
 
-      {messages.slice(1).map(message => (
-        <Message
-          key={message.id}
-          id={message.id}
-          content={message.content}
-          sender={message.sender}
-          timestamp={message.timestamp}
-          type={message.type}
-          images={message.images}
-        />
-      ))}
-      
-      {isLoading && (
-        <div className="flex justify-start">
-          <div className="bg-muted rounded-3xl rounded-bl-lg px-5 py-4 max-w-[85%]">
-            <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-              <div 
-                className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" 
-                style={{ animationDelay: '0.1s' }}
-              ></div>
-              <div 
-                className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" 
-                style={{ animationDelay: '0.2s' }}
-              ></div>
+      {/* Messages */}
+      <div className="space-y-6">
+        {messages.slice(1).map(message => (
+          <Message
+            key={message.id}
+            id={message.id}
+            content={message.content}
+            sender={message.sender}
+            timestamp={message.timestamp}
+            type={message.type}
+            images={message.images}
+          />
+        ))}
+        
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-muted rounded-3xl rounded-bl-lg px-5 py-4 max-w-[85%]">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                <div 
+                  className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" 
+                  style={{ animationDelay: '0.1s' }}
+                ></div>
+                <div 
+                  className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" 
+                  style={{ animationDelay: '0.2s' }}
+                ></div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
       
       {/* Scroll anchor */}
-      <div ref={messagesEndRef} />
+      <div ref={messagesEndRef} className="h-4" />
     </div>
   );
 };

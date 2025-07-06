@@ -38,7 +38,7 @@ const InputArea = ({
   onStartCamera
 }: InputAreaProps) => {
   return (
-    <div className="space-y-4">
+    <div className="p-4 space-y-4">
       {/* Pending Images Preview */}
       <PendingImages 
         pendingImages={pendingImages}
@@ -46,7 +46,7 @@ const InputArea = ({
       />
 
       {/* Message input with action buttons */}
-      <div className="flex gap-2 items-center px-2">
+      <div className="flex gap-2 items-center">
         {/* Action buttons to the left */}
         <ActionButtons
           isRecording={isRecording}

@@ -599,33 +599,30 @@ const ChatInterface = () => {
     }
   };
   return (
-    <div className="min-h-screen bg-background">
-      {/* Chat Messages */}
-      <div className="container px-6 flex-1 max-w-4xl mx-auto py-[6px]">
-        <div className="h-[calc(100vh-80px)] flex flex-col">
-          {/* Messages Container */}
-          <MessageList
-            messages={messages}
-            isLoading={isLoading}
-            onNewChat={handleNewChat}
-            messagesEndRef={messagesEndRef}
-          />
+    <div className="h-screen bg-background flex flex-col">
+      {/* Messages Container */}
+      <MessageList
+        messages={messages}
+        isLoading={isLoading}
+        onNewChat={handleNewChat}
+        messagesEndRef={messagesEndRef}
+      />
 
-          {/* Input Area */}
-          <InputArea
-            inputValue={inputValue}
-            setInputValue={setInputValue}
-            pendingImages={pendingImages}
-            isRecording={isRecording}
-            isLoading={isLoading}
-            onSendMessage={handleSendMessage}
-            onKeyPress={handleKeyPress}
-            onImageUpload={handleImageUpload}
-            onRemovePendingImage={removePendingImage}
-            onVoiceRecording={handleVoiceRecording}
-            onStartCamera={startCamera}
-          />
-        </div>
+      {/* Input Area - Fixed at bottom */}
+      <div className="shrink-0 bg-background border-t border-border/20">
+        <InputArea
+          inputValue={inputValue}
+          setInputValue={setInputValue}
+          pendingImages={pendingImages}
+          isRecording={isRecording}
+          isLoading={isLoading}
+          onSendMessage={handleSendMessage}
+          onKeyPress={handleKeyPress}
+          onImageUpload={handleImageUpload}
+          onRemovePendingImage={removePendingImage}
+          onVoiceRecording={handleVoiceRecording}
+          onStartCamera={startCamera}
+        />
       </div>
 
       {/* Transaction Confirmation Dialog */}
