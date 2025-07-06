@@ -781,7 +781,6 @@ export type Database = {
     Enums: {
       ad_status: "active" | "inactive" | "pending"
       ad_type: "image" | "html"
-      transaction_status: "draft" | "posted" | "reconciled"
       transaction_type: "income" | "expense" | "transfer"
       user_type: "content_provider" | "advertiser"
     }
@@ -901,7 +900,6 @@ export const Constants = {
     Enums: {
       ad_status: ["active", "inactive", "pending"],
       ad_type: ["image", "html"],
-      transaction_status: ["draft", "posted", "reconciled"],
       transaction_type: ["income", "expense", "transfer"],
       user_type: ["content_provider", "advertiser"],
     },
