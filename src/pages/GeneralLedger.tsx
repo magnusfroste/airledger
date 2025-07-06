@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Search, Filter, Plus } from "lucide-react";
+import { BookOpen, Search, Filter, Plus, ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,6 +33,17 @@ interface AccountBalance {
   balance_type: string;
 }
 
+interface AccountEntry {
+  id: string;
+  transaction_id: string;
+  description: string;
+  debit_amount: number;
+  credit_amount: number;
+  created_at: string;
+  transaction_date: string;
+  transaction_description: string;
+}
+
 const GeneralLedger = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [openingBalances, setOpeningBalances] = useState<OpeningBalance[]>([]);
@@ -41,6 +52,9 @@ const GeneralLedger = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const [accountEntries, setAccountEntries] = useState<Record<string, AccountEntry[]>>({});
+  const [loadingEntries, setLoadingEntries] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   useEffect(() => {
@@ -217,6 +231,86 @@ const GeneralLedger = () => {
     }).format(amount);
   };
 
+  const toggleAccountExpansion = async (accountCode: string) => {
+    const newExpanded = new Set(expandedAccounts);
+    
+    if (expandedAccounts.has(accountCode)) {
+      newExpanded.delete(accountCode);
+      setExpandedAccounts(newExpanded);
+    } else {
+      newExpanded.add(accountCode);
+      setExpandedAccounts(newExpanded);
+      
+      // Fetch entries for this account if not already loaded
+      if (!accountEntries[accountCode]) {
+        await fetchAccountEntries(accountCode);
+      }
+    }
+  };
+
+  const fetchAccountEntries = async (accountCode: string) => {
+    try {
+      setLoadingEntries(prev => new Set(prev).add(accountCode));
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: entries, error } = await supabase
+        .from('airledger_entries')
+        .select(`
+          id,
+          transaction_id,
+          description,
+          debit_amount,
+          credit_amount,
+          created_at,
+          airledger_transactions!inner(
+            transaction_date,
+            description,
+            user_id
+          )
+        `)
+        .eq('account_code', accountCode)
+        .eq('airledger_transactions.user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedEntries: AccountEntry[] = (entries || []).map(entry => ({
+        id: entry.id,
+        transaction_id: entry.transaction_id,
+        description: entry.description || '',
+        debit_amount: Number(entry.debit_amount || 0),
+        credit_amount: Number(entry.credit_amount || 0),
+        created_at: entry.created_at,
+        transaction_date: (entry.airledger_transactions as any).transaction_date,
+        transaction_description: (entry.airledger_transactions as any).description
+      }));
+
+      setAccountEntries(prev => ({
+        ...prev,
+        [accountCode]: formattedEntries
+      }));
+    } catch (error) {
+      console.error('Error fetching account entries:', error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte ladda kontobokningar",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingEntries(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(accountCode);
+        return newSet;
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('sv-SE');
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-6 py-8">
@@ -286,12 +380,22 @@ const GeneralLedger = () => {
           filteredBalances.map((account) => (
             <Card key={account.account_code} className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
+                <div 
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => toggleAccountExpansion(account.account_code)}
+                >
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold">
-                        {account.account_code} - {account.account_name}
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        {expandedAccounts.has(account.account_code) ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <h3 className="text-lg font-semibold">
+                          {account.account_code} - {account.account_name}
+                        </h3>
+                      </div>
                       {account.account_type && (
                         <Badge className={getAccountTypeColor(account.account_type)}>
                           {getAccountTypeName(account.account_type)}
@@ -334,6 +438,66 @@ const GeneralLedger = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Expanded account entries */}
+                {expandedAccounts.has(account.account_code) && (
+                  <div className="mt-6 pt-6 border-t border-border">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-4">
+                      Kontobokningar
+                    </h4>
+                    
+                    {loadingEntries.has(account.account_code) ? (
+                      <div className="text-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                        <p className="mt-2 text-sm text-muted-foreground">Laddar bokningar...</p>
+                      </div>
+                    ) : accountEntries[account.account_code]?.length === 0 ? (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-muted-foreground">Inga bokningar på detta konto</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {accountEntries[account.account_code]?.map((entry) => (
+                          <div 
+                            key={entry.id} 
+                            className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium">
+                                  {formatDate(entry.transaction_date)}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDate(entry.created_at)}
+                                </span>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {entry.transaction_description}
+                              </div>
+                              {entry.description && entry.description !== entry.transaction_description && (
+                                <div className="text-xs text-muted-foreground/80 mt-1">
+                                  {entry.description}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right ml-4">
+                              {entry.debit_amount > 0 && (
+                                <div className="text-sm font-medium text-green-600">
+                                  Debet: {formatAmount(entry.debit_amount)}
+                                </div>
+                              )}
+                              {entry.credit_amount > 0 && (
+                                <div className="text-sm font-medium text-blue-600">
+                                  Kredit: {formatAmount(entry.credit_amount)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))
