@@ -9,6 +9,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Chat from "./pages/Chat";
 import Transactions from "./pages/Transactions";
+import Templates from "./pages/Templates";
+import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import OpeningBalances from "./pages/OpeningBalances";
 import GeneralLedger from "./pages/GeneralLedger";
@@ -33,6 +35,8 @@ const App = () => (
                   <Route path="/" element={<Index />} />
                   <Route path="/chat" element={<Chat />} />
                   <Route path="/transactions" element={<Transactions />} />
+                  <Route path="/templates" element={<Templates />} />
+                  <Route path="/settings" element={<Settings />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/opening-balances" element={<OpeningBalances />} />
                   <Route path="/general-ledger" element={<GeneralLedger />} />

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { Home, MessageCircle, FileText, Menu, Settings, LogOut, User, Info, BarChart3, Calculator, BookOpen } from "lucide-react";
 import VoiceInstructions from "@/components/VoiceInstructions";
 
@@ -32,6 +33,43 @@ const Navigation = () => {
     }
   };
 
+  const [transactionCount, setTransactionCount] = useState<number>(0);
+  const [isDeveloper, setIsDeveloper] = useState<boolean>(false);
+
+  // Fetch dynamic data for navigation
+  useEffect(() => {
+    const fetchNavigationData = async () => {
+      if (!user) return;
+      
+      try {
+        // Fetch transaction count
+        const { data: transactions, error: transError } = await supabase
+          .from('airledger_transactions')
+          .select('id', { count: 'exact' })
+          .eq('user_id', user.id);
+        
+        if (!transError && transactions) {
+          setTransactionCount(transactions.length);
+        }
+
+        // Check if user is developer
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_developer')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          setIsDeveloper(profile.is_developer || false);
+        }
+      } catch (error) {
+        console.error('Error fetching navigation data:', error);
+      }
+    };
+
+    fetchNavigationData();
+  }, [user]);
+
   const navigationItems = [
     { 
       href: "/", 
@@ -49,7 +87,13 @@ const Navigation = () => {
       href: "/transactions", 
       label: "Transaktioner", 
       icon: FileText,
-      badge: "3"
+      badge: transactionCount > 0 ? transactionCount.toString() : null
+    },
+    { 
+      href: "/templates", 
+      label: "Mallar", 
+      icon: Settings,
+      badge: null
     },
     { 
       href: "/reports", 
@@ -147,10 +191,12 @@ const Navigation = () => {
                   </div>
                   
                   <div className="border-t border-border/20 pt-4 space-y-1">
-                    <Button variant="ghost" className="w-full justify-start h-10 px-3">
-                      <Settings className="h-4 w-4 mr-3" />
-                      Inställningar
-                    </Button>
+                    <Link to="/settings" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Button variant="ghost" className="w-full justify-start h-10 px-3">
+                        <Settings className="h-4 w-4 mr-3" />
+                        Inställningar
+                      </Button>
+                    </Link>
                     <Button 
                       variant="ghost" 
                       className="w-full justify-start h-10 px-3 text-destructive hover:text-destructive hover:bg-destructive/10"

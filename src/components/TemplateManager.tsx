@@ -16,7 +16,9 @@ import {
   Settings,
   Calendar,
   Hash,
-  Tag
+  Tag,
+  Shield,
+  Crown
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +53,7 @@ const TemplateManager = () => {
   const [templateUsage, setTemplateUsage] = useState<TemplateUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isDeveloper, setIsDeveloper] = useState(false);
 
   // New template form state
   const [newTemplate, setNewTemplate] = useState({
@@ -58,6 +61,7 @@ const TemplateManager = () => {
     description: '',
     category: '',
     keywords: '',
+    is_system_template: false,
     template_entries: [
       { account_code: '', account_name: '', type: 'debit', description: '' },
       { account_code: '', account_name: '', type: 'credit', description: '' }
@@ -66,7 +70,26 @@ const TemplateManager = () => {
 
   useEffect(() => {
     fetchTemplatesAndUsage();
+    checkDeveloperStatus();
   }, []);
+
+  const checkDeveloperStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_developer')
+        .eq('id', user.id)
+        .single();
+      
+      if (profile) {
+        setIsDeveloper(profile.is_developer || false);
+      }
+    } catch (error) {
+      console.error('Error checking developer status:', error);
+    }
+  };
 
   const fetchTemplatesAndUsage = async () => {
     try {
@@ -136,7 +159,7 @@ const TemplateManager = () => {
           template_entries: newTemplate.template_entries.filter(entry => 
             entry.account_code && entry.account_name
           ),
-          is_system_template: false,
+          is_system_template: isDeveloper ? newTemplate.is_system_template : false,
           is_recurring: false
         });
 
@@ -153,6 +176,7 @@ const TemplateManager = () => {
         description: '',
         category: '',
         keywords: '',
+        is_system_template: false,
         template_entries: [
           { account_code: '', account_name: '', type: 'debit', description: '' },
           { account_code: '', account_name: '', type: 'credit', description: '' }
@@ -201,8 +225,17 @@ const TemplateManager = () => {
               <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
                 <FileText className="h-6 w-6" />
                 Transaktionsmallar
+                {isDeveloper && (
+                  <Badge variant="secondary" className="ml-2 gap-1">
+                    <Crown className="h-3 w-3" />
+                    Utvecklare
+                  </Badge>
+                )}
               </h1>
-              <p className="text-gray-600 mt-1">Hantera och skapa mallar för återkommande transaktioner</p>
+              <p className="text-gray-600 mt-1">
+                Hantera och skapa mallar för återkommande transaktioner
+                {isDeveloper && " • Systemmallar tillgängliga"}
+              </p>
             </div>
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
@@ -267,6 +300,22 @@ const TemplateManager = () => {
                       placeholder="hyra, lokaler, kontor"
                     />
                   </div>
+
+                  {isDeveloper && (
+                    <div className="flex items-center space-x-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                      <input
+                        type="checkbox"
+                        id="is_system_template"
+                        checked={newTemplate.is_system_template}
+                        onChange={(e) => setNewTemplate(prev => ({ ...prev, is_system_template: e.target.checked }))}
+                        className="rounded"
+                      />
+                      <Label htmlFor="is_system_template" className="text-orange-800 font-medium flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Systemtemplate (tillgänglig för alla användare)
+                      </Label>
+                    </div>
+                  )}
 
                   <div>
                     <Label>Bokföringsposter</Label>
@@ -380,7 +429,8 @@ const TemplateManager = () => {
                         <p className="text-sm text-gray-600 mt-1">{template.description}</p>
                       </div>
                       {template.is_system_template && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                          <Shield className="h-3 w-3 mr-1" />
                           System
                         </Badge>
                       )}
