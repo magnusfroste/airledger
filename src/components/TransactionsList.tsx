@@ -3,8 +3,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Receipt, FileText, ChevronRight, Calendar, Building, Trash2, Edit } from "lucide-react";
+import { Search, Receipt, FileText, ChevronRight, Calendar, Building, Trash2, Edit, Download, Upload, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import TransactionEditDialog from "./TransactionEditDialog";
@@ -22,6 +24,7 @@ interface Transaction {
   id: string;
   transaction_date: string;
   description: string;
+  reference_number?: string;
   total_amount: number;
   transaction_type: string;
   status: string;
@@ -36,6 +39,13 @@ const TransactionsList = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  
+  // Import/Export state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -172,6 +182,311 @@ const TransactionsList = () => {
     }
   };
 
+  // CSV Export Function
+  const handleExportCSV = () => {
+    if (transactions.length === 0) {
+      toast({
+        title: "Ingen data att exportera",
+        description: "Du har inga transaktioner att exportera.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create flattened CSV with transaction + entry data
+    const csvHeader = "transaction_date,description,reference_number,transaction_type,status,account_code,account_name,debit_amount,credit_amount,entry_description\n";
+    
+    const csvRows = [];
+    transactions.forEach(transaction => {
+      transaction.entries.forEach(entry => {
+        csvRows.push([
+          transaction.transaction_date,
+          `"${transaction.description}"`,
+          transaction.reference_number || '',
+          transaction.transaction_type,
+          transaction.status,
+          entry.account_code,
+          `"${entry.account_name}"`,
+          entry.debit_amount || 0,
+          entry.credit_amount || 0,
+          `"${entry.description || ''}"`
+        ].join(','));
+      });
+    });
+    
+    const csvContent = csvHeader + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `transaktioner_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    const totalEntries = transactions.reduce((sum, t) => sum + t.entries.length, 0);
+    toast({
+      title: "Export lyckades!",
+      description: `${transactions.length} transaktioner med ${totalEntries} bokföringsrader exporterade till CSV.`,
+    });
+  };
+
+  // CSV Import Functions
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast({
+        title: "Fel filformat",
+        description: "Vänligen välj en CSV-fil.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImportFile(file);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      try {
+        parseCSVForPreview(text);
+      } catch (error) {
+        toast({
+          title: "Fel vid läsning av fil",
+          description: "Kunde inte läsa CSV-filen. Kontrollera formatet.",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const parseCSVForPreview = async (csvText: string) => {
+    const lines = csvText.trim().split('\n');
+    const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+    
+    // Validate headers
+    const expectedHeaders = ['transaction_date', 'description', 'reference_number', 'transaction_type', 'status', 'account_code', 'account_name', 'debit_amount', 'credit_amount', 'entry_description'];
+    const requiredHeaders = ['transaction_date', 'description', 'transaction_type', 'account_code', 'account_name'];
+    const hasRequiredHeaders = requiredHeaders.every(header => headers.includes(header));
+    
+    if (!hasRequiredHeaders) {
+      toast({
+        title: "Fel CSV-format",
+        description: `CSV-filen måste innehålla minst kolumnerna: ${requiredHeaders.join(', ')}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get chart of accounts for validation
+    const { data: accountsData } = await supabase
+      .from('airledger_chart_of_accounts')
+      .select('account_code, account_name')
+      .eq('is_active', true);
+
+    const validAccountCodes = new Set(accountsData?.map(acc => acc.account_code) || []);
+    
+    const preview = [];
+    const errors = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      // Simple CSV parsing (handles quoted fields)
+      const values = [];
+      let currentValue = '';
+      let inQuotes = false;
+      
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          values.push(currentValue.trim());
+          currentValue = '';
+        } else {
+          currentValue += char;
+        }
+      }
+      values.push(currentValue.trim());
+      
+      const row = {
+        transaction_date: values[headers.indexOf('transaction_date')] || '',
+        description: values[headers.indexOf('description')] || '',
+        reference_number: values[headers.indexOf('reference_number')] || '',
+        transaction_type: values[headers.indexOf('transaction_type')] || '',
+        status: values[headers.indexOf('status')] || 'draft',
+        account_code: values[headers.indexOf('account_code')] || '',
+        account_name: values[headers.indexOf('account_name')] || '',
+        debit_amount: parseFloat(values[headers.indexOf('debit_amount')]) || 0,
+        credit_amount: parseFloat(values[headers.indexOf('credit_amount')]) || 0,
+        entry_description: values[headers.indexOf('entry_description')] || '',
+        line: i + 1,
+        valid: true,
+        errors: [] as string[]
+      };
+      
+      // Validation
+      if (!row.transaction_date || isNaN(Date.parse(row.transaction_date))) {
+        row.errors.push('Ogiltigt datum');
+        row.valid = false;
+      }
+      
+      if (!row.description) {
+        row.errors.push('Beskrivning saknas');
+        row.valid = false;
+      }
+      
+      if (!['income', 'expense', 'transfer'].includes(row.transaction_type)) {
+        row.errors.push('Transaction_type måste vara income, expense eller transfer');
+        row.valid = false;
+      }
+      
+      if (!['draft', 'posted', 'reconciled'].includes(row.status)) {
+        row.errors.push('Status måste vara draft, posted eller reconciled');
+        row.valid = false;
+      }
+      
+      if (!row.account_code) {
+        row.errors.push('Kontokod saknas');
+        row.valid = false;
+      } else if (!validAccountCodes.has(row.account_code)) {
+        row.errors.push('Kontokod finns inte i BAS 2024');
+        row.valid = false;
+      }
+      
+      if (!row.account_name) {
+        row.errors.push('Kontonamn saknas');
+        row.valid = false;
+      }
+      
+      if (row.debit_amount === 0 && row.credit_amount === 0) {
+        row.errors.push('Antingen debet eller kredit måste ha ett värde');
+        row.valid = false;
+      }
+      
+      if (row.debit_amount > 0 && row.credit_amount > 0) {
+        row.errors.push('Endast ett av debet eller kredit kan ha ett värde');
+        row.valid = false;
+      }
+      
+      preview.push(row);
+    }
+    
+    setImportPreview(preview);
+  };
+
+  const handleImportCSV = async () => {
+    if (importPreview.length === 0) return;
+    
+    const validRows = importPreview.filter(row => row.valid);
+    if (validRows.length === 0) {
+      toast({
+        title: "Inga giltiga rader",
+        description: "Det finns inga giltiga rader att importera.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      // Group rows by transaction (same date, description, type, etc.)
+      const transactionGroups = new Map();
+      
+      validRows.forEach(row => {
+        const key = `${row.transaction_date}_${row.description}_${row.transaction_type}_${row.reference_number}`;
+        if (!transactionGroups.has(key)) {
+          transactionGroups.set(key, {
+            transaction: {
+              transaction_date: row.transaction_date,
+              description: row.description,
+              reference_number: row.reference_number,
+              transaction_type: row.transaction_type,
+              status: row.status,
+            },
+            entries: []
+          });
+        }
+        
+        transactionGroups.get(key).entries.push({
+          account_code: row.account_code,
+          account_name: row.account_name,
+          debit_amount: row.debit_amount,
+          credit_amount: row.credit_amount,
+          description: row.entry_description,
+        });
+      });
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const [key, group] of transactionGroups) {
+        try {
+          // Calculate total amount
+          const totalAmount = group.entries.reduce((sum: number, entry: any) => 
+            sum + Math.max(entry.debit_amount, entry.credit_amount), 0
+          );
+          
+          // Create transaction
+          const { data: transactionData, error: transactionError } = await supabase
+            .from('airledger_transactions')
+            .insert({
+              ...group.transaction,
+              total_amount: totalAmount,
+            })
+            .select()
+            .single();
+          
+          if (transactionError) throw transactionError;
+          
+          // Create entries
+          const entriesWithTransactionId = group.entries.map((entry: any) => ({
+            ...entry,
+            transaction_id: transactionData.id,
+          }));
+          
+          const { error: entriesError } = await supabase
+            .from('airledger_entries')
+            .insert(entriesWithTransactionId);
+          
+          if (entriesError) throw entriesError;
+          
+          successCount++;
+        } catch (error) {
+          console.error(`Error importing transaction group ${key}:`, error);
+          errorCount++;
+        }
+      }
+      
+      toast({
+        title: "Import slutförd",
+        description: `${successCount} transaktioner importerade${errorCount > 0 ? `, ${errorCount} fel` : ''}.`,
+      });
+      
+      setImportDialogOpen(false);
+      setImportFile(null);
+      setImportPreview([]);
+      fetchTransactions();
+      
+    } catch (error) {
+      console.error('Error during import:', error);
+      toast({
+        title: "Import misslyckades",
+        description: "Ett fel uppstod under importen. Försök igen.",
+        variant: "destructive",
+      });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -194,8 +509,125 @@ const TransactionsList = () => {
               <p className="text-gray-600 mt-1">{filteredTransactions.length} transaktioner</p>
             </div>
             <div className="flex items-center space-x-3">
-              <Calendar className="h-5 w-5 text-gray-400" />
-              <span className="text-sm text-gray-600">Senast uppdaterad just nu</span>
+              {/* Export Button */}
+              <Button 
+                onClick={handleExportCSV} 
+                variant="outline" 
+                className="gap-2"
+                disabled={transactions.length === 0}
+              >
+                <Download className="h-4 w-4" />
+                Exportera CSV
+              </Button>
+              
+              {/* Import Dialog */}
+              <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Upload className="h-4 w-4" />
+                    Importera CSV
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-6xl">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <FileSpreadsheet className="h-5 w-5" />
+                      Importera transaktioner från CSV
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="csvFile">Välj CSV-fil</Label>
+                      <Input
+                        id="csvFile"
+                        type="file"
+                        accept=".csv"
+                        onChange={handleFileSelect}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        CSV-filen måste innehålla kolumnerna: transaction_date, description, transaction_type, account_code, account_name, debit_amount, credit_amount. 
+                        Rader med samma datum, beskrivning och typ grupperas till samma transaktion.
+                      </p>
+                    </div>
+                    
+                    {importPreview.length > 0 && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">Förhandsvisning ({importPreview.length} rader)</h4>
+                          <Badge variant={importPreview.filter(r => r.valid).length === importPreview.length ? "default" : "secondary"}>
+                            {importPreview.filter(r => r.valid).length} av {importPreview.length} giltiga
+                          </Badge>
+                        </div>
+                        
+                        <div className="max-h-80 overflow-y-auto border rounded-lg">
+                          <table className="w-full text-sm">
+                            <thead className="bg-muted sticky top-0">
+                              <tr>
+                                <th className="text-left p-2">Rad</th>
+                                <th className="text-left p-2">Datum</th>
+                                <th className="text-left p-2">Beskrivning</th>
+                                <th className="text-left p-2">Typ</th>
+                                <th className="text-left p-2">Konto</th>
+                                <th className="text-left p-2">Debet</th>
+                                <th className="text-left p-2">Kredit</th>
+                                <th className="text-left p-2">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {importPreview.map((row, index) => (
+                                <tr key={index} className={`border-b ${!row.valid ? 'bg-red-50' : ''}`}>
+                                  <td className="p-2">{row.line}</td>
+                                  <td className="p-2">{row.transaction_date}</td>
+                                  <td className="p-2 max-w-32 truncate">{row.description}</td>
+                                  <td className="p-2">{row.transaction_type}</td>
+                                  <td className="p-2">{row.account_code}</td>
+                                  <td className="p-2">{row.debit_amount > 0 ? row.debit_amount : ''}</td>
+                                  <td className="p-2">{row.credit_amount > 0 ? row.credit_amount : ''}</td>
+                                  <td className="p-2">
+                                    {row.valid ? (
+                                      <Badge variant="default" className="text-xs">Giltig</Badge>
+                                    ) : (
+                                      <div>
+                                        <Badge variant="destructive" className="text-xs mb-1">Fel</Badge>
+                                        <div className="text-xs text-red-600">
+                                          {row.errors.slice(0, 2).join(', ')}
+                                          {row.errors.length > 2 && '...'}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2 pt-4">
+                      <Button 
+                        onClick={handleImportCSV}
+                        disabled={importLoading || importPreview.filter(r => r.valid).length === 0}
+                        className="flex-1"
+                      >
+                        {importLoading ? 'Importerar...' : `Importera ${importPreview.filter(r => r.valid).length} rader`}
+                      </Button>
+                      <Button variant="outline" onClick={() => {
+                        setImportDialogOpen(false);
+                        setImportFile(null);
+                        setImportPreview([]);
+                      }}>
+                        Avbryt
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              
+              <div className="border-l border-gray-200 pl-3">
+                <Calendar className="h-5 w-5 text-gray-400" />
+                <span className="text-sm text-gray-600 ml-2">Senast uppdaterad just nu</span>
+              </div>
             </div>
           </div>
         </div>
