@@ -623,11 +623,6 @@ const TransactionsList = () => {
                   </div>
                 </DialogContent>
               </Dialog>
-              
-              <div className="border-l border-gray-200 pl-3">
-                <Calendar className="h-5 w-5 text-gray-400" />
-                <span className="text-sm text-gray-600 ml-2">Senast uppdaterad just nu</span>
-              </div>
             </div>
           </div>
         </div>
