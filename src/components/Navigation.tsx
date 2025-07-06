@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, MessageCircle, FileText, MoreHorizontal, Settings, LogOut, User, BarChart3, Calculator, BookOpen, Menu } from "lucide-react";
+import { Home, Bot, FileText, MoreHorizontal, Settings, LogOut, User, BarChart3, Calculator, BookOpen, Menu } from "lucide-react";
 import VoiceInstructions from "@/components/VoiceInstructions";
 
 const Navigation = () => {
@@ -80,8 +80,8 @@ const Navigation = () => {
     },
     { 
       href: "/chat", 
-      label: "AI-Chat", 
-      icon: MessageCircle,
+      label: "Assistent", 
+      icon: Bot,
       badge: null
     },
     { 
