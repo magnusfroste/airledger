@@ -9,7 +9,7 @@ import StatsCards from "./dashboard/StatsCards";
 import YearlyStatsCards from "./dashboard/YearlyStatsCards";
 import ChartsSection from "./dashboard/ChartsSection";
 import RecentTransactions from "./dashboard/RecentTransactions";
-import QuickActions from "./dashboard/QuickActions";
+
 
 interface DashboardStats {
   revenue: number;
@@ -291,7 +291,6 @@ const Dashboard = () => {
           formatCurrency={formatCurrency}
           formatDate={formatDate}
         />
-        <QuickActions />
       </div>
     </div>
   );
