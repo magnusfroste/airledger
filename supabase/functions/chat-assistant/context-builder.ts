@@ -106,9 +106,7 @@ TRANSAKTIONER:
 
 SENASTE TRANSAKTIONER:
 ${recentTransactions.map(t => `
-- ${t.transaction_date}: ${t.description} (${t.total_amount} kr) - Status: ${t.status}
-  Konton: ${t.airledger_entries?.map((e: any) => `${e.account_code} ${e.account_name}: ${e.debit_amount > 0 ? `Debet ${e.debit_amount}` : `Kredit ${e.credit_amount}`} kr`).join(', ') || 'Inga poster'}
-`).join('')}
+  `).join('')}
 `;
   } else {
     return `

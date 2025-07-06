@@ -69,7 +69,6 @@ serve(async (req) => {
       description: `Betalning från ${customerName}`,
       total_amount: amount,
       transaction_type: 'income',
-      status: 'posted',
       analysis_data: {
         type: 'customer_payment',
         customer_name: customerName,

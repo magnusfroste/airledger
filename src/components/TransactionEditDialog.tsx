@@ -25,7 +25,6 @@ interface Transaction {
   description: string;
   total_amount: number;
   transaction_type: string;
-  status: string;
   analysis_data: any;
   entries: TransactionEntry[];
 }
@@ -83,7 +82,6 @@ const TransactionEditDialog = ({ open, onOpenChange, transaction, onTransactionU
           description: editedTransaction.description,
           total_amount: editedTransaction.total_amount,
           transaction_type: editedTransaction.transaction_type as "income" | "expense" | "transfer",
-          status: editedTransaction.status as "draft" | "posted" | "reconciled",
         })
         .eq('id', editedTransaction.id);
 
@@ -210,28 +208,9 @@ const TransactionEditDialog = ({ open, onOpenChange, transaction, onTransactionU
                     description: e.target.value
                   })}
                   rows={2}
-                />
-              </div>
-              <div>
-                <Label htmlFor="status">Status</Label>
-                <Select 
-                  value={editedTransaction.status} 
-                  onValueChange={(value) => setEditedTransaction({
-                    ...editedTransaction,
-                    status: value
-                  })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Utkast</SelectItem>
-                    <SelectItem value="posted">Publicerad</SelectItem>
-                    <SelectItem value="reconciled">Avstämd</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
+                 />
+               </div>
+             </CardContent>
           </Card>
 
           {/* Accounting Entries */}

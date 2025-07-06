@@ -106,16 +106,15 @@ const Dashboard = () => {
         })
         .reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
-      // Expenses - posted expense transactions this month
-      const monthlyExpenses = transactions
-        .filter(t => {
-          const transactionDate = new Date(t.transaction_date);
-          return t.transaction_type === 'expense' && 
-                 t.status === 'posted' &&
-                 transactionDate.getMonth() === currentMonth &&
-                 transactionDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, t) => sum + t.total_amount, 0);
+       // Expenses - posted expense transactions this month
+       const monthlyExpenses = transactions
+         .filter(t => {
+           const transactionDate = new Date(t.transaction_date);
+           return t.transaction_type === 'expense' && 
+                  transactionDate.getMonth() === currentMonth &&
+                  transactionDate.getFullYear() === currentYear;
+         })
+         .reduce((sum, t) => sum + t.total_amount, 0);
 
       // Checking account balance (1930) - include opening balance + transactions
       const checkingOpeningBalance = await supabase
@@ -151,14 +150,13 @@ const Dashboard = () => {
         })
         .reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
-      const yearlyExpenses = transactions
-        .filter(t => {
-          const transactionDate = new Date(t.transaction_date);
-          return t.transaction_type === 'expense' && 
-                 t.status === 'posted' &&
-                 transactionDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, t) => sum + t.total_amount, 0);
+       const yearlyExpenses = transactions
+         .filter(t => {
+           const transactionDate = new Date(t.transaction_date);
+           return t.transaction_type === 'expense' && 
+                  transactionDate.getFullYear() === currentYear;
+         })
+         .reduce((sum, t) => sum + t.total_amount, 0);
 
       // Create monthly breakdown for charts
       const monthNames = [
@@ -176,15 +174,14 @@ const Dashboard = () => {
           })
           .reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
-        const monthExpenses = transactions
-          .filter(t => {
-            const transactionDate = new Date(t.transaction_date);
-            return t.transaction_type === 'expense' && 
-                   t.status === 'posted' &&
-                   transactionDate.getMonth() === index &&
-                   transactionDate.getFullYear() === currentYear;
-          })
-          .reduce((sum, t) => sum + t.total_amount, 0);
+         const monthExpenses = transactions
+           .filter(t => {
+             const transactionDate = new Date(t.transaction_date);
+             return t.transaction_type === 'expense' && 
+                    transactionDate.getMonth() === index &&
+                    transactionDate.getFullYear() === currentYear;
+           })
+           .reduce((sum, t) => sum + t.total_amount, 0);
 
         return {
           month,

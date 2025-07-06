@@ -27,7 +27,6 @@ interface Transaction {
   reference_number?: string;
   total_amount: number;
   transaction_type: string;
-  status: string;
   analysis_data: any;
   entries: TransactionEntry[];
 }
@@ -36,7 +35,7 @@ const TransactionsList = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  
   const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   
@@ -98,21 +97,9 @@ const TransactionsList = () => {
   const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (transaction.analysis_data?.vendor && transaction.analysis_data.vendor.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'posted':
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Publicerad</Badge>;
-      case 'reconciled':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Avstämd</Badge>;
-      default:
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Utkast</Badge>;
-    }
-  };
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -194,7 +181,7 @@ const TransactionsList = () => {
     }
 
     // Create flattened CSV with transaction + entry data
-    const csvHeader = "transaction_date,description,reference_number,transaction_type,status,account_code,account_name,debit_amount,credit_amount,entry_description\n";
+    const csvHeader = "transaction_date,description,reference_number,transaction_type,account_code,account_name,debit_amount,credit_amount,entry_description\n";
     
     const csvRows = [];
     transactions.forEach(transaction => {
@@ -204,7 +191,6 @@ const TransactionsList = () => {
           `"${transaction.description}"`,
           transaction.reference_number || '',
           transaction.transaction_type,
-          transaction.status,
           entry.account_code,
           `"${entry.account_name}"`,
           entry.debit_amount || 0,
@@ -270,7 +256,7 @@ const TransactionsList = () => {
     const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
     
     // Validate headers
-    const expectedHeaders = ['transaction_date', 'description', 'reference_number', 'transaction_type', 'status', 'account_code', 'account_name', 'debit_amount', 'credit_amount', 'entry_description'];
+    const expectedHeaders = ['transaction_date', 'description', 'reference_number', 'transaction_type', 'account_code', 'account_name', 'debit_amount', 'credit_amount', 'entry_description'];
     const requiredHeaders = ['transaction_date', 'description', 'transaction_type', 'account_code', 'account_name'];
     const hasRequiredHeaders = requiredHeaders.every(header => headers.includes(header));
     
@@ -321,7 +307,6 @@ const TransactionsList = () => {
         description: values[headers.indexOf('description')] || '',
         reference_number: values[headers.indexOf('reference_number')] || '',
         transaction_type: values[headers.indexOf('transaction_type')] || '',
-        status: values[headers.indexOf('status')] || 'draft',
         account_code: values[headers.indexOf('account_code')] || '',
         account_name: values[headers.indexOf('account_name')] || '',
         debit_amount: parseFloat(values[headers.indexOf('debit_amount')]) || 0,
@@ -345,11 +330,6 @@ const TransactionsList = () => {
       
       if (!['income', 'expense', 'transfer'].includes(row.transaction_type)) {
         row.errors.push('Transaction_type måste vara income, expense eller transfer');
-        row.valid = false;
-      }
-      
-      if (!['draft', 'posted', 'reconciled'].includes(row.status)) {
-        row.errors.push('Status måste vara draft, posted eller reconciled');
         row.valid = false;
       }
       
@@ -409,7 +389,6 @@ const TransactionsList = () => {
               description: row.description,
               reference_number: row.reference_number,
               transaction_type: row.transaction_type,
-              status: row.status,
             },
             entries: []
           });
@@ -641,18 +620,6 @@ const TransactionsList = () => {
                 className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48 border-gray-200">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alla statusar</SelectItem>
-                <SelectItem value="draft">Utkast</SelectItem>
-                <SelectItem value="posted">Publicerad</SelectItem>
-                <SelectItem value="reconciled">Avstämd</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
       </div>
@@ -679,7 +646,6 @@ const TransactionsList = () => {
                           {transaction.analysis_data?.vendor && (
                             <span className="text-sm text-gray-500">• {transaction.analysis_data.vendor}</span>
                           )}
-                          {getStatusBadge(transaction.status)}
                         </div>
                       </div>
                     </div>
@@ -802,7 +768,7 @@ const TransactionsList = () => {
       <TransactionEditDialog
         open={!!editingTransaction}
         onOpenChange={(open) => !open && setEditingTransaction(null)}
-        transaction={editingTransaction}
+        transaction={editingTransaction!}
         onTransactionUpdated={fetchTransactions}
       />
     </div>

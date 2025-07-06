@@ -392,7 +392,6 @@ export type Database = {
           id: string
           image_url: string | null
           reference_number: string | null
-          status: Database["public"]["Enums"]["transaction_status"]
           total_amount: number
           transaction_date: string
           transaction_type: Database["public"]["Enums"]["transaction_type"]
@@ -406,7 +405,6 @@ export type Database = {
           id?: string
           image_url?: string | null
           reference_number?: string | null
-          status?: Database["public"]["Enums"]["transaction_status"]
           total_amount: number
           transaction_date: string
           transaction_type: Database["public"]["Enums"]["transaction_type"]
@@ -420,7 +418,6 @@ export type Database = {
           id?: string
           image_url?: string | null
           reference_number?: string | null
-          status?: Database["public"]["Enums"]["transaction_status"]
           total_amount?: number
           transaction_date?: string
           transaction_type?: Database["public"]["Enums"]["transaction_type"]

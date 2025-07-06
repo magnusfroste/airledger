@@ -103,7 +103,6 @@ serve(async (req) => {
       description: description,
       total_amount: totalDebit, // Use total debit as transaction amount
       transaction_type: 'expense', // Default to expense, could be made configurable
-      status: 'posted',
       reference_number: referenceNumber || null,
       analysis_data: {
         type: 'general_transaction',
