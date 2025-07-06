@@ -610,53 +610,68 @@ const ChatInterface = () => {
         <div className="h-[calc(100vh-120px)] flex flex-col">
           {/* Messages Container */}
           <div className="flex-1 overflow-y-auto space-y-6 mb-6">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-4 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {message.sender === 'ai' && (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground flex-shrink-0 mt-1">
-                    <Bot className="h-4 w-4" />
-                  </div>
-                )}
-                
-                <div
-                  className={`max-w-[75%] ${
-                    message.sender === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-3xl rounded-br-lg'
-                      : 'bg-muted rounded-3xl rounded-bl-lg'
-                  } px-5 py-4`}
-                >
-                  {message.images && message.images.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                      {message.images.map((image) => (
-                        <img
-                          key={image.id}
-                          src={image.preview}
-                          alt="Uploaded document"
-                          className="w-full h-24 object-cover rounded-xl"
-                        />
-                      ))}
+            {messages.slice(1).map((message) => (
+              <div key={message.id} className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] ${message.sender === 'user' ? 'order-1' : 'order-2'}`}>
+                  <div className={`px-5 py-4 rounded-3xl ${
+                    message.sender === 'user' 
+                      ? 'bg-primary text-primary-foreground rounded-br-lg' 
+                      : 'bg-muted rounded-bl-lg'
+                  }`}>
+                    {message.type === 'image' && message.images && (
+                      <div className="space-y-3 mb-3">
+                        {message.images.map((image) => (
+                          <div key={image.id} className="relative">
+                            <img
+                              src={image.preview}
+                              alt="Uploaded image"
+                              className="max-w-full h-auto rounded-2xl"
+                            />
+                            {image.analysis && (
+                              <div className="mt-2 p-3 bg-background/90 rounded-xl">
+                                <Badge variant="secondary" className="mb-2">
+                                  {image.analysis.type === 'receipt' ? 'Kvitto' : 'Faktura'}
+                                </Badge>
+                                <p className="text-sm">
+                                  <strong>{image.analysis.vendor}</strong> - {image.analysis.amount} kr
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {image.analysis.date}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="prose prose-sm max-w-none">
+                      {message.content.split('\n').map((line, index) => {
+                        if (line.startsWith('**') && line.endsWith('**')) {
+                          return <p key={index} className="font-bold mb-2">{line.slice(2, -2)}</p>;
+                        }
+                        if (line.startsWith('•')) {
+                          return <p key={index} className="ml-2 mb-1">{line}</p>;
+                        }
+                        return line ? <p key={index} className="mb-2">{line}</p> : <br key={index} />;
+                      })}
                     </div>
-                  )}
-                  <p className="text-sm leading-relaxed">{message.content}</p>
-                </div>
-
-                {message.sender === 'user' && (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground flex-shrink-0 mt-1">
-                    <User className="h-4 w-4" />
                   </div>
-                )}
+                  <div className={`text-xs text-muted-foreground mt-1 px-2 ${
+                    message.sender === 'user' ? 'text-right' : 'text-left'
+                  }`}>
+                    {message.timestamp.toLocaleTimeString('sv-SE', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </div>
+                </div>
               </div>
             ))}
             
             {isLoading && (
-              <div className="flex gap-4 justify-start">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground">
-                  <Bot className="h-4 w-4" />
-                </div>
-                <div className="bg-muted rounded-3xl rounded-bl-lg px-5 py-4">
+              <div className="flex justify-start">
+                <div className="bg-muted rounded-3xl rounded-bl-lg px-5 py-4 max-w-[85%]">
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
@@ -701,11 +716,12 @@ const ChatInterface = () => {
               </div>
             )}
 
-            <div className="flex gap-3 items-end">
+            {/* Action buttons row */}
+            <div className="flex justify-center items-center gap-4 px-4">
               <Button
                 variant="ghost"
                 size="lg"
-                className="px-3 h-12 rounded-full"
+                className="flex-1 h-12 rounded-full bg-muted/50"
                 onClick={() => {
                   const input = document.createElement('input');
                   input.type = 'file';
@@ -719,47 +735,53 @@ const ChatInterface = () => {
                 }}
                 disabled={isLoading}
               >
-                <Paperclip className="h-5 w-5" />
+                <Paperclip className="h-5 w-5 mr-2" />
+                Ladda upp
               </Button>
-              
-              <Button
-                variant="ghost"
-                size="lg"
-                className="px-3 h-12 rounded-full"
-                onClick={startCamera}
-                disabled={isLoading}
-              >
-                <Camera className="h-5 w-5" />
-              </Button>
-              
-              <div className="flex-1 relative">
-                <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Meddelande..."
-                  className="pl-6 pr-14 py-6 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20"
-                  disabled={isLoading}
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 p-0 rounded-full"
-                  onClick={handleSendMessage}
-                  disabled={(!inputValue.trim() && pendingImages.length === 0) || isLoading}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
               
               <Button
                 variant={isRecording ? "destructive" : "default"}
                 size="lg"
                 onClick={handleVoiceRecording}
-                className={`px-4 h-12 rounded-full ${isRecording ? 'animate-pulse' : ''}`}
+                className={`flex-shrink-0 h-14 w-14 rounded-full ${isRecording ? 'animate-pulse' : 'bg-primary'}`}
+                disabled={isLoading}
               >
-                {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                {isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
               </Button>
+              
+              <Button
+                variant="ghost"
+                size="lg"
+                className="flex-1 h-12 rounded-full bg-muted/50"
+                onClick={startCamera}
+                disabled={isLoading}
+              >
+                <Camera className="h-5 w-5 mr-2" />
+                Kamera
+              </Button>
+            </div>
+
+            {/* Message input */}
+            <div className="flex gap-3 items-center px-2">
+              <div className="flex-1 relative">
+                <Input
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Skriv ditt meddelande här..."
+                  className="pl-6 pr-14 py-6 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20 min-h-[56px]"
+                  disabled={isLoading}
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-12 w-12 p-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={handleSendMessage}
+                  disabled={(!inputValue.trim() && pendingImages.length === 0) || isLoading}
+                >
+                  <Send className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
