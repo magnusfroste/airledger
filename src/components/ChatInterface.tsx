@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, FileImage, CheckCircle, AlertCircle, Camera, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import TransactionConfirmDialog from "@/components/TransactionConfirmDialog";
+import MessageList from "./chat/MessageList";
+import InputArea from "./chat/InputArea";
+import CameraModal from "./chat/CameraModal";
 interface Message {
   id: string;
   content: string;
@@ -600,169 +598,52 @@ const ChatInterface = () => {
       throw error;
     }
   };
-  return <div className="min-h-screen bg-background">
+  return (
+    <div className="min-h-screen bg-background">
       {/* Chat Messages */}
       <div className="container px-6 flex-1 max-w-4xl mx-auto py-[6px]">
         <div className="h-[calc(100vh-80px)] flex flex-col">
           {/* Messages Container */}
-          <div className="flex-1 overflow-y-auto space-y-6 mb-6">
-            {/* New Chat Button */}
-            <div className="flex justify-end mb-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleNewChat}
-                className="text-muted-foreground hover:text-foreground transition-colors rounded-full px-3 py-1 h-8"
-                disabled={isLoading}
-              >
-                <RotateCcw className="h-4 w-4 mr-1" />
-                Ny chat
-              </Button>
-            </div>
-
-            {messages.slice(1).map(message => <div key={message.id} className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] ${message.sender === 'user' ? 'order-1' : 'order-2'}`}>
-                  <div className={`px-5 py-4 rounded-3xl ${message.sender === 'user' ? 'bg-primary text-primary-foreground rounded-br-lg' : 'bg-muted rounded-bl-lg'}`}>
-                    {message.type === 'image' && message.images && <div className="space-y-3 mb-3">
-                        {message.images.map(image => <div key={image.id} className="relative">
-                            <img src={image.preview} alt="Uploaded image" className="max-w-full h-auto rounded-2xl" />
-                            {image.analysis && <div className="mt-2 p-3 bg-background/90 rounded-xl">
-                                <Badge variant="secondary" className="mb-2">
-                                  {image.analysis.type === 'receipt' ? 'Kvitto' : 'Faktura'}
-                                </Badge>
-                                <p className="text-sm">
-                                  <strong>{image.analysis.vendor}</strong> - {image.analysis.amount} kr
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {image.analysis.date}
-                                </p>
-                              </div>}
-                          </div>)}
-                      </div>}
-                    
-                    <div className="prose prose-sm max-w-none">
-                      {message.content.split('\n').map((line, index) => {
-                    if (line.startsWith('**') && line.endsWith('**')) {
-                      return <p key={index} className="font-bold mb-2">{line.slice(2, -2)}</p>;
-                    }
-                    if (line.startsWith('•')) {
-                      return <p key={index} className="ml-2 mb-1">{line}</p>;
-                    }
-                    return line ? <p key={index} className="mb-2">{line}</p> : <br key={index} />;
-                  })}
-                    </div>
-                  </div>
-                </div>
-              </div>)}
-            
-            {isLoading && <div className="flex justify-start">
-                <div className="bg-muted rounded-3xl rounded-bl-lg px-5 py-4 max-w-[85%]">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{
-                  animationDelay: '0.1s'
-                }}></div>
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{
-                  animationDelay: '0.2s'
-                }}></div>
-                  </div>
-                </div>
-              </div>}
-            
-            {/* Scroll anchor */}
-            <div ref={messagesEndRef} />
-          </div>
+          <MessageList
+            messages={messages}
+            isLoading={isLoading}
+            onNewChat={handleNewChat}
+            messagesEndRef={messagesEndRef}
+          />
 
           {/* Input Area */}
-          <div className="space-y-4">
-            {/* Pending Images Preview */}
-            {pendingImages.length > 0 && <div className="bg-muted/30 rounded-2xl p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <FileImage className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground font-medium">Bifogade bilder ({pendingImages.length})</span>
-                </div>
-                <div className="flex gap-3 flex-wrap">
-                  {pendingImages.map(image => <div key={image.id} className="relative group">
-                      <img src={image.preview} alt="Pending upload" className="w-16 h-16 object-cover rounded-xl border border-border/20" />
-                      <Button size="sm" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removePendingImage(image.id)}>
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>)}
-                </div>
-              </div>}
-
-            {/* Message input with action buttons */}
-            <div className="flex gap-2 items-center px-2">
-              {/* Action buttons to the left */}
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" className="h-12 w-12 p-0 rounded-full bg-muted/50 hover:bg-muted/70" onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'image/*';
-                  input.multiple = true;
-                  input.onchange = e => {
-                    const files = (e.target as HTMLInputElement).files;
-                    if (files) handleImageUpload(files);
-                  };
-                  input.click();
-                }} disabled={isLoading} title="Ladda upp bilder">
-                  <Paperclip className="h-5 w-5" />
-                </Button>
-                
-                <Button variant={isRecording ? "destructive" : "ghost"} size="sm" onClick={handleVoiceRecording} className={`h-12 w-12 p-0 rounded-full ${isRecording ? 'animate-pulse bg-destructive text-destructive-foreground' : 'bg-muted/50 hover:bg-muted/70'}`} disabled={isLoading} title="Spela in röst">
-                  {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                </Button>
-                
-                <Button variant="ghost" size="sm" className="h-12 w-12 p-0 rounded-full bg-muted/50 hover:bg-muted/70" onClick={startCamera} disabled={isLoading} title="Ta foto">
-                  <Camera className="h-5 w-5" />
-                </Button>
-              </div>
-
-              {/* Text input */}
-              <div className="flex-1 relative">
-                <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyPress={handleKeyPress} placeholder="Skriv ditt meddelande här..." className="pl-6 pr-14 py-6 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20 min-h-[56px]" disabled={isLoading} />
-                
-                {/* Send button to the right */}
-                <Button size="sm" variant="ghost" className="absolute right-2 top-1/2 -translate-y-1/2 h-12 w-12 p-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSendMessage} disabled={!inputValue.trim() && pendingImages.length === 0 || isLoading}>
-                  <Send className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-          </div>
+          <InputArea
+            inputValue={inputValue}
+            setInputValue={setInputValue}
+            pendingImages={pendingImages}
+            isRecording={isRecording}
+            isLoading={isLoading}
+            onSendMessage={handleSendMessage}
+            onKeyPress={handleKeyPress}
+            onImageUpload={handleImageUpload}
+            onRemovePendingImage={removePendingImage}
+            onVoiceRecording={handleVoiceRecording}
+            onStartCamera={startCamera}
+          />
         </div>
       </div>
 
       {/* Transaction Confirmation Dialog */}
-      <TransactionConfirmDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen} analysis={pendingAnalysis} onConfirm={handleTransactionConfirm} />
+      <TransactionConfirmDialog 
+        open={confirmDialogOpen} 
+        onOpenChange={setConfirmDialogOpen} 
+        analysis={pendingAnalysis} 
+        onConfirm={handleTransactionConfirm} 
+      />
 
       {/* Camera Modal */}
-      {showCamera && <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-md mx-auto">
-            <div className="bg-white rounded-2xl overflow-hidden">
-              <div className="relative">
-                {cameraStream && <video id="camera-video" autoPlay playsInline muted className="w-full h-80 object-cover" ref={video => {
-              if (video && cameraStream) {
-                video.srcObject = cameraStream;
-              }
-            }} />}
-                <div className="absolute top-4 right-4">
-                  <Button variant="secondary" size="sm" onClick={stopCamera} className="rounded-full h-10 w-10 p-0">
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6 text-center space-y-4">
-                <p className="text-sm text-gray-600">
-                  Placera kvittot i kamerans vy och tryck på fotoknappen
-                </p>
-                <Button onClick={capturePhoto} className="w-full rounded-full py-3">
-                  <Camera className="h-5 w-5 mr-2" />
-                  Ta foto
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>}
-    </div>;
+      <CameraModal
+        showCamera={showCamera}
+        cameraStream={cameraStream}
+        onStopCamera={stopCamera}
+        onCapturePhoto={capturePhoto}
+      />
+    </div>
+  );
 };
 export default ChatInterface;
