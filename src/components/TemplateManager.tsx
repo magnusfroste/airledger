@@ -103,27 +103,44 @@ const TemplateManager = () => {
 
       if (templatesError) throw templatesError;
 
-      // Fetch template usage history
+      // Fetch template usage history with manual joins
       const { data: usageData, error: usageError } = await supabase
         .from('airledger_template_usage')
-        .select(`
-          *,
-          airledger_transaction_templates!inner(template_name),
-          airledger_transactions!inner(description)
-        `)
+        .select('*')
         .order('used_at', { ascending: false })
         .limit(20);
+
+      let processedUsageData: TemplateUsage[] = [];
+      
+      if (usageData && !usageError) {
+        // Manually fetch template names and transaction descriptions
+        for (const usage of usageData) {
+          const { data: template } = await supabase
+            .from('airledger_transaction_templates')
+            .select('template_name')
+            .eq('id', usage.template_id)
+            .single();
+          
+          const { data: transaction } = await supabase
+            .from('airledger_transactions')
+            .select('description')
+            .eq('id', usage.transaction_id)
+            .single();
+
+          processedUsageData.push({
+            id: usage.id,
+            template_id: usage.template_id,
+            used_at: usage.used_at,
+            template_name: template?.template_name || 'Okänd mall',
+            transaction_description: transaction?.description || 'Okänd transaktion'
+          });
+        }
+      }
 
       if (usageError) throw usageError;
 
       setTemplates(templatesData || []);
-      setTemplateUsage(usageData?.map(u => ({
-        id: u.id,
-        template_id: u.template_id,
-        used_at: u.used_at,
-        template_name: (u as any).airledger_transaction_templates.template_name,
-        transaction_description: (u as any).airledger_transactions.description
-      })) || []);
+      setTemplateUsage(processedUsageData);
 
     } catch (error) {
       console.error('Error fetching templates:', error);
