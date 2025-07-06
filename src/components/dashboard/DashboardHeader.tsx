@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Camera } from "lucide-react";
+import { Bot } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface DashboardHeaderProps {
@@ -21,8 +21,8 @@ const DashboardHeader = ({ greeting, userName }: DashboardHeaderProps) => {
           <div className="flex items-center space-x-3">
             <Button asChild>
               <Link to="/chat">
-                <Camera className="h-4 w-4 mr-2" />
-                Fotografera kvitto
+                <Bot className="h-4 w-4 mr-2" />
+                Bokföringsassistent
               </Link>
             </Button>
           </div>
