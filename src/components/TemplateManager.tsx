@@ -18,7 +18,8 @@ import {
   Hash,
   Tag,
   Shield,
-  Crown
+  Crown,
+  Search
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +58,8 @@ const TemplateManager = () => {
   const [editingTemplate, setEditingTemplate] = useState<TransactionTemplate | null>(null);
   const [isDeveloper, setIsDeveloper] = useState(false);
   const [chartOfAccounts, setChartOfAccounts] = useState<Array<{account_code: string, account_name: string}>>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // New template form state
   const [newTemplate, setNewTemplate] = useState({
@@ -311,6 +314,24 @@ const TemplateManager = () => {
       minute: '2-digit'
     });
   };
+
+  // Filter templates based on search term and category
+  const filteredTemplates = templates.filter(template => {
+    const matchesSearch = !searchTerm || 
+      template.template_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (template.keywords && template.keywords.some(keyword => 
+        keyword.toLowerCase().includes(searchTerm.toLowerCase())
+      ));
+    
+    const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
+
+  // Get unique categories for filter dropdown
+  const uniqueCategories = [...new Set(templates.map(t => t.category))].sort();
 
   if (loading) {
     return (
@@ -691,92 +712,136 @@ const TemplateManager = () => {
             </TabsTrigger>
           </TabsList>
 
+          {/* Search and Filter Controls */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Sök mallar..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <Select
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Alla kategorier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alla kategorier</SelectItem>
+                  {uniqueCategories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {/* Templates Tab */}
           <TabsContent value="templates" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {templates.map((template) => (
-                <Card key={template.id} className="bg-white border border-gray-200">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg font-semibold text-gray-900">
-                          {template.template_name}
-                        </CardTitle>
-                        <p className="text-sm text-gray-600 mt-1">{template.description}</p>
+            {filteredTemplates.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredTemplates.map((template) => (
+                  <Card key={template.id} className="bg-white border border-gray-200">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg font-semibold text-gray-900">
+                            {template.template_name}
+                          </CardTitle>
+                          <p className="text-sm text-gray-600 mt-1">{template.description}</p>
+                        </div>
+                        {template.is_system_template && (
+                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                            <Shield className="h-3 w-3 mr-1" />
+                            System
+                          </Badge>
+                        )}
                       </div>
-                      {template.is_system_template && (
-                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
-                          <Shield className="h-3 w-3 mr-1" />
-                          System
-                        </Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Kategori:</span>
-                      <Badge variant="outline">{template.category}</Badge>
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Användningar:</span>
-                      <div className="flex items-center gap-1">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">{template.usage_count || 0}</span>
-                      </div>
-                    </div>
-
-                    {template.last_used_at && (
+                    </CardHeader>
+                    <CardContent className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Senast använd:</span>
-                        <span className="text-xs text-gray-500">
-                          {formatDate(template.last_used_at)}
-                        </span>
+                        <span className="text-gray-600">Kategori:</span>
+                        <Badge variant="outline">{template.category}</Badge>
                       </div>
-                    )}
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Användningar:</span>
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                          <span className="font-medium">{template.usage_count || 0}</span>
+                        </div>
+                      </div>
 
-                    {template.keywords && template.keywords.length > 0 && (
-                      <div className="space-y-2">
-                        <span className="text-sm text-gray-600">Nyckelord:</span>
-                        <div className="flex flex-wrap gap-1">
-                          {template.keywords.map((keyword, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {keyword}
-                            </Badge>
+                      {template.last_used_at && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Senast använd:</span>
+                          <span className="text-xs text-gray-500">
+                            {formatDate(template.last_used_at)}
+                          </span>
+                        </div>
+                      )}
+
+                      {template.keywords && template.keywords.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-sm text-gray-600">Nyckelord:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {template.keywords.map((keyword, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {keyword}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t">
+                        <span className="text-sm text-gray-600 block mb-2">Bokföringsposter:</span>
+                        <div className="space-y-1 text-xs">
+                          {template.template_entries.map((entry: any, index: number) => (
+                            <div key={index} className="flex justify-between">
+                              <span>{entry.type === 'debit' ? 'D' : 'K'}: {entry.account_code}</span>
+                              <span className="text-gray-500">{entry.account_name}</span>
+                            </div>
                           ))}
                         </div>
                       </div>
-                    )}
 
-                     <div className="pt-2 border-t">
-                       <span className="text-sm text-gray-600 block mb-2">Bokföringsposter:</span>
-                       <div className="space-y-1 text-xs">
-                         {template.template_entries.map((entry: any, index: number) => (
-                           <div key={index} className="flex justify-between">
-                             <span>{entry.type === 'debit' ? 'D' : 'K'}: {entry.account_code}</span>
-                             <span className="text-gray-500">{entry.account_name}</span>
-                           </div>
-                         ))}
-                       </div>
-                     </div>
-
-                     {isDeveloper && template.is_system_template && (
-                       <div className="pt-3 border-t">
-                         <Button
-                           variant="outline"
-                           size="sm"
-                           onClick={() => startEditTemplate(template)}
-                           className="w-full"
-                         >
-                           <Settings className="h-4 w-4 mr-2" />
-                           Redigera mall
-                         </Button>
-                       </div>
-                     )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      {isDeveloper && template.is_system_template && (
+                        <div className="pt-3 border-t">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditTemplate(template)}
+                            className="w-full"
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Redigera mall
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-lg font-medium">Inga mallar hittades</p>
+                <p className="text-sm mt-1">
+                  {searchTerm || selectedCategory !== 'all' 
+                    ? 'Prova att ändra sökkriterier eller filter' 
+                    : 'Skapa din första mall för att komma igång'
+                  }
+                </p>
+              </div>
+            )}
           </TabsContent>
 
           {/* Usage History Tab */}
