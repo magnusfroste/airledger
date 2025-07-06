@@ -70,14 +70,12 @@ const Reports = () => {
           credit_amount,
           airledger_transactions!inner(
             user_id,
-            transaction_date,
-            status
+            transaction_date
           )
         `)
         .eq('airledger_transactions.user_id', user.id)
         .gte('airledger_transactions.transaction_date', startDate.toISOString().split('T')[0])
-        .lte('airledger_transactions.transaction_date', endDate.toISOString().split('T')[0])
-        .in('airledger_transactions.status', ['posted', 'draft']); // Include both posted and draft
+        .lte('airledger_transactions.transaction_date', endDate.toISOString().split('T')[0]);
 
       if (error) {
         throw error;

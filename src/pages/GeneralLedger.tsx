@@ -83,10 +83,9 @@ const GeneralLedger = () => {
           account_code,
           debit_amount,
           credit_amount,
-          airledger_transactions!inner(user_id, status)
+          airledger_transactions!inner(user_id)
         `)
-        .eq('airledger_transactions.user_id', user.id)
-        .eq('airledger_transactions.status', 'posted');
+        .eq('airledger_transactions.user_id', user.id);
 
       if (entriesError) throw entriesError;
 
