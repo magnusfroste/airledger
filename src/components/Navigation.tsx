@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Home, MessageCircle, FileText, MoreHorizontal, Settings, LogOut, User, BarChart3, Calculator, BookOpen, Menu } from "lucide-react";
 import VoiceInstructions from "@/components/VoiceInstructions";
-import FloatingActionButton from "@/components/FloatingActionButton";
 
 const Navigation = () => {
   const location = useLocation();
@@ -267,9 +266,6 @@ const Navigation = () => {
           </Sheet>
         </div>
       </nav>
-
-      {/* Floating Action Button */}
-      <FloatingActionButton />
     </>
   );
 };
