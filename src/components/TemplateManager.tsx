@@ -53,6 +53,8 @@ const TemplateManager = () => {
   const [templateUsage, setTemplateUsage] = useState<TemplateUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<TransactionTemplate | null>(null);
   const [isDeveloper, setIsDeveloper] = useState(false);
   const [chartOfAccounts, setChartOfAccounts] = useState<Array<{account_code: string, account_name: string}>>([]);
 
@@ -96,6 +98,70 @@ const TemplateManager = () => {
     newEntries[index].account_code = accountCode;
     newEntries[index].account_name = account?.account_name || '';
     setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
+  };
+
+  const handleEditAccountCodeChange = (index: number, accountCode: string) => {
+    if (!editingTemplate) return;
+    const account = chartOfAccounts.find(acc => acc.account_code === accountCode);
+    const newEntries = [...editingTemplate.template_entries];
+    newEntries[index].account_code = accountCode;
+    newEntries[index].account_name = account?.account_name || '';
+    setEditingTemplate(prev => prev ? { ...prev, template_entries: newEntries } : null);
+  };
+
+  const startEditTemplate = (template: TransactionTemplate) => {
+    setEditingTemplate({
+      ...template,
+      keywords: template.keywords || []
+    });
+    setShowEditDialog(true);
+  };
+
+  const updateTemplate = async () => {
+    if (!editingTemplate) return;
+    
+    try {
+      if (!editingTemplate.template_name || !editingTemplate.description) {
+        toast({
+          title: "Ofullständiga uppgifter",
+          description: "Fyll i mallnamn och beskrivning.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('airledger_transaction_templates')
+        .update({
+          template_name: editingTemplate.template_name,
+          description: editingTemplate.description,
+          category: editingTemplate.category,
+          keywords: Array.isArray(editingTemplate.keywords) ? editingTemplate.keywords : [],
+          template_entries: editingTemplate.template_entries.filter(entry => 
+            entry.account_code && entry.account_name
+          ),
+        })
+        .eq('id', editingTemplate.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Mall uppdaterad",
+        description: `Mallen "${editingTemplate.template_name}" har uppdaterats.`,
+      });
+
+      setShowEditDialog(false);
+      setEditingTemplate(null);
+      fetchTemplatesAndUsage();
+
+    } catch (error) {
+      console.error('Error updating template:', error);
+      toast({
+        title: "Fel vid uppdatering",
+        description: "Kunde inte uppdatera mallen. Försök igen.",
+        variant: "destructive",
+      });
+    }
   };
 
   const checkDeveloperStatus = async () => {
@@ -459,6 +525,154 @@ const TemplateManager = () => {
                 </div>
               </DialogContent>
             </Dialog>
+
+            {/* Edit Dialog */}
+            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Redigera transaktionsmall</DialogTitle>
+                </DialogHeader>
+                {editingTemplate && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit-template-name">Mallnamn</Label>
+                        <Input
+                          id="edit-template-name"
+                          value={editingTemplate.template_name}
+                          onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, template_name: e.target.value } : null)}
+                          placeholder="t.ex. Månadsvis hyra"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-category">Kategori</Label>
+                        <Select
+                          value={editingTemplate.category}
+                          onValueChange={(value) => setEditingTemplate(prev => prev ? { ...prev, category: value } : null)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Välj kategori" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Lokalkostnader">Lokalkostnader</SelectItem>
+                            <SelectItem value="Fordonskostnader">Fordonskostnader</SelectItem>
+                            <SelectItem value="Lön och personal">Lön och personal</SelectItem>
+                            <SelectItem value="Skatter och avgifter">Skatter och avgifter</SelectItem>
+                            <SelectItem value="Kontorskostnader">Kontorskostnader</SelectItem>
+                            <SelectItem value="Försäkringar">Försäkringar</SelectItem>
+                            <SelectItem value="Övrigt">Övrigt</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit-description">Beskrivning</Label>
+                      <Textarea
+                        id="edit-description"
+                        value={editingTemplate.description}
+                        onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, description: e.target.value } : null)}
+                        placeholder="Beskriv vad denna mall används till..."
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-keywords">Nyckelord (kommaseparerat)</Label>
+                      <Input
+                        id="edit-keywords"
+                        value={Array.isArray(editingTemplate.keywords) ? editingTemplate.keywords.join(', ') : ''}
+                        onChange={(e) => setEditingTemplate(prev => prev ? { 
+                          ...prev, 
+                          keywords: e.target.value.split(',').map(k => k.trim()) 
+                        } : null)}
+                        placeholder="hyra, lokaler, kontor"
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Bokföringsposter</Label>
+                      <div className="space-y-3 mt-2">
+                        {editingTemplate.template_entries.map((entry: any, index: number) => (
+                          <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
+                            <Select
+                              value={entry.account_code}
+                              onValueChange={(value) => handleEditAccountCodeChange(index, value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Välj konto" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60">
+                                {chartOfAccounts.map((account) => (
+                                  <SelectItem key={account.account_code} value={account.account_code}>
+                                    {account.account_code} - {account.account_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              placeholder="Kontonamn"
+                              value={entry.account_name}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                            <Select
+                              value={entry.type}
+                              onValueChange={(value) => {
+                                const newEntries = [...editingTemplate.template_entries];
+                                newEntries[index].type = value;
+                                setEditingTemplate(prev => prev ? { ...prev, template_entries: newEntries } : null);
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="debit">Debet</SelectItem>
+                                <SelectItem value="credit">Kredit</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              placeholder="Beskrivning"
+                              value={entry.description}
+                              onChange={(e) => {
+                                const newEntries = [...editingTemplate.template_entries];
+                                newEntries[index].description = e.target.value;
+                                setEditingTemplate(prev => prev ? { ...prev, template_entries: newEntries } : null);
+                              }}
+                            />
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingTemplate(prev => prev ? {
+                              ...prev,
+                              template_entries: [
+                                ...prev.template_entries,
+                                { account_code: '', account_name: '', type: 'debit', description: '' }
+                              ]
+                            } : null);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Lägg till post
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end space-x-2">
+                      <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+                        Avbryt
+                      </Button>
+                      <Button onClick={updateTemplate}>
+                        Uppdatera mall
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>
@@ -534,17 +748,31 @@ const TemplateManager = () => {
                       </div>
                     )}
 
-                    <div className="pt-2 border-t">
-                      <span className="text-sm text-gray-600 block mb-2">Bokföringsposter:</span>
-                      <div className="space-y-1 text-xs">
-                        {template.template_entries.map((entry: any, index: number) => (
-                          <div key={index} className="flex justify-between">
-                            <span>{entry.type === 'debit' ? 'D' : 'K'}: {entry.account_code}</span>
-                            <span className="text-gray-500">{entry.account_name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                     <div className="pt-2 border-t">
+                       <span className="text-sm text-gray-600 block mb-2">Bokföringsposter:</span>
+                       <div className="space-y-1 text-xs">
+                         {template.template_entries.map((entry: any, index: number) => (
+                           <div key={index} className="flex justify-between">
+                             <span>{entry.type === 'debit' ? 'D' : 'K'}: {entry.account_code}</span>
+                             <span className="text-gray-500">{entry.account_name}</span>
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+
+                     {isDeveloper && template.is_system_template && (
+                       <div className="pt-3 border-t">
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => startEditTemplate(template)}
+                           className="w-full"
+                         >
+                           <Settings className="h-4 w-4 mr-2" />
+                           Redigera mall
+                         </Button>
+                       </div>
+                     )}
                   </CardContent>
                 </Card>
               ))}
