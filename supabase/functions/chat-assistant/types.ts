@@ -9,6 +9,7 @@ export interface UserData {
   transactions: any[];
   openingBalances: any[];
   chartOfAccounts: any[];
+  templates: any[];
 }
 
 export interface FunctionCallArgs {

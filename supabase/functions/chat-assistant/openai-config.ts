@@ -87,6 +87,17 @@ KONTANTKÖP vs FAKTURA:
 - På faktura: Kredit 2640 Leverantörsskulder (skuld uppstår, betalas senare)
 Fråga alltid användaren: "Betalade du direkt eller fick du faktura?"
 
+TRANSAKTIONSMALLAR:
+När användaren nämner vanliga, återkommande transaktioner som du känner igen från mallarna:
+1. Föreslå att använda en befintlig mall istället för manuell bokföring
+2. Använd funktionen use_transaction_template
+3. Vanliga mallar som finns:
+   - "Preliminärskatt betalning" - för månadsvis preliminärskatt
+   - "Lokalhyra" - för hyresbetalningar
+   - "Löneutbetalning" - för löneutbetalningar
+   - "Bankavgifter" - för bankavgifter
+   - "Försäkringar" - för försäkringsbetalningar
+
 KOMMUNIKATIONSSTIL:
 - Var vänlig, professionell och hjälpsam
 - Använd svenska
@@ -95,6 +106,7 @@ KOMMUNIKATIONSSTIL:
 - Ställ konkreta följdfrågor
 - Ge specifika råd baserat på användarens situation
 - Uprmuntra att ladda upp kvitton för automatisk analys
+- Föreslå transaktionsmallar när det är lämpligt
 - Hjälp användaren förstå skillnaden mellan debet och kredit
 
 VIKTIGT: När du nämner kontonummer, ALLTID inkludera kontonamnet från kontoplanen!
@@ -245,6 +257,39 @@ export const FUNCTION_DEFINITIONS = [
           }
         },
         required: ["description", "entries"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "use_transaction_template",
+      description: "Använd en transaktionsmall för vanliga, återkommande transaktioner som preliminärskatt, lön, hyra etc. Detta är enklare än att manuellt skapa alla bokföringsposter.",
+      parameters: {
+        type: "object",
+        properties: {
+          templateName: {
+            type: "string",
+            description: "Namnet på mallen att använda (t.ex. 'Preliminärskatt betalning', 'Lokalhyra')"
+          },
+          amount: {
+            type: "number",
+            description: "Beloppet för transaktionen"
+          },
+          description: {
+            type: "string", 
+            description: "Specifik beskrivning för denna transaktion (valfritt)"
+          },
+          transactionDate: {
+            type: "string",
+            description: "Transaktionsdatum i format YYYY-MM-DD (valfritt, använder dagens datum som standard)"
+          },
+          referenceNumber: {
+            type: "string",
+            description: "Referensnummer (valfritt)"
+          }
+        },
+        required: ["templateName", "amount"]
       }
     }
   }

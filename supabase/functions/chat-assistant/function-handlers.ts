@@ -136,6 +136,39 @@ export async function handleFunctionCall(
       console.error('Error parsing general transaction arguments:', parseError);
       response += `\n\n❌ Ett fel uppstod när jag försökte tolka transaktionsinformationen.`;
     }
+  } else if (functionName === 'use_transaction_template') {
+    try {
+      console.log('Using transaction template:', args);
+      
+      const { data: templateData, error: templateError } = await supabase.functions.invoke('use-transaction-template', {
+        body: {
+          templateName: args.templateName,
+          amount: args.amount,
+          description: args.description,
+          transactionDate: args.transactionDate,
+          referenceNumber: args.referenceNumber
+        }
+      });
+
+      if (templateError) {
+        console.error('Error using transaction template:', templateError);
+        response += `\n\n❌ Ett fel uppstod när jag försökte använda mallen: ${templateError.message}`;
+      } else if (templateData?.success) {
+        console.log('Transaction template used successfully');
+        const transaction = templateData.transaction;
+        
+        response += `\n\n✅ Perfekt! Jag har använt mallen "${args.templateName}" för att bokföra transaktionen.\n\n` +
+          `**Belopp:** ${args.amount} kr\n` +
+          `**Datum:** ${transaction.transaction_date}\n` +
+          `**Mall:** ${templateData.template_used}\n\n` +
+          `Transaktionen är nu bokförd enligt mallen.`;
+      } else {
+        response += `\n\n❌ Ett okänt fel uppstod när jag försökte använda transaktionsmallen.`;
+      }
+    } catch (parseError) {
+      console.error('Error parsing template arguments:', parseError);
+      response += `\n\n❌ Ett fel uppstod när jag försökte tolka mallinformationen.`;
+    }
   }
 
   return response;

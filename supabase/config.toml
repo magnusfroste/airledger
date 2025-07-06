@@ -15,5 +15,14 @@ verify_jwt = true
 [functions.save-invoice]
 verify_jwt = true
 
+[functions.save-payment]
+verify_jwt = true
+
+[functions.save-general-transaction]
+verify_jwt = true
+
+[functions.use-transaction-template]
+verify_jwt = true
+
 [functions.voice-to-text]
 verify_jwt = true

@@ -45,11 +45,24 @@ export async function fetchUserData(userId: string, supabase: any): Promise<User
 
   const userName = profile?.full_name || profile?.name || 'användare';
 
+  console.log('Fetching transaction templates');
+  const { data: templates, error: templatesError } = await supabase
+    .from('airledger_transaction_templates')
+    .select('*')
+    .order('template_name');
+
+  if (templatesError) {
+    console.error('Error fetching templates:', templatesError);
+  }
+
+  console.log('Fetched templates:', templates?.length || 0);
+
   return {
     userId,
     userName,
     transactions: transactions || [],
     openingBalances: openingBalances || [],
-    chartOfAccounts: chartOfAccounts || []
+    chartOfAccounts: chartOfAccounts || [],
+    templates: templates || []
   };
 }

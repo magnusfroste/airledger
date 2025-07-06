@@ -1,7 +1,7 @@
 import { UserData } from './types.ts';
 
 export function buildBookkeepingContext(userData: UserData): string {
-  const { userName, transactions, openingBalances, chartOfAccounts } = userData;
+  const { userName, transactions, openingBalances, chartOfAccounts, templates } = userData;
 
   // Add chart of accounts context
   let chartContext = '';
@@ -66,6 +66,26 @@ INGÅENDE BALANSER:
 `;
   }
   
+  // Add templates context
+  let templatesContext = '';
+  if (templates && templates.length > 0) {
+    templatesContext = `
+TILLGÄNGLIGA TRANSAKTIONSMALLAR:
+${templates.map(template => `
+- ${template.template_name}: ${template.description}
+  Kategori: ${template.category}${template.is_recurring ? ' (återkommande ' + template.recurring_frequency + ')' : ''}
+`).join('')}
+
+Dessa mallar kan användas för vanliga transaktioner istället för manuell bokföring.
+`;
+  } else {
+    templatesContext = `
+TRANSAKTIONSMALLAR:
+- Inga anpassade mallar finns än
+- Systemet har inbyggda mallar för vanliga transaktioner som preliminärskatt, lön, hyra etc.
+`;
+  }
+  
   if (transactions && transactions.length > 0) {
     const totalTransactions = transactions.length;
     const totalAmount = transactions.reduce((sum, t) => sum + Number(t.total_amount), 0);
@@ -77,6 +97,8 @@ BOKFÖRINGSDATA FÖR ${userName.toUpperCase()}:
 ${chartContext}
 
 ${openingBalancesContext}
+
+${templatesContext}
 
 TRANSAKTIONER:
 - Totalt antal transaktioner: ${totalTransactions}
@@ -95,6 +117,8 @@ BOKFÖRINGSDATA FÖR ${userName.toUpperCase()}:
 ${chartContext}
 
 ${openingBalancesContext}
+
+${templatesContext}
 
 TRANSAKTIONER:
 - Inga transaktioner registrerade än

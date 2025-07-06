@@ -303,6 +303,45 @@ export type Database = {
         }
         Relationships: []
       }
+      airledger_transaction_templates: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          is_recurring: boolean
+          recurring_frequency: string | null
+          template_entries: Json
+          template_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          id?: string
+          is_recurring?: boolean
+          recurring_frequency?: string | null
+          template_entries: Json
+          template_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          is_recurring?: boolean
+          recurring_frequency?: string | null
+          template_entries?: Json
+          template_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       airledger_transactions: {
         Row: {
           analysis_data: Json | null
