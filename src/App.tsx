@@ -11,6 +11,7 @@ import Chat from "./pages/Chat";
 import Transactions from "./pages/Transactions";
 import Reports from "./pages/Reports";
 import OpeningBalances from "./pages/OpeningBalances";
+import GeneralLedger from "./pages/GeneralLedger";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +35,7 @@ const App = () => (
                   <Route path="/transactions" element={<Transactions />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/opening-balances" element={<OpeningBalances />} />
+                  <Route path="/general-ledger" element={<GeneralLedger />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
