@@ -13,28 +13,40 @@ import {
 const VoiceInstructions = () => {
   const instructions = [
     {
-      title: "🧾 Ingående balanser",
-      description: "Registrera startbalans för dina konton",
-      example: "Jag har 50 000 kr på checkkonto 1930",
-      details: "AI:n förstår automatiskt om det ska vara debet eller kredit baserat på kontotyp"
+      title: "🧾 Utgifter & Kvitton",
+      description: "Registrera företagsutgifter enkelt med naturligt språk",
+      example: "Jag köpte kontorsmaterial för 850 kr på ICA",
+      details: "AI:n föreslår rätt konto automatiskt. Du kan också ladda upp kvittobilder för analys."
     },
     {
-      title: "📄 Utgående fakturor",
-      description: "När du fakturerar en kund",
-      example: "Jag har fakturerat Företag AB 25 000 kr för webbutveckling",
-      details: "Bokförs automatiskt: Debet 1510 Kundfordringar, Kredit 3000 Försäljning"
+      title: "📄 Utgående Fakturor",
+      description: "Bokför fakturor du skickat till kunder",
+      example: "Jag fakturerade Acme AB 15 000 kr exkl moms för konsulttjänster",
+      details: "Bokförs som: Debet 1510 Kundfordringar, Kredit 3000 Försäljning + moms"
     },
     {
-      title: "🧾 Inkommande kvitton",
-      description: "Ladda upp bild av kvitto för automatisk analys",
-      example: "Fota ditt kvitto och ladda upp",
-      details: "AI:n analyserar och föreslår korrekt kontering"
+      title: "💰 Inkommande Betalningar",
+      description: "Registrera när kunder betalar sina fakturor",
+      example: "Acme AB betalade 18 750 kr till mitt bankkonto",
+      details: "Bokförs som: Debet 1930 Checkkonto, Kredit 1510 Kundfordringar"
     },
     {
-      title: "💬 Allmänna frågor",
-      description: "Ställ frågor om bokföring och BAS-kontoplanen",
-      example: "Vilket konto ska jag använda för kontorsmaterial?",
-      details: "AI:n hjälper dig med svensk bokföring och debet/kredit"
+      title: "👥 Löner & Sociala avgifter",
+      description: "Bokför löneutbetalningar och arbetsgivaravgifter",
+      example: "Jag betalade ut lön 35 000 kr och sociala avgifter 11 000 kr",
+      details: "AI:n hjälper med alla lönekonton: bruttolön, skatt, sociala avgifter"
+    },
+    {
+      title: "🏦 Ingående Balanser",
+      description: "Sätt startbalans när du börjar använda systemet",
+      example: "Jag har 50 000 kr på checkkonto och kundfordringar på 25 000 kr",
+      details: "AI:n förstår vilka konton som ska ha debet/kredit baserat på kontotyp"
+    },
+    {
+      title: "📋 Mallar & Återkommande",
+      description: "Använd mallar för återkommande transaktioner",
+      example: "Använd mallen för hyra eller skapa en mall för detta",
+      details: "Spara tid genom att återanvända vanliga bokföringar som mallar"
     }
   ];
 
