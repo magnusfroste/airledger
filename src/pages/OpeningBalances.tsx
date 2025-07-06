@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2, Calculator, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Edit, Trash2, Calculator, TrendingUp, TrendingDown, Download, Upload, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,13 @@ const OpeningBalances = () => {
     account_name: '',
     opening_balance: 0,
   });
+  
+  // Import/Export state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -233,6 +240,207 @@ const OpeningBalances = () => {
 
   const { debitTotal, creditTotal } = getTotalsByType();
 
+  // CSV Export Function
+  const handleExportCSV = () => {
+    if (balances.length === 0) {
+      toast({
+        title: "Ingen data att exportera",
+        description: "Du har inga ingående balanser att exportera.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const csvHeader = "account_code,account_name,opening_balance,balance_type\n";
+    const csvData = balances.map(balance => 
+      `${balance.account_code},"${balance.account_name}",${balance.opening_balance},${balance.balance_type}`
+    ).join('\n');
+    
+    const csvContent = csvHeader + csvData;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `ingående_balanser_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Export lyckades!",
+      description: `${balances.length} ingående balanser exporterade till CSV.`,
+    });
+  };
+
+  // CSV Import Functions
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast({
+        title: "Fel filformat",
+        description: "Vänligen välj en CSV-fil.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImportFile(file);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      try {
+        parseCSVForPreview(text);
+      } catch (error) {
+        toast({
+          title: "Fel vid läsning av fil",
+          description: "Kunde inte läsa CSV-filen. Kontrollera formatet.",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const parseCSVForPreview = async (csvText: string) => {
+    const lines = csvText.trim().split('\n');
+    const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+    
+    // Validate headers
+    const expectedHeaders = ['account_code', 'account_name', 'opening_balance', 'balance_type'];
+    const hasValidHeaders = expectedHeaders.every(header => headers.includes(header));
+    
+    if (!hasValidHeaders) {
+      toast({
+        title: "Fel CSV-format",
+        description: "CSV-filen måste innehålla kolumnerna: account_code, account_name, opening_balance, balance_type",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get chart of accounts for validation
+    const { data: accountsData } = await supabase
+      .from('airledger_chart_of_accounts')
+      .select('account_code, account_name')
+      .eq('is_active', true);
+
+    const validAccountCodes = new Set(accountsData?.map(acc => acc.account_code) || []);
+    
+    const preview = [];
+    const errors = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      const row = {
+        account_code: values[headers.indexOf('account_code')],
+        account_name: values[headers.indexOf('account_name')],
+        opening_balance: parseFloat(values[headers.indexOf('opening_balance')]) || 0,
+        balance_type: values[headers.indexOf('balance_type')],
+        line: i + 1,
+        valid: true,
+        errors: [] as string[]
+      };
+      
+      // Validation
+      if (!row.account_code) {
+        row.errors.push('Kontokod saknas');
+        row.valid = false;
+      } else if (!validAccountCodes.has(row.account_code)) {
+        row.errors.push('Kontokod finns inte i BAS 2024');
+        row.valid = false;
+      }
+      
+      if (!row.account_name) {
+        row.errors.push('Kontonamn saknas');
+        row.valid = false;
+      }
+      
+      if (isNaN(row.opening_balance)) {
+        row.errors.push('Ogiltigt belopp');
+        row.valid = false;
+      }
+      
+      if (!['debit', 'credit'].includes(row.balance_type)) {
+        row.errors.push('Balance_type måste vara debit eller credit');
+        row.valid = false;
+      }
+      
+      preview.push(row);
+    }
+    
+    setImportPreview(preview);
+  };
+
+  const handleImportCSV = async () => {
+    if (!user || importPreview.length === 0) return;
+    
+    const validRows = importPreview.filter(row => row.valid);
+    if (validRows.length === 0) {
+      toast({
+        title: "Inga giltiga rader",
+        description: "Det finns inga giltiga rader att importera.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const row of validRows) {
+        try {
+          const { error } = await supabase
+            .from('airledger_opening')
+            .upsert({
+              user_id: user.id,
+              account_code: row.account_code,
+              account_name: row.account_name,
+              opening_balance: Math.abs(row.opening_balance),
+              balance_type: row.balance_type,
+            }, {
+              onConflict: 'user_id,account_code'
+            });
+          
+          if (error) throw error;
+          successCount++;
+        } catch (error) {
+          console.error(`Error importing row ${row.line}:`, error);
+          errorCount++;
+        }
+      }
+      
+      toast({
+        title: "Import slutförd",
+        description: `${successCount} balanser importerade${errorCount > 0 ? `, ${errorCount} fel` : ''}.`,
+      });
+      
+      setImportDialogOpen(false);
+      setImportFile(null);
+      setImportPreview([]);
+      fetchBalances();
+      
+    } catch (error) {
+      console.error('Error during import:', error);
+      toast({
+        title: "Import misslyckades",
+        description: "Ett fel uppstod under importen. Försök igen.",
+        variant: "destructive",
+      });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container px-6 py-6 max-w-6xl mx-auto">
@@ -259,57 +467,169 @@ const OpeningBalances = () => {
           </p>
         </div>
         
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Ny ingående balans
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {editingBalance ? 'Redigera' : 'Lägg till'} ingående balans
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Välj konto</Label>
-                <AccountSelector
-                  value={formData.account_code}
-                  onValueChange={(accountCode, accountName) => 
-                    setFormData({ ...formData, account_code: accountCode, account_name: accountName })
-                  }
-                  placeholder="Sök och välj konto från BAS 2024..."
-                />
+        <div className="flex gap-2">
+          {/* Export Button */}
+          <Button 
+            onClick={handleExportCSV} 
+            variant="outline" 
+            className="gap-2"
+            disabled={balances.length === 0}
+          >
+            <Download className="h-4 w-4" />
+            Exportera CSV
+          </Button>
+          
+          {/* Import Dialog */}
+          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Upload className="h-4 w-4" />
+                Importera CSV
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-4xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-5 w-5" />
+                  Importera ingående balanser från CSV
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="csvFile">Välj CSV-fil</Label>
+                  <Input
+                    id="csvFile"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    CSV-filen måste innehålla kolumnerna: account_code, account_name, opening_balance, balance_type
+                  </p>
+                </div>
+                
+                {importPreview.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Förhandsvisning ({importPreview.length} rader)</h4>
+                      <Badge variant={importPreview.filter(r => r.valid).length === importPreview.length ? "default" : "secondary"}>
+                        {importPreview.filter(r => r.valid).length} av {importPreview.length} giltiga
+                      </Badge>
+                    </div>
+                    
+                    <div className="max-h-60 overflow-y-auto border rounded-lg">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="text-left p-2">Rad</th>
+                            <th className="text-left p-2">Kontokod</th>
+                            <th className="text-left p-2">Kontonamn</th>
+                            <th className="text-left p-2">Belopp</th>
+                            <th className="text-left p-2">Typ</th>
+                            <th className="text-left p-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importPreview.map((row, index) => (
+                            <tr key={index} className={`border-b ${!row.valid ? 'bg-red-50' : ''}`}>
+                              <td className="p-2">{row.line}</td>
+                              <td className="p-2">{row.account_code}</td>
+                              <td className="p-2">{row.account_name}</td>
+                              <td className="p-2">{row.opening_balance}</td>
+                              <td className="p-2">{row.balance_type}</td>
+                              <td className="p-2">
+                                {row.valid ? (
+                                  <Badge variant="default" className="text-xs">Giltig</Badge>
+                                ) : (
+                                  <div>
+                                    <Badge variant="destructive" className="text-xs mb-1">Fel</Badge>
+                                    <div className="text-xs text-red-600">
+                                      {row.errors.join(', ')}
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex gap-2 pt-4">
+                  <Button 
+                    onClick={handleImportCSV}
+                    disabled={importLoading || importPreview.filter(r => r.valid).length === 0}
+                    className="flex-1"
+                  >
+                    {importLoading ? 'Importerar...' : `Importera ${importPreview.filter(r => r.valid).length} balanser`}
+                  </Button>
+                  <Button variant="outline" onClick={() => {
+                    setImportDialogOpen(false);
+                    setImportFile(null);
+                    setImportPreview([]);
+                  }}>
+                    Avbryt
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="opening_balance">Belopp (kr)</Label>
-                <Input
-                  id="opening_balance"
-                  type="number"
-                  value={formData.opening_balance}
-                  onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
-                  placeholder="0"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Systemet bestämmer automatiskt debet/kredit baserat på kontotyp enligt BAS 2024
-                </p>
+            </DialogContent>
+          </Dialog>
+          
+          {/* Add New Balance Dialog */}
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Ny ingående balans
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingBalance ? 'Redigera' : 'Lägg till'} ingående balans
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Välj konto</Label>
+                  <AccountSelector
+                    value={formData.account_code}
+                    onValueChange={(accountCode, accountName) => 
+                      setFormData({ ...formData, account_code: accountCode, account_name: accountName })
+                    }
+                    placeholder="Sök och välj konto från BAS 2024..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="opening_balance">Belopp (kr)</Label>
+                  <Input
+                    id="opening_balance"
+                    type="number"
+                    value={formData.opening_balance}
+                    onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Systemet bestämmer automatiskt debet/kredit baserat på kontotyp enligt BAS 2024
+                  </p>
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <Button onClick={handleSave} className="flex-1">
+                    {editingBalance ? 'Uppdatera' : 'Spara'}
+                  </Button>
+                  <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                    Avbryt
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2 pt-4">
-                <Button onClick={handleSave} className="flex-1">
-                  {editingBalance ? 'Uppdatera' : 'Spara'}
-                </Button>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Avbryt
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Summary Cards */}
