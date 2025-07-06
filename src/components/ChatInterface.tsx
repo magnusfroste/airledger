@@ -7,7 +7,6 @@ import { Send, Mic, MicOff, Bot, User, Volume2, MessageCircle, Paperclip, X, Fil
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import TransactionConfirmDialog from "@/components/TransactionConfirmDialog";
-
 interface Message {
   id: string;
   content: string;
@@ -27,17 +26,14 @@ interface Message {
     };
   }>;
 }
-
 const ChatInterface = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: 'Hej och välkommen till Air Ledger! 👋 \n\nJag är din AI-assistent för bokföring som kan hjälpa dig med allt från kvittoanalys till att svara på frågor om din bokföring.\n\n**🤖 Vad kan jag hjälpa dig med?**\n• 📷 **Ta foto av kvitton** - Använd kameraknappen för att fotografera kvitton direkt\n• 📊 **Analysera kvitton automatiskt** - Jag läser av belopp, datum och leverantör\n• 💬 **Svara på bokföringsfrågor** - Fråga mig om svensk bokföring och BAS-kontoplanen\n• 🏷️ **Föreslå transaktionsmallar** - Beskriv transaktionen så föreslår jag rätt mall\n• 📋 **Registrera transaktioner** - Fakturor, betalningar och utgifter\n\n**💡 Snabbtips för att komma igång:**\n• Börja med att fota ett kvitto - jag visar hur det fungerar!\n• Fråga mig om mina funktioner - jag berättar gärna mer\n• Använd röstinspelning om du vill prata istället för att skriva\n• Separera "fakturera kund" från "få betalning" - det är olika saker\n\nVad undrar du över idag? 🚀',
-      sender: 'ai',
-      timestamp: new Date(),
-      type: 'text'
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([{
+    id: '1',
+    content: 'Hej och välkommen till Air Ledger! 👋 \n\nJag är din AI-assistent för bokföring som kan hjälpa dig med allt från kvittoanalys till att svara på frågor om din bokföring.\n\n**🤖 Vad kan jag hjälpa dig med?**\n• 📷 **Ta foto av kvitton** - Använd kameraknappen för att fotografera kvitton direkt\n• 📊 **Analysera kvitton automatiskt** - Jag läser av belopp, datum och leverantör\n• 💬 **Svara på bokföringsfrågor** - Fråga mig om svensk bokföring och BAS-kontoplanen\n• 🏷️ **Föreslå transaktionsmallar** - Beskriv transaktionen så föreslår jag rätt mall\n• 📋 **Registrera transaktioner** - Fakturor, betalningar och utgifter\n\n**💡 Snabbtips för att komma igång:**\n• Börja med att fota ett kvitto - jag visar hur det fungerar!\n• Fråga mig om mina funktioner - jag berättar gärna mer\n• Använd röstinspelning om du vill prata istället för att skriva\n• Separera "fakturera kund" från "få betalning" - det är olika saker\n\nVad undrar du över idag? 🚀',
+    sender: 'ai',
+    timestamp: new Date(),
+    type: 'text'
+  }]);
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,74 +49,72 @@ const ChatInterface = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
 
   // Load or create conversation on mount
   useEffect(() => {
     const initializeConversation = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: {
+            user
+          }
+        } = await supabase.auth.getUser();
         if (!user) return;
 
         // Try to find existing conversation
-        const { data: conversations, error: fetchError } = await supabase
-          .from('airledger_conversations')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-          .limit(1);
-
+        const {
+          data: conversations,
+          error: fetchError
+        } = await supabase.from('airledger_conversations').select('*').eq('user_id', user.id).order('updated_at', {
+          ascending: false
+        }).limit(1);
         let currentConversationId = null;
-
         if (fetchError) {
           console.error('Error fetching conversations:', fetchError);
           return;
         }
-
         if (conversations && conversations.length > 0) {
           // Use existing conversation
           currentConversationId = conversations[0].id;
         } else {
           // Create new conversation
-          const { data: newConversation, error: createError } = await supabase
-            .from('airledger_conversations')
-            .insert({
-              user_id: user.id,
-              title: 'Chat Session'
-            })
-            .select()
-            .single();
-
+          const {
+            data: newConversation,
+            error: createError
+          } = await supabase.from('airledger_conversations').insert({
+            user_id: user.id,
+            title: 'Chat Session'
+          }).select().single();
           if (createError) {
             console.error('Error creating conversation:', createError);
             return;
           }
-          
           currentConversationId = newConversation.id;
         }
-
         setConversationId(currentConversationId);
 
         // Load existing messages for this conversation
         if (currentConversationId) {
-          const { data: existingMessages, error: messagesError } = await supabase
-            .from('airledger_messages')
-            .select('*')
-            .eq('conversation_id', currentConversationId)
-            .order('created_at', { ascending: true });
-
+          const {
+            data: existingMessages,
+            error: messagesError
+          } = await supabase.from('airledger_messages').select('*').eq('conversation_id', currentConversationId).order('created_at', {
+            ascending: true
+          });
           if (messagesError) {
             console.error('Error loading messages:', messagesError);
             return;
           }
-
           if (existingMessages && existingMessages.length > 0) {
             const loadedMessages: Message[] = existingMessages.map(msg => ({
               id: msg.id,
               content: msg.content,
               sender: msg.sender as 'user' | 'ai',
               timestamp: new Date(msg.created_at),
-              type: (msg.message_type as 'text' | 'voice' | 'image') || 'text'
+              type: msg.message_type as 'text' | 'voice' | 'image' || 'text'
             }));
 
             // Keep welcome message and add loaded messages
@@ -131,47 +125,42 @@ const ChatInterface = () => {
         console.error('Error initializing conversation:', error);
       }
     };
-
     initializeConversation();
   }, []);
 
   // Save message to database
   const saveMessageToDatabase = async (message: Message) => {
     if (!conversationId) return;
-
     try {
-      await supabase
-        .from('airledger_messages')
-        .insert({
-          conversation_id: conversationId,
-          content: message.content,
-          sender: message.sender,
-          message_type: message.type || 'text'
-        });
+      await supabase.from('airledger_messages').insert({
+        conversation_id: conversationId,
+        content: message.content,
+        sender: message.sender,
+        message_type: message.type || 'text'
+      });
     } catch (error) {
       console.error('Error saving message:', error);
     }
   };
-
   const handleImageUpload = (files: FileList) => {
     const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-    
     if (imageFiles.length !== files.length) {
       toast({
         title: "Endast bilder tillåtna",
         description: "Vänligen välj endast bildfiler (JPG, PNG, etc.)",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
-
     imageFiles.forEach(file => {
       const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
       const preview = URL.createObjectURL(file);
-      
-      setPendingImages(prev => [...prev, { id, file, preview }]);
+      setPendingImages(prev => [...prev, {
+        id,
+        file,
+        preview
+      }]);
     });
   };
-
   const removePendingImage = (imageId: string) => {
     setPendingImages(prev => {
       const image = prev.find(img => img.id === imageId);
@@ -181,7 +170,6 @@ const ChatInterface = () => {
       return prev.filter(img => img.id !== imageId);
     });
   };
-
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -195,10 +183,8 @@ const ChatInterface = () => {
       reader.readAsDataURL(file);
     });
   };
-
   const handleSendMessage = async () => {
     if (!inputValue.trim() && pendingImages.length === 0) return;
-
     const userMessage: Message = {
       id: Date.now().toString(),
       content: inputValue || (pendingImages.length > 0 ? "Bifogade bilder för analys" : ""),
@@ -211,39 +197,38 @@ const ChatInterface = () => {
         preview: img.preview
       })) : undefined
     };
-
     setMessages(prev => [...prev, userMessage]);
-    
+
     // Save user message to database
     await saveMessageToDatabase(userMessage);
     setInputValue("");
     const currentPendingImages = [...pendingImages];
     setPendingImages([]);
     setIsLoading(true);
-
     try {
       if (currentPendingImages.length > 0) {
         // Process images with OpenAI
         for (const image of currentPendingImages) {
           try {
             const imageBase64 = await convertFileToBase64(image.file);
-            
-            const { data, error } = await supabase.functions.invoke('analyze-receipt', {
-              body: { imageBase64 }
+            const {
+              data,
+              error
+            } = await supabase.functions.invoke('analyze-receipt', {
+              body: {
+                imageBase64
+              }
             });
-
             if (error) {
               console.error('Error analyzing receipt:', error);
               throw new Error(error.message || 'Failed to analyze receipt');
             }
-
             if (data?.success && data?.analysis) {
               const analysis = data.analysis;
-              
+
               // Show confirmation dialog instead of auto-saving
               setPendingAnalysis(analysis);
               setConfirmDialogOpen(true);
-              
               const aiResponse: Message = {
                 id: (Date.now() + Math.random()).toString(),
                 content: `🎯 **Kvittoanalys klar!**\n\n**${analysis.vendor}** - ${analysis.date}\n**Belopp:** ${analysis.total_amount} kr\n**Dokumenttyp:** ${analysis.document_type === 'receipt' ? 'Kvitto' : 'Faktura'} (${analysis.document_type_confidence}% säkerhet)\n\n**Föreslaget betalningssätt:** ${analysis.suggested_payment_method}\n\n📋 Klicka "Bekräfta bokföring" för att granska och spara transaktionen.`,
@@ -251,15 +236,13 @@ const ChatInterface = () => {
                 timestamp: new Date(),
                 type: 'text'
               };
-              
               setMessages(prev => [...prev, aiResponse]);
-              
+
               // Save AI response to database
               await saveMessageToDatabase(aiResponse);
-              
               toast({
                 title: "Kvitto analyserat!",
-                description: `${analysis.vendor} - Väntar på bekräftelse`,
+                description: `${analysis.vendor} - Väntar på bekräftelse`
               });
             } else {
               throw new Error('Invalid response from analysis');
@@ -274,14 +257,13 @@ const ChatInterface = () => {
               type: 'text'
             };
             setMessages(prev => [...prev, errorResponse]);
-            
+
             // Save error message to database
             await saveMessageToDatabase(errorResponse);
-            
             toast({
               title: "Analysfel",
               description: "Kunde inte analysera kvittot. Försök igen.",
-              variant: "destructive",
+              variant: "destructive"
             });
           }
         }
@@ -293,19 +275,19 @@ const ChatInterface = () => {
             sender: msg.sender,
             content: msg.content
           }));
-
-          const { data, error } = await supabase.functions.invoke('chat-assistant', {
-            body: { 
+          const {
+            data,
+            error
+          } = await supabase.functions.invoke('chat-assistant', {
+            body: {
               message: inputValue,
               conversationHistory: conversationHistory
             }
           });
-
           if (error) {
             console.error('Error calling chat assistant:', error);
             throw new Error(error.message || 'Failed to get AI response');
           }
-
           if (data?.success && data?.response) {
             const aiResponse: Message = {
               id: (Date.now() + 1).toString(),
@@ -315,7 +297,7 @@ const ChatInterface = () => {
               type: 'text'
             };
             setMessages(prev => [...prev, aiResponse]);
-            
+
             // Save AI response to database  
             await saveMessageToDatabase(aiResponse);
           } else {
@@ -331,7 +313,7 @@ const ChatInterface = () => {
             type: 'text'
           };
           setMessages(prev => [...prev, errorResponse]);
-          
+
           // Save error message to database
           await saveMessageToDatabase(errorResponse);
         }
@@ -346,7 +328,7 @@ const ChatInterface = () => {
         type: 'text'
       };
       setMessages(prev => [...prev, errorResponse]);
-      
+
       // Save error message to database
       await saveMessageToDatabase(errorResponse);
     } finally {
@@ -355,7 +337,6 @@ const ChatInterface = () => {
       currentPendingImages.forEach(img => URL.revokeObjectURL(img.preview));
     }
   };
-
   const convertAudioToBase64 = (blob: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -369,50 +350,48 @@ const ChatInterface = () => {
       reader.readAsDataURL(blob);
     });
   };
-
   const handleVoiceRecording = async () => {
     if (!isRecording) {
       try {
         // Start recording
-        const stream = await navigator.mediaDevices.getUserMedia({ 
+        const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             sampleRate: 16000,
             channelCount: 1,
             echoCancellation: true,
-            noiseSuppression: true,
+            noiseSuppression: true
           }
         });
-        
         const recorder = new MediaRecorder(stream, {
           mimeType: 'audio/webm;codecs=opus'
         });
-        
         const chunks: Blob[] = [];
-        
-        recorder.ondataavailable = (e) => {
+        recorder.ondataavailable = e => {
           chunks.push(e.data);
         };
-        
         recorder.onstop = async () => {
-          const blob = new Blob(chunks, { type: 'audio/webm' });
-          
+          const blob = new Blob(chunks, {
+            type: 'audio/webm'
+          });
           try {
             setIsLoading(true);
             const audioBase64 = await convertAudioToBase64(blob);
-            
-            const { data, error } = await supabase.functions.invoke('voice-to-text', {
-              body: { audio: audioBase64 }
+            const {
+              data,
+              error
+            } = await supabase.functions.invoke('voice-to-text', {
+              body: {
+                audio: audioBase64
+              }
             });
-            
             if (error) {
               throw new Error(error.message || 'Failed to transcribe audio');
             }
-            
             if (data?.success && data?.text) {
               setInputValue(data.text);
               toast({
                 title: "Röst transkriberad!",
-                description: "Text har satts i meddelandefältet",
+                description: "Text har satts i meddelandefältet"
               });
             } else {
               throw new Error('No transcription received');
@@ -422,7 +401,7 @@ const ChatInterface = () => {
             toast({
               title: "Transkriptionsfel",
               description: "Kunde inte transkribera rösten. Försök igen.",
-              variant: "destructive",
+              variant: "destructive"
             });
           } finally {
             setIsLoading(false);
@@ -430,22 +409,19 @@ const ChatInterface = () => {
             stream.getTracks().forEach(track => track.stop());
           }
         };
-        
         setMediaRecorder(recorder);
         setIsRecording(true);
         recorder.start();
-        
         toast({
           title: "Spelar in...",
-          description: "Klicka igen för att stoppa inspelningen",
+          description: "Klicka igen för att stoppa inspelningen"
         });
-        
       } catch (error) {
         console.error('Error starting recording:', error);
         toast({
           title: "Mikrofonfel",
           description: "Kunde inte komma åt mikrofonen. Kontrollera behörigheter.",
-          variant: "destructive",
+          variant: "destructive"
         });
       }
     } else {
@@ -454,15 +430,13 @@ const ChatInterface = () => {
         mediaRecorder.stop();
         setIsRecording(false);
         setMediaRecorder(null);
-        
         toast({
           title: "Bearbetar...",
-          description: "Transkriberar din röst till text",
+          description: "Transkriberar din röst till text"
         });
       }
     }
   };
-
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -473,30 +447,33 @@ const ChatInterface = () => {
   // Camera functionality
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment', // Use back camera on mobile
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        } 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          // Use back camera on mobile
+          width: {
+            ideal: 1920
+          },
+          height: {
+            ideal: 1080
+          }
+        }
       });
       setCameraStream(stream);
       setShowCamera(true);
-      
       toast({
         title: "Kamera startad",
-        description: "Ta ett foto av ditt kvitto",
+        description: "Ta ett foto av ditt kvitto"
       });
     } catch (error) {
       console.error('Error accessing camera:', error);
       toast({
         title: "Kamerafel",
         description: "Kunde inte komma åt kameran. Kontrollera behörigheter.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const stopCamera = () => {
     if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
@@ -504,10 +481,8 @@ const ChatInterface = () => {
     }
     setShowCamera(false);
   };
-
   const capturePhoto = () => {
     if (!cameraStream) return;
-
     const video = document.getElementById('camera-video') as HTMLVideoElement;
     if (!video) return;
 
@@ -515,30 +490,33 @@ const ChatInterface = () => {
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     // Draw the video frame to canvas
     ctx.drawImage(video, 0, 0);
-    
+
     // Convert canvas to blob
-    canvas.toBlob((blob) => {
+    canvas.toBlob(blob => {
       if (!blob) return;
-      
+
       // Create file from blob  
-      const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const file = new File([blob], `photo-${Date.now()}.jpg`, {
+        type: 'image/jpeg'
+      });
       const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
       const preview = URL.createObjectURL(file);
-      
-      setPendingImages(prev => [...prev, { id, file, preview }]);
-      
+      setPendingImages(prev => [...prev, {
+        id,
+        file,
+        preview
+      }]);
+
       // Stop camera after taking photo
       stopCamera();
-      
       toast({
         title: "Foto taget!",
-        description: "Bilden har lagts till för analys",
+        description: "Bilden har lagts till för analys"
       });
     }, 'image/jpeg', 0.9);
   };
@@ -554,9 +532,10 @@ const ChatInterface = () => {
 
   // Scroll to bottom when messages change
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth'
+    });
   };
-
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
@@ -566,24 +545,24 @@ const ChatInterface = () => {
     const timer = setTimeout(() => {
       scrollToBottom();
     }, 100); // Small delay to ensure DOM is ready
-    
+
     return () => clearTimeout(timer);
   }, []);
-
   const handleTransactionConfirm = async (analysis: any, entries: any[], paymentMethod: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('save-transaction', {
-        body: { 
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('save-transaction', {
+        body: {
           analysis,
           entries,
           paymentMethod
         }
       });
-
       if (error) {
         throw new Error(error.message || 'Failed to save transaction');
       }
-
       if (data?.success && data?.transaction) {
         const aiResponse: Message = {
           id: (Date.now() + Math.random()).toString(),
@@ -592,9 +571,8 @@ const ChatInterface = () => {
           timestamp: new Date(),
           type: 'text'
         };
-        
         setMessages(prev => [...prev, aiResponse]);
-        
+
         // Save AI response to database
         await saveMessageToDatabase(aiResponse);
       }
@@ -602,33 +580,19 @@ const ChatInterface = () => {
       throw error;
     }
   };
-
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       {/* Chat Messages */}
-      <div className="container px-6 py-4 flex-1 max-w-4xl mx-auto">
+      <div className="container px-6 flex-1 max-w-4xl mx-auto py-[6px]">
         <div className="h-[calc(100vh-80px)] flex flex-col">
           {/* Messages Container */}
           <div className="flex-1 overflow-y-auto space-y-6 mb-6">
-            {messages.slice(1).map((message) => (
-              <div key={message.id} className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {messages.slice(1).map(message => <div key={message.id} className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] ${message.sender === 'user' ? 'order-1' : 'order-2'}`}>
-                  <div className={`px-5 py-4 rounded-3xl ${
-                    message.sender === 'user' 
-                      ? 'bg-primary text-primary-foreground rounded-br-lg' 
-                      : 'bg-muted rounded-bl-lg'
-                  }`}>
-                    {message.type === 'image' && message.images && (
-                      <div className="space-y-3 mb-3">
-                        {message.images.map((image) => (
-                          <div key={image.id} className="relative">
-                            <img
-                              src={image.preview}
-                              alt="Uploaded image"
-                              className="max-w-full h-auto rounded-2xl"
-                            />
-                            {image.analysis && (
-                              <div className="mt-2 p-3 bg-background/90 rounded-xl">
+                  <div className={`px-5 py-4 rounded-3xl ${message.sender === 'user' ? 'bg-primary text-primary-foreground rounded-br-lg' : 'bg-muted rounded-bl-lg'}`}>
+                    {message.type === 'image' && message.images && <div className="space-y-3 mb-3">
+                        {message.images.map(image => <div key={image.id} className="relative">
+                            <img src={image.preview} alt="Uploaded image" className="max-w-full h-auto rounded-2xl" />
+                            {image.analysis && <div className="mt-2 p-3 bg-background/90 rounded-xl">
                                 <Badge variant="secondary" className="mb-2">
                                   {image.analysis.type === 'receipt' ? 'Kvitto' : 'Faktura'}
                                 </Badge>
@@ -638,40 +602,38 @@ const ChatInterface = () => {
                                 <p className="text-xs text-muted-foreground">
                                   {image.analysis.date}
                                 </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                              </div>}
+                          </div>)}
+                      </div>}
                     
                     <div className="prose prose-sm max-w-none">
                       {message.content.split('\n').map((line, index) => {
-                        if (line.startsWith('**') && line.endsWith('**')) {
-                          return <p key={index} className="font-bold mb-2">{line.slice(2, -2)}</p>;
-                        }
-                        if (line.startsWith('•')) {
-                          return <p key={index} className="ml-2 mb-1">{line}</p>;
-                        }
-                        return line ? <p key={index} className="mb-2">{line}</p> : <br key={index} />;
-                      })}
+                    if (line.startsWith('**') && line.endsWith('**')) {
+                      return <p key={index} className="font-bold mb-2">{line.slice(2, -2)}</p>;
+                    }
+                    if (line.startsWith('•')) {
+                      return <p key={index} className="ml-2 mb-1">{line}</p>;
+                    }
+                    return line ? <p key={index} className="mb-2">{line}</p> : <br key={index} />;
+                  })}
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              </div>)}
             
-            {isLoading && (
-              <div className="flex justify-start">
+            {isLoading && <div className="flex justify-start">
                 <div className="bg-muted rounded-3xl rounded-bl-lg px-5 py-4 max-w-[85%]">
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{
+                  animationDelay: '0.1s'
+                }}></div>
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{
+                  animationDelay: '0.2s'
+                }}></div>
                   </div>
                 </div>
-              </div>
-            )}
+              </div>}
             
             {/* Scroll anchor */}
             <div ref={messagesEndRef} />
@@ -680,74 +642,43 @@ const ChatInterface = () => {
           {/* Input Area */}
           <div className="space-y-4">
             {/* Pending Images Preview */}
-            {pendingImages.length > 0 && (
-              <div className="bg-muted/30 rounded-2xl p-4">
+            {pendingImages.length > 0 && <div className="bg-muted/30 rounded-2xl p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <FileImage className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground font-medium">Bifogade bilder ({pendingImages.length})</span>
                 </div>
                 <div className="flex gap-3 flex-wrap">
-                  {pendingImages.map((image) => (
-                    <div key={image.id} className="relative group">
-                      <img
-                        src={image.preview}
-                        alt="Pending upload"
-                        className="w-16 h-16 object-cover rounded-xl border border-border/20"
-                      />
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => removePendingImage(image.id)}
-                      >
+                  {pendingImages.map(image => <div key={image.id} className="relative group">
+                      <img src={image.preview} alt="Pending upload" className="w-16 h-16 object-cover rounded-xl border border-border/20" />
+                      <Button size="sm" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removePendingImage(image.id)}>
                         <X className="h-3 w-3" />
                       </Button>
-                    </div>
-                  ))}
+                    </div>)}
                 </div>
-              </div>
-            )}
+              </div>}
 
             {/* Action buttons row */}
             <div className="flex justify-center items-center gap-4 px-4">
-              <Button
-                variant="ghost"
-                size="lg"
-                className="flex-1 h-12 rounded-full bg-muted/50"
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'image/*';
-                  input.multiple = true;
-                  input.onchange = (e) => {
-                    const files = (e.target as HTMLInputElement).files;
-                    if (files) handleImageUpload(files);
-                  };
-                  input.click();
-                }}
-                disabled={isLoading}
-              >
+              <Button variant="ghost" size="lg" className="flex-1 h-12 rounded-full bg-muted/50" onClick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = 'image/*';
+              input.multiple = true;
+              input.onchange = e => {
+                const files = (e.target as HTMLInputElement).files;
+                if (files) handleImageUpload(files);
+              };
+              input.click();
+            }} disabled={isLoading}>
                 <Paperclip className="h-5 w-5 mr-2" />
                 Ladda upp
               </Button>
               
-              <Button
-                variant={isRecording ? "destructive" : "default"}
-                size="lg"
-                onClick={handleVoiceRecording}
-                className={`flex-shrink-0 h-14 w-14 rounded-full ${isRecording ? 'animate-pulse' : 'bg-primary'}`}
-                disabled={isLoading}
-              >
+              <Button variant={isRecording ? "destructive" : "default"} size="lg" onClick={handleVoiceRecording} className={`flex-shrink-0 h-14 w-14 rounded-full ${isRecording ? 'animate-pulse' : 'bg-primary'}`} disabled={isLoading}>
                 {isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
               </Button>
               
-              <Button
-                variant="ghost"
-                size="lg"
-                className="flex-1 h-12 rounded-full bg-muted/50"
-                onClick={startCamera}
-                disabled={isLoading}
-              >
+              <Button variant="ghost" size="lg" className="flex-1 h-12 rounded-full bg-muted/50" onClick={startCamera} disabled={isLoading}>
                 <Camera className="h-5 w-5 mr-2" />
                 Kamera
               </Button>
@@ -756,21 +687,8 @@ const ChatInterface = () => {
             {/* Message input */}
             <div className="flex gap-3 items-center px-2">
               <div className="flex-1 relative">
-                <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Skriv ditt meddelande här..."
-                  className="pl-6 pr-14 py-6 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20 min-h-[56px]"
-                  disabled={isLoading}
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-12 w-12 p-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
-                  onClick={handleSendMessage}
-                  disabled={(!inputValue.trim() && pendingImages.length === 0) || isLoading}
-                >
+                <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyPress={handleKeyPress} placeholder="Skriv ditt meddelande här..." className="pl-6 pr-14 py-6 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20 min-h-[56px]" disabled={isLoading} />
+                <Button size="sm" variant="ghost" className="absolute right-2 top-1/2 -translate-y-1/2 h-12 w-12 p-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSendMessage} disabled={!inputValue.trim() && pendingImages.length === 0 || isLoading}>
                   <Send className="h-5 w-5" />
                 </Button>
               </div>
@@ -780,40 +698,20 @@ const ChatInterface = () => {
       </div>
 
       {/* Transaction Confirmation Dialog */}
-      <TransactionConfirmDialog
-        open={confirmDialogOpen}
-        onOpenChange={setConfirmDialogOpen}
-        analysis={pendingAnalysis}
-        onConfirm={handleTransactionConfirm}
-      />
+      <TransactionConfirmDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen} analysis={pendingAnalysis} onConfirm={handleTransactionConfirm} />
 
       {/* Camera Modal */}
-      {showCamera && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-4">
+      {showCamera && <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-4">
           <div className="relative w-full max-w-md mx-auto">
             <div className="bg-white rounded-2xl overflow-hidden">
               <div className="relative">
-                {cameraStream && (
-                  <video
-                    id="camera-video"
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-80 object-cover"
-                    ref={(video) => {
-                      if (video && cameraStream) {
-                        video.srcObject = cameraStream;
-                      }
-                    }}
-                  />
-                )}
+                {cameraStream && <video id="camera-video" autoPlay playsInline muted className="w-full h-80 object-cover" ref={video => {
+              if (video && cameraStream) {
+                video.srcObject = cameraStream;
+              }
+            }} />}
                 <div className="absolute top-4 right-4">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={stopCamera}
-                    className="rounded-full h-10 w-10 p-0"
-                  >
+                  <Button variant="secondary" size="sm" onClick={stopCamera} className="rounded-full h-10 w-10 p-0">
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
@@ -822,20 +720,14 @@ const ChatInterface = () => {
                 <p className="text-sm text-gray-600">
                   Placera kvittot i kamerans vy och tryck på fotoknappen
                 </p>
-                <Button
-                  onClick={capturePhoto}
-                  className="w-full rounded-full py-3"
-                >
+                <Button onClick={capturePhoto} className="w-full rounded-full py-3">
                   <Camera className="h-5 w-5 mr-2" />
                   Ta foto
                 </Button>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>}
+    </div>;
 };
-
 export default ChatInterface;
