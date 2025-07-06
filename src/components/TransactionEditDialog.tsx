@@ -40,6 +40,7 @@ interface TransactionEditDialogProps {
 const TransactionEditDialog = ({ open, onOpenChange, transaction, onTransactionUpdated }: TransactionEditDialogProps) => {
   const [editedTransaction, setEditedTransaction] = useState<Transaction | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,6 +48,27 @@ const TransactionEditDialog = ({ open, onOpenChange, transaction, onTransactionU
       setEditedTransaction({ ...transaction });
     }
   }, [transaction]);
+
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('airledger_chart_of_accounts')
+          .select('account_code, account_name')
+          .eq('is_active', true)
+          .order('account_code');
+
+        if (error) throw error;
+        setAccounts(data || []);
+      } catch (error) {
+        console.error('Error fetching chart of accounts:', error);
+      }
+    };
+
+    if (open) {
+      fetchAccounts();
+    }
+  }, [open]);
 
   const handleSave = async () => {
     if (!editedTransaction) return;
@@ -107,6 +129,14 @@ const TransactionEditDialog = ({ open, onOpenChange, transaction, onTransactionU
 
     const updatedEntries = [...editedTransaction.entries];
     updatedEntries[index] = { ...updatedEntries[index], [field]: value };
+    
+    // Auto-fill account name when account code changes
+    if (field === 'account_code' && typeof value === 'string') {
+      const account = accounts.find(acc => acc.account_code === value);
+      if (account) {
+        updatedEntries[index].account_name = account.account_name;
+      }
+    }
     
     // Recalculate total amount
     const newTotal = updatedEntries.reduce((sum, entry) => sum + Math.max(entry.debit_amount, entry.credit_amount), 0);
