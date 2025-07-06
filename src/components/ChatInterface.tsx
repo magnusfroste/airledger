@@ -691,37 +691,38 @@ const ChatInterface = () => {
                 </div>
               </div>}
 
-            {/* Action buttons row */}
-            <div className="flex justify-center items-center gap-4 px-4">
-              <Button variant="ghost" size="lg" className="flex-1 h-12 rounded-full bg-muted/50" onClick={() => {
-              const input = document.createElement('input');
-              input.type = 'file';
-              input.accept = 'image/*';
-              input.multiple = true;
-              input.onchange = e => {
-                const files = (e.target as HTMLInputElement).files;
-                if (files) handleImageUpload(files);
-              };
-              input.click();
-            }} disabled={isLoading}>
-                <Paperclip className="h-5 w-5 mr-2" />
-                Ladda upp
-              </Button>
-              
-              <Button variant={isRecording ? "destructive" : "default"} size="lg" onClick={handleVoiceRecording} className={`flex-shrink-0 h-14 w-14 rounded-full ${isRecording ? 'animate-pulse' : 'bg-primary'}`} disabled={isLoading}>
-                {isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-              </Button>
-              
-              <Button variant="ghost" size="lg" className="flex-1 h-12 rounded-full bg-muted/50" onClick={startCamera} disabled={isLoading}>
-                <Camera className="h-5 w-5 mr-2" />
-                Kamera
-              </Button>
-            </div>
+            {/* Message input with action buttons */}
+            <div className="flex gap-2 items-center px-2">
+              {/* Action buttons to the left */}
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" className="h-12 w-12 p-0 rounded-full bg-muted/50 hover:bg-muted/70" onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'image/*';
+                  input.multiple = true;
+                  input.onchange = e => {
+                    const files = (e.target as HTMLInputElement).files;
+                    if (files) handleImageUpload(files);
+                  };
+                  input.click();
+                }} disabled={isLoading} title="Ladda upp bilder">
+                  <Paperclip className="h-5 w-5" />
+                </Button>
+                
+                <Button variant={isRecording ? "destructive" : "ghost"} size="sm" onClick={handleVoiceRecording} className={`h-12 w-12 p-0 rounded-full ${isRecording ? 'animate-pulse bg-destructive text-destructive-foreground' : 'bg-muted/50 hover:bg-muted/70'}`} disabled={isLoading} title="Spela in röst">
+                  {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </Button>
+                
+                <Button variant="ghost" size="sm" className="h-12 w-12 p-0 rounded-full bg-muted/50 hover:bg-muted/70" onClick={startCamera} disabled={isLoading} title="Ta foto">
+                  <Camera className="h-5 w-5" />
+                </Button>
+              </div>
 
-            {/* Message input */}
-            <div className="flex gap-3 items-center px-2">
+              {/* Text input */}
               <div className="flex-1 relative">
                 <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyPress={handleKeyPress} placeholder="Skriv ditt meddelande här..." className="pl-6 pr-14 py-6 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20 min-h-[56px]" disabled={isLoading} />
+                
+                {/* Send button to the right */}
                 <Button size="sm" variant="ghost" className="absolute right-2 top-1/2 -translate-y-1/2 h-12 w-12 p-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSendMessage} disabled={!inputValue.trim() && pendingImages.length === 0 || isLoading}>
                   <Send className="h-5 w-5" />
                 </Button>
