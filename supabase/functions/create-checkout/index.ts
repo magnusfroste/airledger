@@ -37,17 +37,51 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
-    // Define price IDs for predefined Stripe products
-    const priceIds = {
-      premium: "price_1RiNIzHTXSpIB5InKK9y0IFw", // 99 SEK
-      professional: "price_1RiNJFHTXSpIB5InJZrgxuRw" // 199 SEK
-    };
-
-    const priceId = priceIds[tier as keyof typeof priceIds];
-    if (!priceId) {
-      throw new Error(`Invalid tier: ${tier}`);
+    console.log('Creating checkout session for tier:', tier);
+    console.log('User email:', user.email);
+    
+    // Check if we're in test mode by trying to detect test key
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
+    const isTestMode = stripeKey.startsWith('sk_test_');
+    console.log('Stripe test mode detected:', isTestMode);
+    
+    // For test mode, create products on-the-fly instead of using predefined price IDs
+    let priceId: string;
+    
+    if (isTestMode) {
+      console.log('Creating test product and price');
+      // Create product and price dynamically for test mode
+      const product = await stripe.products.create({
+        name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Plan`,
+        description: `${tier} subscription plan`,
+      });
+      
+      const price = await stripe.prices.create({
+        product: product.id,
+        unit_amount: tier === 'premium' ? 9900 : 19900, // 99 or 199 SEK
+        currency: 'sek',
+        recurring: {
+          interval: 'month',
+        },
+      });
+      
+      priceId = price.id;
+      console.log('Created test price:', priceId);
+    } else {
+      // Use predefined price IDs for live mode
+      const priceIds = {
+        premium: "price_1RiNIzHTXSpIB5InKK9y0IFw", // 99 SEK
+        professional: "price_1RiNJFHTXSpIB5InJZrgxuRw" // 199 SEK
+      };
+      
+      priceId = priceIds[tier as keyof typeof priceIds];
+      if (!priceId) {
+        throw new Error(`Invalid tier: ${tier}`);
+      }
+      console.log('Using live price:', priceId);
     }
 
+    console.log('Creating Stripe checkout session');
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
@@ -61,6 +95,8 @@ serve(async (req) => {
       success_url: `${req.headers.get("origin")}/`,
       cancel_url: `${req.headers.get("origin")}/`,
     });
+    
+    console.log('Checkout session created successfully:', session.id);
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
