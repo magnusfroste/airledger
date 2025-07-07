@@ -136,36 +136,36 @@ export type Database = {
       }
       airledger_chart_of_accounts: {
         Row: {
-          account_category: string
+          account_category: string | null
           account_code: string
           account_name: string
-          account_type: string
+          account_type: string | null
           created_at: string
           id: string
           is_active: boolean
-          normal_balance: string
+          normal_balance: string | null
           updated_at: string
         }
         Insert: {
-          account_category: string
+          account_category?: string | null
           account_code: string
           account_name: string
-          account_type: string
+          account_type?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
-          normal_balance: string
+          normal_balance?: string | null
           updated_at?: string
         }
         Update: {
-          account_category?: string
+          account_category?: string | null
           account_code?: string
           account_name?: string
-          account_type?: string
+          account_type?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
-          normal_balance?: string
+          normal_balance?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -423,6 +423,24 @@ export type Database = {
           transaction_type?: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      bas: {
+        Row: {
+          account_code: string | null
+          account_name: string | null
+          id: number
+        }
+        Insert: {
+          account_code?: string | null
+          account_name?: string | null
+          id?: never
+        }
+        Update: {
+          account_code?: string | null
+          account_name?: string | null
+          id?: never
         }
         Relationships: []
       }
