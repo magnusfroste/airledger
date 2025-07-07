@@ -107,6 +107,30 @@ serve(async (req) => {
       throw new Error('Failed to create transaction from template: ' + transactionError.message)
     }
 
+    console.log('Transaction created successfully, now recording template usage...')
+
+    // Record template usage for analytics - this will trigger the stats update
+    try {
+      const { error: usageError } = await supabase
+        .from('airledger_template_usage')
+        .insert({
+          user_id: userId,
+          template_id: template.id,
+          transaction_id: transactionData.transaction.id,
+          used_at: new Date().toISOString()
+        });
+
+      if (usageError) {
+        console.error('Failed to record template usage:', usageError);
+        // Don't fail the main operation if usage tracking fails
+      } else {
+        console.log('Template usage recorded successfully');
+      }
+    } catch (usageError) {
+      console.error('Error recording template usage:', usageError);
+      // Don't fail the main operation if usage tracking fails
+    }
+
     console.log('=== USE TRANSACTION TEMPLATE FUNCTION COMPLETED SUCCESSFULLY ===')
 
     return new Response(
