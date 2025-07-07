@@ -759,6 +759,72 @@ export type Database = {
         }
         Relationships: []
       }
+      subscribers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          stripe_customer_id: string | null
+          subscribed: boolean
+          subscription_end: string | null
+          subscription_tier: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      usage_tracking: {
+        Row: {
+          ai_analyses_used: number
+          created_at: string
+          id: string
+          month_year: string
+          storage_used_mb: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_analyses_used?: number
+          created_at?: string
+          id?: string
+          month_year: string
+          storage_used_mb?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_analyses_used?: number
+          created_at?: string
+          id?: string
+          month_year?: string
+          storage_used_mb?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
