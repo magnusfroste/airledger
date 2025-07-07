@@ -8,6 +8,17 @@ VAD KAN JAG HJÄLPA DIG MED?
 - Jag kan föreslå lämpliga transaktionsmallar automatiskt
 - Du kan alltid fråga mig om mina funktioner - jag berättar gärna mer!
 
+🔧 **BESLUTSSTUKTUR FÖR TOOL-VAL:**
+
+När användaren nämner:
+- "Ingående balans" / "Saldo på konto" → save_opening_balance
+- "Jag har fakturerat" / "Skickat faktura" → save_invoice
+- "Fått betalning" / "Kund har betalat" → save_payment
+- Vanliga kostnader (hyra, bankavgift, etc.) → use_transaction_template ELLER save_general_transaction
+- Komplexa transaktioner / specialfall → save_general_transaction
+
+VIKTIGT: Använd save_general_transaction som fallback när ingen annan tool passar perfekt.
+
 📊 **PRAKTISKA TIPS BASERAT PÅ ANVÄNDARNAS BEHOV:**
 
 **För nybörjare:**
@@ -173,7 +184,7 @@ export const FUNCTION_DEFINITIONS = [
     type: "function",
     function: {
       name: "save_opening_balance",
-      description: "Spara en ingående balans för ett konto",
+      description: "ANVÄND DENNA NÄR: Användaren nämner 'ingående balans', 'saldo på konto', 'startbalans' eller liknande. EXEMPEL: 'Jag har 50 000 kr på checkkontot som ingående balans'",
       parameters: {
         type: "object",
         properties: {
@@ -198,7 +209,7 @@ export const FUNCTION_DEFINITIONS = [
     type: "function",
     function: {
       name: "save_invoice",
-      description: "Spara en utgående faktura när användaren nämner att de har fakturerat någon. ANVÄND DENNA FUNKTION när användaren säger att de har fakturerat en kund.",
+      description: "ANVÄND DENNA NÄR: Användaren säger 'jag har fakturerat', 'skickat faktura', 'jag faktureran X'. EXEMPEL: 'Jag har fakturerat Acme AB 10 000 kr för konsultuppdrag'",
       parameters: {
         type: "object",
         properties: {
@@ -235,7 +246,7 @@ export const FUNCTION_DEFINITIONS = [
     type: "function",
     function: {
       name: "save_payment",
-      description: "Registrera en betalning från kund när användaren nämner att de har fått betalning. ANVÄND DENNA FUNKTION när användaren säger att en kund har betalat eller att de har fått betalning.",
+      description: "ANVÄND DENNA NÄR: Användaren säger 'fått betalning', 'X har betalat', 'inbetalning från kund'. EXEMPEL: 'Acme AB har betalat 12 500 kr'",
       parameters: {
         type: "object",
         properties: {
@@ -264,7 +275,7 @@ export const FUNCTION_DEFINITIONS = [
     type: "function",
     function: {
       name: "save_general_transaction",
-      description: "Spara en allmän transaktion för vanliga kostnader, leverantörsfakturor, löner etc. Använd denna för alla transaktioner som inte är kundbetalningar eller utgående fakturor.",
+      description: "ANVÄND DENNA NÄR: Komplexa transaktioner, leverantörsfakturor, löner, eller när ingen annan tool passar. EXEMPEL: 'Betalat faktura från Telia 500 kr', 'Betalat ut lön 30 000 kr'",
       parameters: {
         type: "object",
         properties: {
@@ -319,7 +330,7 @@ export const FUNCTION_DEFINITIONS = [
     type: "function",
     function: {
       name: "use_transaction_template",
-      description: "Använd en transaktionsmall för vanliga, återkommande transaktioner som preliminärskatt, lön, hyra etc. Detta är enklare än att manuellt skapa alla bokföringsposter.",
+      description: "ANVÄND DENNA NÄR: Vanliga återkommande transaktioner som perfekt matchar befintliga mallar. EXEMPEL: 'Betalat hyra 8 000 kr', 'Bankavgift 25 kr'. VIKTIGT: Använd bara för exakt matchande scenarion!",
       parameters: {
         type: "object",
         properties: {

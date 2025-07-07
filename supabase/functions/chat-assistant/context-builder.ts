@@ -3,7 +3,7 @@ import { UserData } from './types.ts';
 export function buildBookkeepingContext(userData: UserData): string {
   const { userName, transactions, openingBalances, chartOfAccounts, templates } = userData;
 
-  // Add chart of accounts context
+  // Add chart of accounts context with detailed information
   let chartContext = '';
   if (chartOfAccounts && chartOfAccounts.length > 0) {
     // Group accounts by type for better organization
@@ -14,32 +14,55 @@ export function buildBookkeepingContext(userData: UserData): string {
     }, {});
 
     chartContext = `
-BAS 2024 KONTOPLAN (urval av vanligaste kontona):
+BAS 2024 KONTOPLAN (detaljerad information för AI-assistent):
 
-TILLGÅNGAR (Assets - Normal balans: Debet):
-${accountsByType.asset?.slice(0, 20).map((a: any) => `- ${a.account_code} ${a.account_name}`).join('\n') || ''}
+TILLGÅNGAR (Assets - Normal balans: DEBET):
+Ökningar: Debet (+) | Minskningar: Kredit (-)
+${accountsByType.asset?.slice(0, 25).map((a: any) => `- ${a.account_code} ${a.account_name} (${a.account_category || 'allmän'})`).join('\n') || ''}
 
-SKULDER (Liabilities - Normal balans: Kredit):
-${accountsByType.liability?.slice(0, 15).map((a: any) => `- ${a.account_code} ${a.account_name}`).join('\n') || ''}
+SKULDER (Liabilities - Normal balans: KREDIT):
+Ökningar: Kredit (+) | Minskningar: Debet (-)
+${accountsByType.liability?.slice(0, 20).map((a: any) => `- ${a.account_code} ${a.account_name} (${a.account_category || 'allmän'})`).join('\n') || ''}
 
-EGET KAPITAL (Equity - Normal balans: Kredit):
-${accountsByType.equity?.slice(0, 10).map((a: any) => `- ${a.account_code} ${a.account_name}`).join('\n') || ''}
+EGET KAPITAL (Equity - Normal balans: KREDIT):
+Ökningar: Kredit (+) | Minskningar: Debet (-)
+${accountsByType.equity?.slice(0, 15).map((a: any) => `- ${a.account_code} ${a.account_name} (${a.account_category || 'allmän'})`).join('\n') || ''}
 
-INTÄKTER (Income - Normal balans: Kredit):
-${accountsByType.income?.slice(0, 15).map((a: any) => `- ${a.account_code} ${a.account_name}`).join('\n') || ''}
+INTÄKTER (Income - Normal balans: KREDIT):
+Ökningar: Kredit (+) | Minskningar: Debet (-)
+${accountsByType.income?.slice(0, 20).map((a: any) => `- ${a.account_code} ${a.account_name} (${a.account_category || 'allmän'})`).join('\n') || ''}
 
-KOSTNADER (Expenses - Normal balans: Debet):
-${accountsByType.expense?.slice(0, 30).map((a: any) => `- ${a.account_code} ${a.account_name}`).join('\n') || ''}
+KOSTNADER (Expenses - Normal balans: DEBET):
+Ökningar: Debet (+) | Minskningar: Kredit (-)
+${accountsByType.expense?.slice(0, 40).map((a: any) => `- ${a.account_code} ${a.account_name} (${a.account_category || 'allmän'})`).join('\n') || ''}
 
-VIKTIGA KONTON ATT KOMMA IHÅG:
-- 1930 Checkkonto (bankkonto)
-- 1510 Kundfordringar (när du fakturerat men inte fått betalt)
-- 2640 Leverantörsskulder (när du fått faktura men inte betalat)
-- 3000 Försäljning (intäkter från försäljning)
-- 4000 Inköp av varor (kostnader för varor du säljer)
-- 6000 Lokalhyra, 6830 Bankavgifter, 6850 Försäkringar
+VANLIGASTE KONTON FÖR AI TOOL-VAL:
+- 1930 Checkkonto (bankkonto) - alla kontanta transaktioner
+- 1510 Kundfordringar - fakturering och kundbetalningar  
+- 2640 Leverantörsskulder - leverantörsfakturor och betalningar
+- 3000 Försäljning - alla försäljningsintäkter
+- 4000 Inköp av varor - varor för återförsäljning
+- 6000 Lokalhyra - hyra för lokaler
+- 6830 Bankavgifter - bankavgifter och banktjänster
+- 6850 Försäkringar - företagsförsäkringar
+- 6570 Kontorsmaterial - kontorsutrustning och material
+- 5410 Datakostnader - programlicenser och IT-tjänster
+- 7210 Löner - löneutbetalningar
+- 2510 Skulder skatter och avgifter - preliminärskatt mm
 
-När användaren nämner kontonummer, använd denna lista för att ge korrekt kontonamn.
+TOOL-VAL BASERAT PÅ KONTONAMN:
+- När användaren nämner bankkonto/checkkonto → 1930
+- När användaren säger "fakturerat" → 1510 Kundfordringar (save_invoice)
+- När användaren säger "fått betalning" → 1930 & 1510 (save_payment)
+- När användaren nämner leverantör → 2640 Leverantörsskulder
+- När användaren nämner hyra → 6000 (use_transaction_template "Lokalhyra")
+- När användaren nämner bankavgift → 6830 (use_transaction_template "Bankavgifter")
+
+KONTOTYP REFERENS FÖR KORREKT DEBET/KREDIT:
+- Tillgångar (1xxx): Debet = ökning, Kredit = minskning
+- Skulder (2xxx): Kredit = ökning, Debet = minskning  
+- Intäkter (3xxx): Kredit = ökning, Debet = minskning
+- Kostnader (4xxx, 6xxx, 7xxx): Debet = ökning, Kredit = minskning
 `;
   } else {
     chartContext = `
