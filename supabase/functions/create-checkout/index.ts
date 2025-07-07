@@ -39,7 +39,7 @@ serve(async (req) => {
 
     // Define price IDs for predefined Stripe products
     const priceIds = {
-      premium: "price_PREMIUM_ID_HERE", // Replace with your 99 SEK price ID
+      premium: "price_1RiNIzHTXSpIB5InKK9y0IFw", // 99 SEK
       professional: "price_1RiNJFHTXSpIB5InJZrgxuRw" // 199 SEK
     };
 
