@@ -9,6 +9,8 @@ import StatsCards from "./dashboard/StatsCards";
 import YearlyStatsCards from "./dashboard/YearlyStatsCards";
 import ChartsSection from "./dashboard/ChartsSection";
 import RecentTransactions from "./dashboard/RecentTransactions";
+import QuotaWarning from "./QuotaWarning";
+import { useSubscription } from "@/hooks/useSubscription";
 
 
 interface DashboardStats {
@@ -42,6 +44,7 @@ interface RecentTransaction {
 const Dashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { subscription, usage } = useSubscription();
   const [stats, setStats] = useState<DashboardStats>({
     revenue: 0,
     expenses: 0,
@@ -259,6 +262,15 @@ const Dashboard = () => {
 
       {/* Main Content with Tabs */}
       <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Quota Warning */}
+        {subscription && (
+          <div className="mb-6">
+            <QuotaWarning 
+              subscriptionTier={subscription.subscription_tier} 
+              usage={usage || undefined} 
+            />
+          </div>
+        )}
         <Tabs defaultValue="month" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="month" className="flex items-center gap-2">

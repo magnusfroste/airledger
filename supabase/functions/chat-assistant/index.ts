@@ -9,6 +9,7 @@ import { fetchUserData } from './data-fetcher.ts';
 import { buildBookkeepingContext } from './context-builder.ts';
 import { handleFunctionCall } from './function-handlers.ts';
 import { SYSTEM_PROMPT, FUNCTION_DEFINITIONS } from './openai-config.ts';
+import { checkAndUpdateQuota } from '../quota-helper/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,6 +57,26 @@ serve(async (req) => {
 
     // Authenticate user
     const userId = await authenticateUser(authHeader || '', supabase);
+
+    // Check quota and increment usage - use service role for database operations
+    const serviceSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+      auth: { persistSession: false }
+    });
+    const quotaCheck = await checkAndUpdateQuota(userId, serviceSupabase, true);
+    if (!quotaCheck.allowed) {
+      console.log('Quota exceeded for user:', userId, 'tier:', quotaCheck.subscription_tier);
+      return new Response(
+        JSON.stringify({ 
+          error: 'AI-analyskvoter överskridna för denna månad',
+          subscription_tier: quotaCheck.subscription_tier,
+          usage: quotaCheck.usage
+        }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // Fetch user data
     const userData = await fetchUserData(userId, supabase);

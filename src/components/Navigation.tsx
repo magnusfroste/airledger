@@ -118,6 +118,12 @@ const Navigation = () => {
       icon: Calculator,
       badge: null
     },
+    { 
+      href: "/subscription", 
+      label: "Prenumeration", 
+      icon: User,
+      badge: null
+    },
   ];
 
   const isActive = (href: string) => {

@@ -14,6 +14,7 @@ import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import OpeningBalances from "./pages/OpeningBalances";
 import GeneralLedger from "./pages/GeneralLedger";
+import Subscription from "./pages/Subscription";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -42,6 +43,7 @@ const App = () => (
                       <Route path="/reports" element={<Reports />} />
                       <Route path="/opening-balances" element={<OpeningBalances />} />
                       <Route path="/general-ledger" element={<GeneralLedger />} />
+                      <Route path="/subscription" element={<Subscription />} />
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>

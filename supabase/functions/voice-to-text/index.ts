@@ -1,5 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { checkAndUpdateQuota } from '../quota-helper/index.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +16,45 @@ serve(async (req) => {
 
   try {
     console.log('Voice-to-text function called')
+
+    // Create Supabase client for quota checking
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false }
+    })
+
+    // Get user from auth header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error('No authorization header provided')
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: userData, error: userError } = await supabase.auth.getUser(token)
+    if (userError || !userData.user) {
+      throw new Error('User not authenticated')
+    }
+
+    // Check quota and increment usage
+    const quotaCheck = await checkAndUpdateQuota(userData.user.id, supabase, true);
+    if (!quotaCheck.allowed) {
+      console.log('Quota exceeded for user:', userData.user.id, 'tier:', quotaCheck.subscription_tier);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'AI-analyskvoter överskridna för denna månad',
+          subscription_tier: quotaCheck.subscription_tier,
+          usage: quotaCheck.usage
+        }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const { audio } = await req.json()
     
     if (!audio) {

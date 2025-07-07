@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import OpenAI from 'https://esm.sh/openai@4.20.1'
+import { checkAndUpdateQuota } from '../quota-helper/index.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -76,6 +77,29 @@ serve(async (req) => {
       console.error('Authentication completely failed:', jwtError)
       throw new Error('Authentication failed')
     }
+
+    // Check quota and increment usage - use service role for database operations
+    console.log('Checking AI analysis quota for user:', userId)
+    const serviceSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+      auth: { persistSession: false }
+    });
+    const quotaCheck = await checkAndUpdateQuota(userId, serviceSupabase, true);
+    if (!quotaCheck.allowed) {
+      console.log('Quota exceeded for user:', userId, 'tier:', quotaCheck.subscription_tier);
+      return new Response(
+        JSON.stringify({ 
+          error: 'AI-analyskvoter överskridna för denna månad',
+          subscription_tier: quotaCheck.subscription_tier,
+          usage: quotaCheck.usage,
+          success: false
+        }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    console.log('Quota check passed, proceeding with analysis')
 
     // Initialize OpenAI
     console.log('Initializing OpenAI...')
