@@ -34,11 +34,11 @@ serve(async (req) => {
       throw new Error('No authorization header')
     }
 
-    // Create Supabase client
+    // Create Supabase client with service role for system templates access
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     
-    const supabase = createClient(supabaseUrl, supabaseKey, {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       global: {
         headers: {
           Authorization: authHeader,
