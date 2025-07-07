@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,7 +20,8 @@ import {
   Tag,
   Shield,
   Crown,
-  Search
+  Search,
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -267,6 +269,32 @@ const TemplateManager = () => {
       toast({
         title: "Fel vid skapande",
         description: "Kunde inte skapa mallen. Försök igen.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteTemplate = async (templateId: string, templateName: string) => {
+    try {
+      const { error } = await supabase
+        .from('airledger_transaction_templates')
+        .delete()
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Mall borttagen",
+        description: `Mallen "${templateName}" har tagits bort.`,
+      });
+
+      fetchTemplatesAndUsage();
+
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      toast({
+        title: "Fel vid borttagning",
+        description: "Kunde inte ta bort mallen. Försök igen.",
         variant: "destructive",
       });
     }
@@ -753,19 +781,55 @@ const TemplateManager = () => {
                         </div>
                       </div>
 
-                      {isDeveloper && template.is_system_template && (
-                        <div className="pt-3 border-t">
+                      <div className="flex gap-2 pt-3 border-t">
+                        {/* Show edit button for developers on system templates */}
+                        {isDeveloper && template.is_system_template && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => startEditTemplate(template)}
-                            className="w-full"
+                            className="flex-1"
                           >
                             <Settings className="h-4 w-4 mr-2" />
-                            Redigera mall
+                            Redigera
                           </Button>
-                        </div>
-                      )}
+                        )}
+                        
+                        {/* Show delete button based on permissions */}
+                        {((!template.is_system_template) || (isDeveloper && template.is_system_template)) && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className={`${isDeveloper && template.is_system_template ? 'flex-1' : 'w-full'} border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300`}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Ta bort
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Ta bort mall</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Är du säker på att du vill ta bort mallen "{template.template_name}"? 
+                                  {template.is_system_template && " Detta är en systemmall som kommer att tas bort för alla användare."}
+                                  {" "}Denna åtgärd kan inte ångras.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteTemplate(template.id, template.template_name)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Ta bort
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
