@@ -73,7 +73,9 @@ serve(async (req) => {
       analysis_data: {
         ...analysis,
         confirmed_payment_method: paymentMethod
-      }
+      },
+      image_metadata: analysis.image_metadata || null,
+      image_url: analysis.storage_path || null
     }
 
     console.log('Saving transaction to database...')

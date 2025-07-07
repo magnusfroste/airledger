@@ -395,6 +395,7 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          image_metadata: Json | null
           image_url: string | null
           reference_number: string | null
           total_amount: number
@@ -408,6 +409,7 @@ export type Database = {
           created_at?: string
           description: string
           id?: string
+          image_metadata?: Json | null
           image_url?: string | null
           reference_number?: string | null
           total_amount: number
@@ -421,6 +423,7 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          image_metadata?: Json | null
           image_url?: string | null
           reference_number?: string | null
           total_amount?: number

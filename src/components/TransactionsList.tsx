@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Receipt, FileText, ChevronRight, Calendar, Building, Trash2, Edit, Download, Upload, FileSpreadsheet } from "lucide-react";
+import { Search, Receipt, FileText, ChevronRight, Calendar, Building, Trash2, Edit, Download, Upload, FileSpreadsheet, Image } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import TransactionEditDialog from "./TransactionEditDialog";
+import ReceiptThumbnail from "./ReceiptThumbnail";
 
 interface TransactionEntry {
   id: string;
@@ -28,6 +29,8 @@ interface Transaction {
   total_amount: number;
   transaction_type: string;
   analysis_data: any;
+  image_url?: string;
+  image_metadata?: any;
   entries: TransactionEntry[];
 }
 
@@ -101,8 +104,15 @@ const TransactionsList = () => {
     return matchesSearch;
   });
 
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
+  const getTransactionIcon = (transaction: Transaction) => {
+    // If transaction has an image, show image icon
+    if (transaction.image_metadata || transaction.image_url) {
+      return <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+        <Image className="h-5 w-5 text-blue-600" />
+      </div>;
+    }
+    
+    switch (transaction.transaction_type) {
       case 'income':
         return <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
           <Building className="h-5 w-5 text-green-600" />
@@ -637,18 +647,30 @@ const TransactionsList = () => {
                   )}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      {getTransactionIcon(transaction.transaction_type)}
-                      <div>
-                        <h3 className="font-medium text-gray-900">{transaction.description}</h3>
-                        <div className="flex items-center space-x-4 mt-1">
-                          <span className="text-sm text-gray-500">{formatDate(transaction.transaction_date)}</span>
-                          {transaction.analysis_data?.vendor && (
-                            <span className="text-sm text-gray-500">• {transaction.analysis_data.vendor}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                     <div className="flex items-center space-x-4">
+                       {getTransactionIcon(transaction)}
+                       <div className="flex-1">
+                         <div className="flex items-center gap-2">
+                           <h3 className="font-medium text-gray-900">{transaction.description}</h3>
+                           {(transaction.image_metadata || transaction.image_url) && (
+                             <ReceiptThumbnail
+                               imagePath={transaction.image_metadata?.storagePath || transaction.image_url}
+                               thumbnailPath={transaction.image_metadata?.thumbnailPath}
+                               metadata={transaction.image_metadata}
+                               analysis={transaction.analysis_data}
+                               compact={true}
+                               showActions={false}
+                             />
+                           )}
+                         </div>
+                         <div className="flex items-center space-x-4 mt-1">
+                           <span className="text-sm text-gray-500">{formatDate(transaction.transaction_date)}</span>
+                           {transaction.analysis_data?.vendor && (
+                             <span className="text-sm text-gray-500">• {transaction.analysis_data.vendor}</span>
+                           )}
+                         </div>
+                       </div>
+                     </div>
                     
                     <div className="flex items-center space-x-4">
                       <span className={`text-lg font-semibold ${
@@ -686,10 +708,27 @@ const TransactionsList = () => {
                   </div>
                 </div>
 
-                {/* Expanded Content - Accounting Entries */}
+                 {/* Expanded Content - Accounting Entries */}
                 {expandedTransaction === transaction.id && transaction.entries.length > 0 && (
                   <div className="border-t border-gray-100 bg-gray-50">
                     <div className="p-6">
+                      {/* Image thumbnail if available */}
+                      {(transaction.image_metadata || transaction.image_url) && (
+                        <div className="mb-6">
+                          <h4 className="font-medium text-gray-900 mb-3">Bifogad bild</h4>
+                          <div className="w-fit">
+                            <ReceiptThumbnail
+                              imagePath={transaction.image_metadata?.storagePath || transaction.image_url}
+                              thumbnailPath={transaction.image_metadata?.thumbnailPath}
+                              metadata={transaction.image_metadata}
+                              analysis={transaction.analysis_data}
+                              compact={false}
+                              showActions={true}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
                       <h4 className="font-medium text-gray-900 mb-4">Kontering</h4>
                       <div className="space-y-3">
                         {transaction.entries.map((entry) => (

@@ -183,17 +183,52 @@ const ChatInterface = () => {
   };
   const handleSendMessage = async () => {
     if (!inputValue.trim() && pendingImages.length === 0) return;
+    
+    // Upload images to permanent storage if any
+    let uploadedImages: any[] = [];
+    if (pendingImages.length > 0) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          const { ImageStorageService } = await import('@/lib/imageStorage');
+          
+          uploadedImages = await Promise.all(
+            pendingImages.map(async (img) => {
+              try {
+                const metadata = await ImageStorageService.uploadImage({
+                  file: img.file,
+                  userId: user.id,
+                  compress: true
+                });
+                
+                return {
+                  id: img.id,
+                  file: img.file,
+                  preview: img.preview,
+                  metadata,
+                  storagePath: metadata.storagePath,
+                  thumbnailPath: metadata.thumbnailPath
+                };
+              } catch (error) {
+                console.error('Error uploading image:', error);
+                return img; // Fallback to original image
+              }
+            })
+          );
+        } catch (error) {
+          console.error('Error importing storage service:', error);
+          uploadedImages = pendingImages; // Fallback
+        }
+      }
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content: inputValue || (pendingImages.length > 0 ? "Bifogade bilder för analys" : ""),
       sender: 'user',
       timestamp: new Date(),
       type: pendingImages.length > 0 ? 'image' : 'text',
-      images: pendingImages.length > 0 ? pendingImages.map(img => ({
-        id: img.id,
-        file: img.file,
-        preview: img.preview
-      })) : undefined
+      images: uploadedImages.length > 0 ? uploadedImages : undefined
     };
     setMessages(prev => [...prev, userMessage]);
 
@@ -223,6 +258,14 @@ const ChatInterface = () => {
             }
             if (data?.success && data?.analysis) {
               const analysis = data.analysis;
+
+              // Add image metadata to analysis for permanent storage link
+              const uploadedImage = uploadedImages.find(img => img.id === image.id);
+              if (uploadedImage?.metadata) {
+                analysis.image_metadata = uploadedImage.metadata;
+                analysis.storage_path = uploadedImage.storagePath;
+                analysis.thumbnail_path = uploadedImage.thumbnailPath;
+              }
 
               // Show confirmation dialog instead of auto-saving
               setPendingAnalysis(analysis);
