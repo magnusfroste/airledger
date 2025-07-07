@@ -37,36 +37,23 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
-    // Define pricing based on tier
-    const pricing = {
-      premium: {
-        amount: 9900, // 99 SEK
-        name: "Premium Subscription",
-        description: "500 AI-analyser per månad, 5GB lagring, standard support"
-      },
-      professional: {
-        amount: 19900, // 199 SEK  
-        name: "Professional Subscription",
-        description: "Obegränsade AI-analyser, 50GB lagring, prioriterad support"
-      }
+    // Define price IDs for predefined Stripe products
+    const priceIds = {
+      premium: "price_PREMIUM_ID_HERE", // Replace with your 99 SEK price ID
+      professional: "price_1RiNJFHTXSpIB5InJZrgxuRw" // 199 SEK
     };
 
-    const selectedPlan = pricing[tier as keyof typeof pricing];
+    const priceId = priceIds[tier as keyof typeof priceIds];
+    if (!priceId) {
+      throw new Error(`Invalid tier: ${tier}`);
+    }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
         {
-          price_data: {
-            currency: "sek",
-            product_data: { 
-              name: selectedPlan.name,
-              description: selectedPlan.description
-            },
-            unit_amount: selectedPlan.amount,
-            recurring: { interval: "month" },
-          },
+          price: priceId,
           quantity: 1,
         },
       ],
