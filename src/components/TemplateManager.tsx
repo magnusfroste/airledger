@@ -24,6 +24,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { AccountSelector } from "@/components/AccountSelector";
 
 interface TransactionTemplate {
   id: string;
@@ -57,7 +58,6 @@ const TemplateManager = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TransactionTemplate | null>(null);
   const [isDeveloper, setIsDeveloper] = useState(false);
-  const [chartOfAccounts, setChartOfAccounts] = useState<Array<{account_code: string, account_name: string}>>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
@@ -77,40 +77,7 @@ const TemplateManager = () => {
   useEffect(() => {
     fetchTemplatesAndUsage();
     checkDeveloperStatus();
-    fetchChartOfAccounts();
   }, []);
-
-  const fetchChartOfAccounts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('airledger_chart_of_accounts')
-        .select('account_code, account_name')
-        .eq('is_active', true)
-        .order('account_code');
-      
-      if (error) throw error;
-      setChartOfAccounts(data || []);
-    } catch (error) {
-      console.error('Error fetching chart of accounts:', error);
-    }
-  };
-
-  const handleAccountCodeChange = (index: number, accountCode: string) => {
-    const account = chartOfAccounts.find(acc => acc.account_code === accountCode);
-    const newEntries = [...newTemplate.template_entries];
-    newEntries[index].account_code = accountCode;
-    newEntries[index].account_name = account?.account_name || '';
-    setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
-  };
-
-  const handleEditAccountCodeChange = (index: number, accountCode: string) => {
-    if (!editingTemplate) return;
-    const account = chartOfAccounts.find(acc => acc.account_code === accountCode);
-    const newEntries = [...editingTemplate.template_entries];
-    newEntries[index].account_code = accountCode;
-    newEntries[index].account_name = account?.account_name || '';
-    setEditingTemplate(prev => prev ? { ...prev, template_entries: newEntries } : null);
-  };
 
   const startEditTemplate = (template: TransactionTemplate) => {
     setEditingTemplate({
@@ -450,45 +417,23 @@ const TemplateManager = () => {
                     <Label>Bokföringsposter</Label>
                     <div className="space-y-3 mt-2">
                        {newTemplate.template_entries.map((entry, index) => (
-                         <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
-                           {isDeveloper ? (
-                             <Select
-                               value={entry.account_code}
-                               onValueChange={(value) => handleAccountCodeChange(index, value)}
-                             >
-                               <SelectTrigger>
-                                 <SelectValue placeholder="Välj konto" />
-                               </SelectTrigger>
-                               <SelectContent className="max-h-60">
-                                 {chartOfAccounts.map((account) => (
-                                   <SelectItem key={account.account_code} value={account.account_code}>
-                                     {account.account_code} - {account.account_name}
-                                   </SelectItem>
-                                 ))}
-                               </SelectContent>
-                             </Select>
-                           ) : (
-                             <Input
-                               placeholder="Kontonummer"
-                               value={entry.account_code}
-                               onChange={(e) => {
-                                 const newEntries = [...newTemplate.template_entries];
-                                 newEntries[index].account_code = e.target.value;
-                                 setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
-                               }}
-                             />
-                           )}
-                           <Input
-                             placeholder="Kontonamn"
-                             value={entry.account_name}
-                             onChange={(e) => {
-                               const newEntries = [...newTemplate.template_entries];
-                               newEntries[index].account_name = e.target.value;
-                               setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
-                             }}
-                             disabled={isDeveloper}
-                             className={isDeveloper ? "bg-gray-100" : ""}
-                           />
+                          <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
+                            <AccountSelector
+                              value={entry.account_code}
+                              onValueChange={(accountCode, accountName) => {
+                                const newEntries = [...newTemplate.template_entries];
+                                newEntries[index].account_code = accountCode;
+                                newEntries[index].account_name = accountName;
+                                setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
+                              }}
+                              placeholder="Välj konto"
+                            />
+                            <Input
+                              placeholder="Kontonamn"
+                              value={entry.account_name}
+                              disabled
+                              className="bg-gray-100"
+                            />
                            <Select
                              value={entry.type}
                              onValueChange={(value) => {
@@ -614,28 +559,23 @@ const TemplateManager = () => {
                       <Label>Bokföringsposter</Label>
                       <div className="space-y-3 mt-2">
                         {editingTemplate.template_entries.map((entry: any, index: number) => (
-                          <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
-                            <Select
-                              value={entry.account_code}
-                              onValueChange={(value) => handleEditAccountCodeChange(index, value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Välj konto" />
-                              </SelectTrigger>
-                              <SelectContent className="max-h-60">
-                                {chartOfAccounts.map((account) => (
-                                  <SelectItem key={account.account_code} value={account.account_code}>
-                                    {account.account_code} - {account.account_name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Input
-                              placeholder="Kontonamn"
-                              value={entry.account_name}
-                              disabled
-                              className="bg-gray-100"
-                            />
+                           <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
+                             <AccountSelector
+                               value={entry.account_code}
+                               onValueChange={(accountCode, accountName) => {
+                                 const newEntries = [...editingTemplate.template_entries];
+                                 newEntries[index].account_code = accountCode;
+                                 newEntries[index].account_name = accountName;
+                                 setEditingTemplate(prev => prev ? { ...prev, template_entries: newEntries } : null);
+                               }}
+                               placeholder="Välj konto"
+                             />
+                             <Input
+                               placeholder="Kontonamn"
+                               value={entry.account_name}
+                               disabled
+                               className="bg-gray-100"
+                             />
                             <Select
                               value={entry.type}
                               onValueChange={(value) => {
