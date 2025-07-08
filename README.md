@@ -1,73 +1,376 @@
-# Welcome to your Lovable project
+# Air Ledger - AI-Driven Bokföring
 
-## Project info
+Air Ledger är en AI-assisterad bokföringsapplikation byggd för svenska småföretag. Applikationen använder avancerad AI för att automatisera bokföring, analysera kvitton och ge personlig vägledning baserat på BAS-kontoplanen 2024.
 
-**URL**: https://lovable.dev/projects/7be6dff7-42d0-4111-a08f-dc1566cccd38
+## Översikt
 
-## How can I edit this code?
+Air Ledger kombinerar modern webbteknik med AI för att skapa en smidig bokföringsupplevelse:
 
-There are several ways of editing your application.
+- **AI-assistent**: Conversational AI som förstår svensk bokföring
+- **Kvittoanalys**: Automatisk OCR och kategorisering av kvitton
+- **Transaktionsmallar**: Återanvändbara mallar för vanliga transaktioner
+- **BAS-kontoplanen 2024**: Fullständig implementation av svensk standard
 
-**Use Lovable**
+## Teknisk Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/7be6dff7-42d0-4111-a08f-dc1566cccd38) and start prompting.
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS, shadcn/ui
+- **Backend**: Supabase (PostgreSQL + Edge Functions)
+- **AI**: OpenAI GPT-4 med funktionsanrop
+- **Storage**: Supabase Storage för kvitton och bilder
 
-Changes made via Lovable will be committed automatically to this repo.
+## AI-Systemets Kärna
 
-**Use your preferred IDE**
+### System Prompt (`supabase/functions/chat-assistant/system-prompt.ts`)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+AI-assistenten styrs av en omfattande system prompt som definierar:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Persona**: "Air Ledger Assistant" - specialist på svensk bokföring
+- **Kunskaper**: BAS-kontoplanen 2024, svensk bokföringspraxis
+- **Beslutsstuktur**: Regler för att välja rätt verktyg (tool) baserat på användarens input
+- **Kommunikationsstil**: Vänlig, professionell, svenskspråkig
 
-Follow these steps:
+#### Viktiga delar av system prompt:
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```typescript
+// Beslutsstuktur för tool-val
+När användaren nämner:
+- "Ingående balans" / "Saldo på konto" → save_opening_balance
+- "Jag har fakturerat" / "Skickat faktura" → save_invoice  
+- "Fått betalning" / "Kund har betalat" → save_payment
+- Vanliga kostnader (hyra, bankavgift, etc.) → use_transaction_template
+- Komplexa transaktioner → save_general_transaction
 ```
 
-**Edit a file directly in GitHub**
+### Tool Calling System
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+AI:n använder fem huvudsakliga funktioner för att utföra bokföringsoperationer:
 
-**Use GitHub Codespaces**
+#### 1. `save_opening_balance`
+- **Syfte**: Registrera ingående balanser
+- **Användning**: När användaren anger saldo på konton
+- **Exempel**: "Jag har 50 000 kr på checkkontot"
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+#### 2. `save_invoice` 
+- **Syfte**: Skapa utgående fakturor
+- **Användning**: När användaren fakturerat en kund
+- **Bokföring**: Automatisk 25% moms, skapar kundfordran
+- **Exempel**: "Jag har fakturerat Acme AB 10 000 kr"
 
-## What technologies are used for this project?
+#### 3. `save_payment`
+- **Syfte**: Registrera inbetalningar från kunder
+- **Användning**: När kund betalat faktura
+- **Bokföring**: Debet checkkonto, kredit kundfordran
+- **Exempel**: "Acme AB har betalat 12 500 kr"
 
-This project is built with:
+#### 4. `use_transaction_template`
+- **Syfte**: Använd fördefinierade mallar för vanliga transaktioner
+- **Användning**: Återkommande kostnader som hyra, bankavgifter
+- **Fördel**: Snabb och konsekvent bokföring
+- **Exempel**: "Betalat hyra 8 000 kr"
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+#### 5. `save_general_transaction`
+- **Syfte**: Skapa komplexa eller specialiserade transaktioner
+- **Användning**: Fallback för allt som inte passar andra tools
+- **Flexibilitet**: Stöder flera bokföringsposter per transaktion
+- **Exempel**: "Betalat faktura från leverantör med moms"
 
-## How can I deploy this project?
+### Function Definitions (`supabase/functions/chat-assistant/function-definitions.ts`)
 
-Simply open [Lovable](https://lovable.dev/projects/7be6dff7-42d0-4111-a08f-dc1566cccd38) and click on Share -> Publish.
+Varje tool definieras med:
+- **Beskrivning**: När och hur verktyget ska användas
+- **Parametrar**: Obligatoriska och valfria fält
+- **Validering**: Datatyper och format
 
-## Can I connect a custom domain to my Lovable project?
+```typescript
+{
+  name: "use_transaction_template",
+  description: "ANVÄND DENNA NÄR: Vanliga återkommande transaktioner...",
+  parameters: {
+    templateName: { type: "string" },
+    amount: { type: "number" }, 
+    description: { type: "string" },
+    // ...
+  }
+}
+```
 
-Yes, you can!
+## Transaktionsmallar - Hjärtat av Användarupplevelsen
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Vad är Transaktionsmallar?
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Transaktionsmallar är fördefinierade bokföringsstrukturer som automatiserar vanliga transaktioner. De består av:
+
+- **Mallnamn**: Beskrivande namn (t.ex. "Lokalhyra")
+- **Kategori**: Gruppering för organisation
+- **Bokföringsposter**: Fördefinierade debet/kredit-poster
+- **Nyckelord**: För automatisk igenkänning
+- **Metadata**: Återkommande frekvens, användarstatistik
+
+### Mallstruktur i Databas
+
+```sql
+CREATE TABLE airledger_transaction_templates (
+  id UUID PRIMARY KEY,
+  template_name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  category TEXT NOT NULL,
+  template_entries JSONB NOT NULL, -- Bokföringsposter
+  keywords TEXT[], -- För AI-matchning
+  is_system_template BOOLEAN, -- Systemmallar vs användarskapade
+  auto_suggest BOOLEAN, -- Föreslå automatiskt
+  usage_count INTEGER DEFAULT 0,
+  last_used_at TIMESTAMP,
+  -- ...
+);
+```
+
+### Exempel på Mallstruktur
+
+```json
+{
+  "template_name": "Lokalhyra",
+  "description": "Månadsvis hyra för lokaler",
+  "category": "Lokalkostnader", 
+  "template_entries": [
+    {
+      "account_code": "6000",
+      "account_name": "Lokalhyra", 
+      "type": "debit",
+      "description": "Hyra för lokaler"
+    },
+    {
+      "account_code": "1930",
+      "account_name": "Checkkonto",
+      "type": "credit", 
+      "description": "Betalning från bankkonto"
+    }
+  ],
+  "keywords": ["hyra", "lokal", "kontor"],
+  "is_system_template": true,
+  "auto_suggest": true
+}
+```
+
+## Hur Användare Skapar Mallar
+
+### Via AI-Assistent (Rekommenderat)
+
+1. **Naturlig dialog**: "Skapa en mall för månadsvis telefonräkning"
+2. **AI föreslår struktur**: Baserat på BAS-kontoplanen
+3. **Användarverifiering**: Kontrollera konton och belopp
+4. **Automatisk sparning**: Mall sparas för framtida användning
+
+### Via Mallhanteraren (`src/components/TemplateManager.tsx`)
+
+1. **Grafiskt gränssnitt**: Formulär för mallskapande
+2. **Kontoval**: Dropdown med BAS-kontoplanen
+3. **Bokföringsposter**: Lägg till debet/kredit-rader
+4. **Metadata**: Nyckelord, kategori, återkommande
+
+```typescript
+// Exempel på mallskapande via UI
+const createTemplate = async (templateData: {
+  templateName: string;
+  description: string;
+  category: string;
+  entries: TemplateEntry[];
+  keywords: string[];
+}) => {
+  // Validera bokföringsposter
+  // Spara till databas
+  // Uppdatera användargränssnitt
+};
+```
+
+## Hur Utvecklare Skapar Systemmallar
+
+### 1. Databas-Migration
+
+```sql
+-- Skapa systemmallar via SQL
+INSERT INTO airledger_transaction_templates (
+  template_name,
+  description, 
+  category,
+  template_entries,
+  keywords,
+  is_system_template,
+  auto_suggest,
+  user_id
+) VALUES (
+  'Bankavgifter',
+  'Månadsvis bankavgift',
+  'Bankkostnader',
+  '[
+    {
+      "account_code": "6830",
+      "account_name": "Bankavgifter",
+      "type": "debit"
+    },
+    {
+      "account_code": "1930", 
+      "account_name": "Checkkonto",
+      "type": "credit"
+    }
+  ]'::jsonb,
+  ARRAY['bank', 'avgift', 'månadsavgift'],
+  true, -- Systemmallar
+  true, -- Auto-förslag
+  '00000000-0000-0000-0000-000000000000' -- System-användar-ID
+);
+```
+
+### 2. Seed-Script för Standardmallar
+
+```typescript
+// Skapa standardmallar programmatiskt
+const systemTemplates = [
+  {
+    name: "Preliminärskatt betalning",
+    category: "Skatter",
+    entries: [
+      { account: "2510", name: "Skulder skatter och avgifter", type: "debit" },
+      { account: "1930", name: "Checkkonto", type: "credit" }
+    ],
+    keywords: ["skatt", "preliminärskatt", "månadsvis"]
+  },
+  // Fler standardmallar...
+];
+```
+
+### 3. AI-Systemets Mallhantering
+
+I system prompt definieras vilka mallar som ska användas automatiskt:
+
+```typescript
+// Från system-prompt.ts
+✅ ANVÄND MALLAR FÖR DESSA VANLIGA TRANSAKTIONER:
+- "Lokalhyra" - när användaren nämner hyra för lokaler
+- "Bankavgifter" - för bankavgifter och bankkostnader  
+- "Kontorsmaterial" - för kontorsmaterial och utrustning
+- "Drivmedel/Bensin" - för bensin, diesel, drivmedel
+// ...
+```
+
+## Edge Functions - Backend Logic
+
+### Chat Assistant (`supabase/functions/chat-assistant/`)
+
+Huvudfunktionen som hanterar AI-kommunikation:
+
+```typescript
+// Processflöde
+1. Ta emot användarmeddelande
+2. Bygg kontext (tidigare transaktioner, mallar)
+3. Skicka till OpenAI med system prompt
+4. Tolka AI-svar och funktionsanrop
+5. Utför bokföringsoperationer
+6. Returnera svar till användaren
+```
+
+### Mallhantering (`supabase/functions/use-transaction-template/`)
+
+Specifik funktion för att använda mallar:
+
+```typescript
+// Processflöde
+1. Ta emot mallnamn och belopp
+2. Hämta mall från databas
+3. Generera bokföringsposter baserat på mall
+4. Skapa transaktion via save-general-transaction
+5. Registrera mallanvändning för statistik
+```
+
+## Användningsstatistik och Analytics
+
+### Mallstatistik
+
+Systemet spårar automatiskt:
+- **Användningsfrekvens**: Hur ofta varje mall används
+- **Senaste användning**: Timestamp för senaste användning
+- **Populära mallar**: För att förbättra AI-förslag
+
+### Implementering
+
+```sql
+-- Trigger som uppdaterar statistik automatiskt
+CREATE OR REPLACE FUNCTION update_template_usage_stats()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE airledger_transaction_templates 
+  SET 
+    usage_count = usage_count + 1,
+    last_used_at = NEW.used_at
+  WHERE id = NEW.template_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+## Utveckling och Deployment
+
+### Lokal utveckling
+
+```bash
+# Installera dependencies
+npm install
+
+# Starta utvecklingsserver
+npm run dev
+
+# Starta Supabase lokalt (valfritt)
+supabase start
+```
+
+### Edge Functions
+
+Edge functions deployeras automatiskt när kod uppdateras. För lokal testning:
+
+```bash
+# Kör edge function lokalt
+supabase functions serve chat-assistant
+
+# Testa med curl
+curl -X POST http://localhost:54321/functions/v1/chat-assistant \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Betalat hyra 8000 kr"}'
+```
+
+### Databas-migrations
+
+```bash
+# Skapa ny migration
+supabase migration new add_new_template_feature
+
+# Tillämpa migrations
+supabase db push
+```
+
+## Bidra till Projektet
+
+### Lägg till Nya Mallar
+
+1. Identifiera vanliga transaktioner
+2. Definiera korrekta BAS-konton
+3. Skapa mall i systemet
+4. Uppdatera AI system prompt
+5. Testa med olika användarinput
+
+### Förbättra AI-Logik
+
+1. Uppdatera system prompt för nya scenarion
+2. Lägg till nya function definitions
+3. Implementera nya edge functions
+4. Testa med verkliga användardialoguer
+
+### Rapportera Buggar
+
+Använd GitHub Issues för att rapportera:
+- AI-misstag i kontoklassificering
+- Mallfel eller saknade mallar
+- Bokföringsfel
+- Användbarhetsproblem
+
+## Licens
+
+Detta projekt är utvecklat som en del av Lovable-plattformen.
