@@ -29,11 +29,37 @@ interface MessageListProps {
   isLoading: boolean;
   onNewChat: () => void;
   messagesEndRef: React.RefObject<HTMLDivElement>;
+  hasMoreMessages?: boolean;
+  loadingOlderMessages?: boolean;
+  onLoadOlderMessages?: () => void;
 }
 
-const MessageList = ({ messages, isLoading, onNewChat, messagesEndRef }: MessageListProps) => {
+const MessageList = ({ 
+  messages, 
+  isLoading, 
+  onNewChat, 
+  messagesEndRef, 
+  hasMoreMessages, 
+  loadingOlderMessages, 
+  onLoadOlderMessages 
+}: MessageListProps) => {
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4">
+      {/* Load Older Messages Button */}
+      {hasMoreMessages && (
+        <div className="flex justify-center mb-4">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onLoadOlderMessages}
+            disabled={loadingOlderMessages || isLoading}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {loadingOlderMessages ? "Laddar..." : "Ladda äldre meddelanden"}
+          </Button>
+        </div>
+      )}
+
       {/* New Chat Button */}
       <div className="flex justify-end mb-4">
         <Button 

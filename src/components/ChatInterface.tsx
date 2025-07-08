@@ -46,6 +46,8 @@ const ChatInterface = () => {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const {
     toast
@@ -94,29 +96,45 @@ const ChatInterface = () => {
         }
         setConversationId(currentConversationId);
 
-        // Load existing messages for this conversation
+        // Load only the latest 10 messages for this conversation
         if (currentConversationId) {
+          // First, get total message count
+          const { count: totalCount } = await supabase
+            .from('airledger_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('conversation_id', currentConversationId);
+
+          // Then load latest 10 messages
           const {
             data: existingMessages,
             error: messagesError
-          } = await supabase.from('airledger_messages').select('*').eq('conversation_id', currentConversationId).order('created_at', {
-            ascending: true
-          });
+          } = await supabase
+            .from('airledger_messages')
+            .select('*')
+            .eq('conversation_id', currentConversationId)
+            .order('created_at', { ascending: false })
+            .limit(10);
+            
           if (messagesError) {
             console.error('Error loading messages:', messagesError);
             return;
           }
           if (existingMessages && existingMessages.length > 0) {
-            const loadedMessages: Message[] = existingMessages.map(msg => ({
-              id: msg.id,
-              content: msg.content,
-              sender: msg.sender as 'user' | 'ai',
-              timestamp: new Date(msg.created_at),
-              type: msg.message_type as 'text' | 'voice' | 'image' || 'text'
-            }));
+            const loadedMessages: Message[] = existingMessages
+              .reverse() // Reverse to show chronological order
+              .map(msg => ({
+                id: msg.id,
+                content: msg.content,
+                sender: msg.sender as 'user' | 'ai',
+                timestamp: new Date(msg.created_at),
+                type: msg.message_type as 'text' | 'voice' | 'image' || 'text'
+              }));
 
             // Keep welcome message and add loaded messages
             setMessages(prev => [prev[0], ...loadedMessages]);
+            
+            // Set if there are more messages to load
+            setHasMoreMessages((totalCount || 0) > existingMessages.length);
           }
         }
       } catch (error) {
@@ -125,6 +143,101 @@ const ChatInterface = () => {
     };
     initializeConversation();
   }, []);
+
+  // Load older messages (lazy loading)
+  const loadOlderMessages = async () => {
+    if (!conversationId || loadingOlderMessages || !hasMoreMessages) return;
+    
+    setLoadingOlderMessages(true);
+    try {
+      // Get the oldest message timestamp from current messages (excluding welcome message)
+      const oldestMessage = messages.slice(1).sort((a, b) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )[0];
+      
+      if (!oldestMessage) {
+        setLoadingOlderMessages(false);
+        return;
+      }
+
+      const { data: olderMessages, error } = await supabase
+        .from('airledger_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .lt('created_at', oldestMessage.timestamp.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error loading older messages:', error);
+        return;
+      }
+
+      if (olderMessages && olderMessages.length > 0) {
+        const loadedOlderMessages: Message[] = olderMessages
+          .reverse()
+          .map(msg => ({
+            id: msg.id,
+            content: msg.content,
+            sender: msg.sender as 'user' | 'ai',
+            timestamp: new Date(msg.created_at),
+            type: msg.message_type as 'text' | 'voice' | 'image' || 'text'
+          }));
+
+        // Insert older messages after welcome message
+        setMessages(prev => [prev[0], ...loadedOlderMessages, ...prev.slice(1)]);
+        
+        // Check if there are more messages to load
+        setHasMoreMessages(olderMessages.length === 10);
+      } else {
+        setHasMoreMessages(false);
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+    } finally {
+      setLoadingOlderMessages(false);
+    }
+  };
+
+  // Limit messages in conversation (max 100)
+  const limitMessagesInConversation = async () => {
+    if (!conversationId) return;
+    
+    try {
+      // Count total messages
+      const { count: totalCount } = await supabase
+        .from('airledger_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversation_id', conversationId);
+
+      if (totalCount && totalCount > 100) {
+        // Get oldest messages to delete
+        const { data: oldestMessages } = await supabase
+          .from('airledger_messages')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: true })
+          .limit(totalCount - 100);
+
+        if (oldestMessages && oldestMessages.length > 0) {
+          const idsToDelete = oldestMessages.map(msg => msg.id);
+          
+          await supabase
+            .from('airledger_messages')
+            .delete()
+            .in('id', idsToDelete);
+
+          toast({
+            title: "Gamla meddelanden rensades",
+            description: `${oldestMessages.length} äldre meddelanden togs bort för att hålla konversationen hanterbar.`,
+            variant: "default"
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error limiting messages:', error);
+    }
+  };
 
   // Save message to database
   const saveMessageToDatabase = async (message: Message) => {
@@ -136,6 +249,9 @@ const ChatInterface = () => {
         sender: message.sender,
         message_type: message.type || 'text'
       });
+
+      // Limit messages after saving (run in background)
+      limitMessagesInConversation();
     } catch (error) {
       console.error('Error saving message:', error);
     }
@@ -589,24 +705,42 @@ const ChatInterface = () => {
 
     return () => clearTimeout(timer);
   }, []);
-  const handleNewChat = () => {
-    // Reset messages to only show welcome message
-    setMessages([{
-      id: '1',
-      content: 'Hej och välkommen till Air Ledger! 👋 \n\nJag är din AI-assistent för bokföring som kan hjälpa dig med allt från kvittoanalys till att svara på frågor om din bokföring.\n\n**🤖 Vad kan jag hjälpa dig med?**\n• 📷 **Ta foto av kvitton** - Använd kameraknappen för att fotografera kvitton direkt\n• 📊 **Analysera kvitton automatiskt** - Jag läser av belopp, datum och leverantör\n• 💬 **Svara på bokföringsfrågor** - Fråga mig om svensk bokföring och BAS-kontoplanen\n• 🏷️ **Föreslå transaktionsmallar** - Beskriv transaktionen så föreslår jag rätt mall\n• 📋 **Registrera transaktioner** - Fakturor, betalningar och utgifter\n\n**💡 Snabbtips för att komma igång:**\n• Börja med att fota ett kvitto - jag visar hur det fungerar!\n• Fråga mig om mina funktioner - jag berättar gärna mer\n• Använd röstinspelning om du vill prata istället för att skriva\n• Separera "fakturera kund" från "få betalning" - det är olika saker\n\nVad undrar du över idag? 🚀',
-      sender: 'ai',
-      timestamp: new Date(),
-      type: 'text'
-    }]);
+  const handleNewChat = async () => {
+    if (!conversationId) return;
     
-    // Clear input and pending images
-    setInputValue("");
-    setPendingImages([]);
-    
-    toast({
-      title: "Ny chat startad",
-      description: "Chatvyn har rensats för en ny konversation"
-    });
+    try {
+      // Clear all messages from database for this conversation (except AI messages we want to keep)
+      await supabase
+        .from('airledger_messages')
+        .delete()
+        .eq('conversation_id', conversationId);
+      
+      // Reset messages to only show welcome message
+      setMessages([{
+        id: '1',
+        content: 'Hej och välkommen till Air Ledger! 👋 \n\nJag är din AI-assistent för bokföring som kan hjälpa dig med allt från kvittoanalys till att svara på frågor om din bokföring.\n\n**🤖 Vad kan jag hjälpa dig med?**\n• 📷 **Ta foto av kvitton** - Använd kameraknappen för att fotografera kvitton direkt\n• 📊 **Analysera kvitton automatiskt** - Jag läser av belopp, datum och leverantör\n• 💬 **Svara på bokföringsfrågor** - Fråga mig om svensk bokföring och BAS-kontoplanen\n• 🏷️ **Föreslå transaktionsmallar** - Beskriv transaktionen så föreslår jag rätt mall\n• 📋 **Registrera transaktioner** - Fakturor, betalningar och utgifter\n\n**💡 Snabbtips för att komma igång:**\n• Börja med att fota ett kvitto - jag visar hur det fungerar!\n• Fråga mig om mina funktioner - jag berättar gärna mer\n• Använd röstinspelning om du vill prata istället för att skriva\n• Separera "fakturera kund" från "få betalning" - det är olika saker\n\nVad undrar du över idag? 🚀',
+        sender: 'ai',
+        timestamp: new Date(),
+        type: 'text'
+      }]);
+      
+      // Reset state
+      setInputValue("");
+      setPendingImages([]);
+      setHasMoreMessages(false);
+      
+      toast({
+        title: "Ny chat startad",
+        description: "All chatthistorik har rensats från databasen"
+      });
+    } catch (error) {
+      console.error('Error clearing chat:', error);
+      toast({
+        title: "Fel vid rensning",
+        description: "Kunde inte rensa chatthistoriken från databasen",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleTransactionConfirm = async (analysis: any, entries: any[], paymentMethod: string) => {
@@ -649,6 +783,9 @@ const ChatInterface = () => {
         isLoading={isLoading}
         onNewChat={handleNewChat}
         messagesEndRef={messagesEndRef}
+        hasMoreMessages={hasMoreMessages}
+        loadingOlderMessages={loadingOlderMessages}
+        onLoadOlderMessages={loadOlderMessages}
       />
 
       {/* Input Area - Fixed at bottom */}
