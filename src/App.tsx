@@ -32,20 +32,20 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/*" element={
               <ProtectedRoute>
-                <div className="min-h-screen bg-background pb-16">
+                <div className="min-h-screen bg-background">
                   <Navigation />
-                  <main className="pb-2">
+                  <main className="h-[calc(100vh-48px-64px)]"> {/* Full height minus header and bottom nav */}
                     <Routes>
                       <Route path="/chat" element={<Chat />} />
-                      <Route path="/transactions" element={<Transactions />} />
-                      <Route path="/templates" element={<Templates />} />
-                      <Route path="/settings" element={<Settings />} />
-                      <Route path="/reports" element={<Reports />} />
-                      <Route path="/opening-balances" element={<OpeningBalances />} />
-                      <Route path="/general-ledger" element={<GeneralLedger />} />
-                      <Route path="/subscription" element={<Subscription />} />
+                      <Route path="/transactions" element={<div className="pb-2"><Transactions /></div>} />
+                      <Route path="/templates" element={<div className="pb-2"><Templates /></div>} />
+                      <Route path="/settings" element={<div className="pb-2"><Settings /></div>} />
+                      <Route path="/reports" element={<div className="pb-2"><Reports /></div>} />
+                      <Route path="/opening-balances" element={<div className="pb-2"><OpeningBalances /></div>} />
+                      <Route path="/general-ledger" element={<div className="pb-2"><GeneralLedger /></div>} />
+                      <Route path="/subscription" element={<div className="pb-2"><Subscription /></div>} />
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                      <Route path="*" element={<NotFound />} />
+                      <Route path="*" element={<div className="pb-2"><NotFound /></div>} />
                     </Routes>
                   </main>
                 </div>

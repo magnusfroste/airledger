@@ -38,15 +38,15 @@ const InputArea = ({
   onStartCamera
 }: InputAreaProps) => {
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-3 space-y-3">
       {/* Pending Images Preview */}
       <PendingImages 
         pendingImages={pendingImages}
         onRemoveImage={onRemovePendingImage}
       />
 
-      {/* Message input with action buttons */}
-      <div className="flex gap-2 items-center">
+      {/* Message input with action buttons - optimized for iOS */}
+      <div className="flex gap-2 items-end">
         {/* Action buttons to the left */}
         <ActionButtons
           isRecording={isRecording}
@@ -63,19 +63,20 @@ const InputArea = ({
             onChange={e => setInputValue(e.target.value)} 
             onKeyPress={onKeyPress} 
             placeholder="Skriv ditt meddelande här..." 
-            className="pl-6 pr-14 py-6 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20 min-h-[56px]" 
-            disabled={isLoading} 
+            className="pl-4 pr-14 py-3 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20 min-h-[48px] resize-none"
+            disabled={isLoading}
+            style={{ fontSize: '16px' }} // Prevents zoom on iOS
           />
           
           {/* Send button to the right */}
           <Button 
             size="sm" 
             variant="ghost" 
-            className="absolute right-2 top-1/2 -translate-y-1/2 h-12 w-12 p-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90" 
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 p-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-transform" 
             onClick={onSendMessage} 
             disabled={!inputValue.trim() && pendingImages.length === 0 || isLoading}
           >
-            <Send className="h-5 w-5" />
+            <Send className="h-4 w-4" />
           </Button>
         </div>
       </div>

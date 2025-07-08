@@ -207,9 +207,9 @@ const Navigation = () => {
         </div>
       </header>
 
-      {/* Bottom Tab Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t border-border/20">
-        <div className="flex items-center justify-around px-2 py-1">
+      {/* Bottom Tab Navigation with iOS safe area */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t border-border/20 pb-safe">
+        <div className="flex items-center justify-around px-2 py-2">
           {bottomTabItems.map((item) => (
             <BottomTabLink key={item.href} item={item} />
           ))}

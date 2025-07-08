@@ -19,9 +19,9 @@ const Index = () => {
 
   if (user) {
     return (
-      <div className="min-h-screen bg-background pb-16">
+      <div className="min-h-screen bg-background">
         <Navigation />
-        <main className="pb-2">
+        <main className="h-[calc(100vh-48px-64px)] pb-2"> {/* Full height minus header and bottom nav */}
           <Dashboard />
         </main>
       </div>

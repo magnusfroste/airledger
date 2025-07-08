@@ -776,7 +776,7 @@ const ChatInterface = () => {
     }
   };
   return (
-    <div className="h-screen bg-background flex flex-col">
+    <div className="h-full bg-background flex flex-col">
       {/* Messages Container */}
       <MessageList
         messages={messages}
@@ -788,8 +788,8 @@ const ChatInterface = () => {
         onLoadOlderMessages={loadOlderMessages}
       />
 
-      {/* Input Area - Fixed at bottom */}
-      <div className="shrink-0 bg-background border-t border-border/20">
+      {/* Input Area - Fixed at bottom with safe area padding */}
+      <div className="shrink-0 bg-background border-t border-border/20 pb-safe">
         <InputArea
           inputValue={inputValue}
           setInputValue={setInputValue}
