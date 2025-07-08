@@ -32,6 +32,7 @@ interface AccountSelectorProps {
   placeholder?: string;
   disabled?: boolean;
   filter?: 'asset' | 'liability' | 'equity' | 'income' | 'expense' | 'all';
+  showAccountNumbers?: boolean;
 }
 
 export function AccountSelector({ 
@@ -39,7 +40,8 @@ export function AccountSelector({
   onValueChange, 
   placeholder = "Välj konto...",
   disabled = false,
-  filter = 'all' 
+  filter = 'all',
+  showAccountNumbers = true
 }: AccountSelectorProps) {
   const [open, setOpen] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -108,7 +110,9 @@ export function AccountSelector({
           className="w-full justify-between"
         >
           {selectedAccount
-            ? `${selectedAccount.account_code} - ${selectedAccount.account_name}`
+            ? showAccountNumbers 
+              ? `${selectedAccount.account_name} (${selectedAccount.account_code})`
+              : selectedAccount.account_name
             : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -136,10 +140,13 @@ export function AccountSelector({
                   />
                   <div className="flex flex-col">
                     <span className="font-medium">
-                      {account.account_code} - {account.account_name}
+                      {showAccountNumbers 
+                        ? `${account.account_name} (${account.account_code})`
+                        : account.account_name}
                     </span>
                     <span className="text-xs text-muted-foreground capitalize">
                       {account.account_type} • {account.normal_balance}
+                      {showAccountNumbers && ` • Konto ${account.account_code}`}
                     </span>
                   </div>
                 </CommandItem>
