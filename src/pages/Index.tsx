@@ -1,5 +1,6 @@
 import Dashboard from "@/components/Dashboard";
 import LandingPage from "@/components/LandingPage";
+import Navigation from "@/components/Navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
@@ -16,7 +17,18 @@ const Index = () => {
     );
   }
 
-  return user ? <Dashboard /> : <LandingPage />;
+  if (user) {
+    return (
+      <div className="min-h-screen bg-background pb-16">
+        <Navigation />
+        <main className="pb-2">
+          <Dashboard />
+        </main>
+      </div>
+    );
+  }
+
+  return <LandingPage />;
 };
 
 export default Index;

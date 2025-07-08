@@ -29,13 +29,13 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/" element={<Index />} />
             <Route path="/*" element={
               <ProtectedRoute>
                 <div className="min-h-screen bg-background pb-16">
                   <Navigation />
                   <main className="pb-2">
                     <Routes>
-                      <Route path="/" element={<Index />} />
                       <Route path="/chat" element={<Chat />} />
                       <Route path="/transactions" element={<Transactions />} />
                       <Route path="/templates" element={<Templates />} />
