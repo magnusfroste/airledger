@@ -75,7 +75,7 @@ const StatsCards = ({ stats, formatCurrency }: StatsCardsProps) => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Obetalda fakturor</p>
+                <p className="text-sm font-medium text-gray-600">Obetalda fakturor (kunder)</p>
                 <p className="text-2xl font-bold text-orange-600">{formatCurrency(stats.unpaidInvoices)}</p>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">

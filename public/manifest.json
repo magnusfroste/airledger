@@ -1,7 +1,7 @@
 {
-  "name": "Air Ledger - Småföretagsbokföring",
+  "name": "Air Ledger förenklar bokföringen",
   "short_name": "Air Ledger",
-  "description": "AI-driven bookkeeping for Swedish small businesses",
+  "description": "Air Ledgers AI assistent gör bokföring kul",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#faf9f7",
