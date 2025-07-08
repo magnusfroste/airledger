@@ -281,6 +281,125 @@ Specifik funktion för att använda mallar:
 5. Registrera mallanvändning för statistik
 ```
 
+## Resultatrapport - Tolkning av BAS-Kontoklasser
+
+### Översikt
+
+Resultatrapporten (`src/pages/Reports.tsx`) genererar en automatisk resultaträkning baserad på BAS-kontoplanen 2024. Rapporten använder specifika regler för att klassificera och beräkna intäkter och kostnader.
+
+### Inkluderade Kontoklasser
+
+#### Intäktskonton (3000-3999)
+- **Normal balans**: Kredit
+- **Beräkning**: Kredit - Debit = Nettointäkt
+- **Exempel**: 
+  - 3000 Försäljning varor
+  - 3100 Tjänsteintäkter
+  - 3200 Hyresintäkter
+
+#### Kostnadskonton (4000-4999 & 6000-6999)
+- **Normal balans**: Debit
+- **Beräkning**: Debit - Kredit = Nettokostnad
+- **Exempel**:
+  - 4000 Inköp varor
+  - 6000 Lokalhyra
+  - 6250 Telekommunikation
+  - 6830 Bankavgifter
+
+### Exkluderade Kontoklasser
+
+Följande konton visas **INTE** i resultatrapporten:
+
+- **1000-2999**: Balansräkningskonton (tillgångar och skulder)
+- **5000-5999**: Finansiella poster och extraordinära poster
+- **7000-8999**: Koncern- och övriga poster
+
+### Beräkningslogik
+
+```typescript
+// Pseudokod för rapportlogik
+const revenue = accounts
+  .filter(account => account.code >= 3000 && account.code <= 3999)
+  .map(account => ({
+    ...account,
+    total: account.credit_total - account.debit_total
+  }))
+  .filter(account => account.total !== 0);
+
+const expenses = accounts
+  .filter(account => 
+    (account.code >= 4000 && account.code <= 4999) ||
+    (account.code >= 6000 && account.code <= 6999)
+  )
+  .map(account => ({
+    ...account,
+    total: account.debit_total - account.credit_total
+  }))
+  .filter(account => account.total !== 0);
+
+const netResult = totalRevenue - totalExpenses;
+```
+
+### Praktiska Exempel
+
+#### ✅ Transaktioner som Visas i Rapporten
+
+```javascript
+// Intäktstransaktion
+Debet: 1930 Checkkonto         10,000 kr
+Kredit: 3000 Försäljning        10,000 kr
+// → Visas som +10,000 kr intäkt
+
+// Kostnadstransaktion
+Debet: 6000 Lokalhyra           8,000 kr
+Kredit: 1930 Checkkonto         8,000 kr
+// → Visas som +8,000 kr kostnad
+```
+
+#### ❌ Transaktioner som INTE Visas
+
+```javascript
+// Balansräkningstransaktion
+Debet: 1510 Kundfordringar      5,000 kr
+Kredit: 1930 Checkkonto         5,000 kr
+// → Visas INTE (endast balansräkningskonten)
+
+// Lånetransaktion
+Debet: 1930 Checkkonto          50,000 kr
+Kredit: 2330 Banklån            50,000 kr
+// → Visas INTE (endast balansräkningskonten)
+```
+
+### Felsökning
+
+#### Saknas Transaktioner i Rapporten?
+
+1. **Kontrollera kontokod**: Är det 3000-3999 eller 4000-4999/6000-6999?
+2. **Kontrollera datumperiod**: Är transaktionen inom vald tidsperiod?
+3. **Kontrollera nollbalans**: Konton med nollsaldo visas inte
+4. **Kontrollera bokföring**: Är debet/kredit korrekt bokförda?
+
+#### Felaktiga Belopp?
+
+- **Negativa intäkter**: Kontrollera att kreditposter är större än debetposter på intäktskonton
+- **Negativa kostnader**: Kontrollera att debetposter är större än kreditposter på kostnadskonton
+
+### Rapportperioder
+
+Rapporten stöder följande perioder:
+- **Innevarande månad**: Från månadens första dag
+- **Föregående månad**: Hela föregående månad
+- **Innevarande år**: Från årets första dag
+- **Föregående år**: Hela föregående år
+
+### Export-funktionalitet
+
+Rapporten kan exporteras som CSV-fil med:
+- Detaljerade kontouppgifter
+- Summering per kategori
+- Nettoresultat
+- Tidsperiod och genereringsdatum
+
 ## Användningsstatistik och Analytics
 
 ### Mallstatistik
