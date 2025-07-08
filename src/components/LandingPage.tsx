@@ -37,24 +37,39 @@ const LandingPage = () => {
       period: "för alltid",
       description: "Perfekt för att komma igång",
       features: [
-        "10 AI-analyser per månad",
+        "50 AI-analyser per månad",
+        "500 MB lagring för kvitton",
         "Grundläggande bokföring",
-        "Kvittoanalys",
-        "BAS-kontoplanen"
+        "BAS-kontoplanen",
+        "Community support"
       ]
     },
     {
-      name: "Pro",
-      price: "199 kr",
+      name: "Premium", 
+      price: "99 kr",
       period: "per månad",
       description: "För växande företag",
       features: [
-        "Obegränsade AI-analyser",
-        "Avancerade rapporter", 
-        "Mallar och automation",
-        "Prioriterad support"
+        "500 AI-analyser per månad",
+        "5 GB lagring för kvitton",
+        "Avancerade rapporter",
+        "Mallar och automation", 
+        "Standard support"
       ],
       popular: true
+    },
+    {
+      name: "Professional",
+      price: "199 kr", 
+      period: "per månad",
+      description: "För professionella användare",
+      features: [
+        "Obegränsade AI-analyser",
+        "50 GB lagring för kvitton",
+        "Alla premium-funktioner",
+        "Prioriterad support",
+        "Anpassade rapporter"
+      ]
     }
   ];
 
@@ -183,7 +198,7 @@ const LandingPage = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {pricingPlans.map((plan, index) => (
               <Card key={index} className={`relative ${plan.popular ? 'border-primary shadow-lg scale-105' : ''}`}>
                 {plan.popular && (
