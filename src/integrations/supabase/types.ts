@@ -674,35 +674,44 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accounting_experience: string | null
           avatar_url: string | null
           created_at: string | null
           email: string | null
           full_name: string | null
           id: string
+          industry: string | null
           is_developer: boolean | null
           name: string | null
+          show_account_numbers: boolean | null
           updated_at: string | null
           username: string | null
         }
         Insert: {
+          accounting_experience?: string | null
           avatar_url?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
           id: string
+          industry?: string | null
           is_developer?: boolean | null
           name?: string | null
+          show_account_numbers?: boolean | null
           updated_at?: string | null
           username?: string | null
         }
         Update: {
+          accounting_experience?: string | null
           avatar_url?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
+          industry?: string | null
           is_developer?: boolean | null
           name?: string | null
+          show_account_numbers?: boolean | null
           updated_at?: string | null
           username?: string | null
         }
