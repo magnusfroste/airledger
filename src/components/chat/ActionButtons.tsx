@@ -31,17 +31,6 @@ const ActionButtons = ({
   return (
     <div className="flex gap-1">
       <Button 
-        variant={isRecording ? "destructive" : "ghost"} 
-        size="sm" 
-        onClick={onVoiceRecording} 
-        className={`h-12 w-12 p-0 rounded-full ${isRecording ? 'animate-pulse bg-destructive text-destructive-foreground' : 'bg-green-500 hover:bg-green-600 text-white'}`} 
-        disabled={isLoading} 
-        title="Spela in röst"
-      >
-        {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-      </Button>
-      
-      <Button 
         variant="ghost" 
         size="sm" 
         className="h-12 w-12 p-0 rounded-full bg-muted/50 hover:bg-muted/70" 
@@ -61,6 +50,17 @@ const ActionButtons = ({
         title="Ta foto"
       >
         <Camera className="h-5 w-5" />
+      </Button>
+      
+      <Button 
+        variant={isRecording ? "destructive" : "ghost"} 
+        size="sm" 
+        onClick={onVoiceRecording} 
+        className={`h-12 w-12 p-0 rounded-full ${isRecording ? 'animate-pulse bg-destructive text-destructive-foreground' : 'bg-green-500 hover:bg-green-600 text-white'}`} 
+        disabled={isLoading} 
+        title="Spela in röst"
+      >
+        {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
       </Button>
     </div>
   );
