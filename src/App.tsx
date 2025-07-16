@@ -12,6 +12,7 @@ import Transactions from "./pages/Transactions";
 import Templates from "./pages/Templates";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
+import BalanceSheet from "./pages/BalanceSheet";
 import OpeningBalances from "./pages/OpeningBalances";
 import GeneralLedger from "./pages/GeneralLedger";
 import Subscription from "./pages/Subscription";
@@ -41,6 +42,7 @@ const App = () => (
                       <Route path="/templates" element={<div className="pb-2"><Templates /></div>} />
                       <Route path="/settings" element={<div className="pb-2"><Settings /></div>} />
                       <Route path="/reports" element={<div className="pb-2"><Reports /></div>} />
+                      <Route path="/balance-sheet" element={<div className="pb-2"><BalanceSheet /></div>} />
                       <Route path="/opening-balances" element={<div className="pb-2"><OpeningBalances /></div>} />
                       <Route path="/general-ledger" element={<div className="pb-2"><GeneralLedger /></div>} />
                       <Route path="/subscription" element={<div className="pb-2"><Subscription /></div>} />

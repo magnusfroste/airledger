@@ -101,6 +101,12 @@ const Navigation = () => {
   // More menu items (less frequently used)
   const moreMenuItems = [
     { 
+      href: "/balance-sheet", 
+      label: "Balansrapport", 
+      icon: BarChart3,
+      badge: null
+    },
+    { 
       href: "/templates", 
       label: "Mallar", 
       icon: Settings,
