@@ -37,7 +37,7 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
   const demoSteps = [
     {
       trigger: 'start',
-      aiResponse: "Hej! Jag är Air, din AI-assistent för bokföring. 🤖\n\nJag hjälper svenska småföretag med allt från kvittoanalys till BAS-kontoplanen. Jag förstår svenska och gör bokföringen superenkel!\n\nVad är du nyfiken på?",
+      aiResponse: "Hej! Jag är Air, din AI-assistent för bokföring. 🤖\n\nJag hjälper svenska småföretag med allt ifrån den löpande bokföringen, kontering samt kvittoanalys till BAS-kontoplanen. Jag förstår svenska och gör bokföringen superenkel!\n\nVad är du nyfiken på?",
       suggestions: [
         "Vad kan du bokföra åt mig?",
         "Hur fungerar kvittoanalys?",
