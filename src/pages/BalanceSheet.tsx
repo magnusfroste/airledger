@@ -176,17 +176,12 @@ const BalanceSheet = () => {
         change: change
       };
 
-      // Categorize based on BAS 2024 account codes
-      const accountNum = parseInt(accountCode);
-      
-      if (accountNum >= 1000 && accountNum <= 1999) {
-        // Assets (Tillgångar)
+      // Categorize based on account_type from database
+      if (accountType === 'asset') {
         assets.push(balanceAccount);
-      } else if (accountNum >= 2000 && accountNum <= 2999) {
-        // Liabilities (Skulder)
+      } else if (accountType === 'liability') {
         liabilities.push(balanceAccount);
-      } else if (accountNum >= 8000 && accountNum <= 8999) {
-        // Equity (Eget kapital)
+      } else if (accountType === 'equity') {
         equity.push(balanceAccount);
       }
     });
