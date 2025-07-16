@@ -49,7 +49,9 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
         // Extract preferences from profile or use defaults
         const userPrefs: UserPreferences = {
           showAccountNumbers: profile.show_account_numbers ?? defaultPreferences.showAccountNumbers,
-          accountingExperience: profile.accounting_experience ?? defaultPreferences.accountingExperience,
+          accountingExperience: (['beginner', 'intermediate', 'advanced'].includes(profile.accounting_experience)) 
+            ? profile.accounting_experience as 'beginner' | 'intermediate' | 'advanced'
+            : defaultPreferences.accountingExperience,
           industry: profile.industry ?? defaultPreferences.industry,
         };
         setPreferences(userPrefs);
