@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, TrendingUp, TrendingDown, FileText, Download } from "lucide-react";
+import { Calendar, TrendingUp, TrendingDown, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -185,62 +185,6 @@ const Reports = () => {
     }
   };
 
-  const handleExport = () => {
-    if (!reportData) return;
-
-    // Create CSV content
-    const csvLines = [];
-    
-    // Header
-    csvLines.push('Resultatrapport');
-    csvLines.push(`Period: ${getPeriodLabel()}`);
-    csvLines.push(`Genererad: ${new Date().toLocaleDateString('sv-SE')}`);
-    csvLines.push(''); // Empty line
-    
-    // Revenue section
-    csvLines.push('INTÄKTER');
-    csvLines.push('Konto,Kontonamn,Belopp');
-    
-    reportData.revenue.forEach(item => {
-      csvLines.push(`${item.account_code},"${item.account_name}",${item.total.toFixed(2)}`);
-    });
-    
-    csvLines.push(`SUMMA INTÄKTER,,${reportData.totalRevenue.toFixed(2)}`);
-    csvLines.push(''); // Empty line
-    
-    // Expenses section
-    csvLines.push('KOSTNADER');
-    csvLines.push('Konto,Kontonamn,Belopp');
-    
-    reportData.expenses.forEach(item => {
-      csvLines.push(`${item.account_code},"${item.account_name}",${item.total.toFixed(2)}`);
-    });
-    
-    csvLines.push(`SUMMA KOSTNADER,,${reportData.totalExpenses.toFixed(2)}`);
-    csvLines.push(''); // Empty line
-    
-    // Net result
-    csvLines.push(`NETTORESULTAT,,${reportData.netResult.toFixed(2)}`);
-    
-    // Convert to CSV string
-    const csvContent = csvLines.join('\n');
-    
-    // Create and download file
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `resultatrapport_${period}_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast({
-      title: "Export klar",
-      description: "Resultatrapporten har exporterats som CSV-fil",
-    });
-  };
 
   if (loading) {
     return (
@@ -280,11 +224,6 @@ const Reports = () => {
               <SelectItem value="last-year">Föregående år</SelectItem>
             </SelectContent>
           </Select>
-          
-          <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
-            <Download className="h-4 w-4" />
-            Exportera
-          </Button>
         </div>
       </div>
 
