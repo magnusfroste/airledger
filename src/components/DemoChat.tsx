@@ -39,6 +39,7 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
       trigger: 'start',
       aiResponse: "Hej! Jag är Air, din AI-assistent för bokföring. 🤖\n\nJag hjälper svenska småföretag med allt från kvittoanalys till BAS-kontoplanen. Jag förstår svenska och gör bokföringen superenkel!\n\nVad är du nyfiken på?",
       suggestions: [
+        "Vad kan du bokföra åt mig?",
         "Hur fungerar kvittoanalys?",
         "Vad är BAS-kontoplanen?",
         "Kan du hjälpa med moms?"
@@ -274,25 +275,8 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
           </div>
         </ScrollArea>
 
-        {/* Action Button */}
-        {!isTyping && messages.length === 1 && (
-          <div className="p-4 border-t border-border flex-shrink-0">
-            <Button
-              variant="default"
-              size={isMobile ? "default" : "sm"}
-              onClick={() => handleSuggestionClick("Vad kan du bokföra åt mig?")}
-              className={cn(
-                isMobile ? "text-sm min-h-[44px] px-4" : "text-xs",
-                "w-full touch-manipulation"
-              )}
-            >
-              Vad jag kan bokföra åt dig?
-            </Button>
-          </div>
-        )}
-
         {/* Suggestions */}
-        {!isTyping && messages.length > 1 && (
+        {!isTyping && (
           <div className="p-4 border-t border-border flex-shrink-0">
             <div className="flex flex-wrap gap-2">
               {getCurrentSuggestions().map((suggestion, index) => (
