@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
 import ActionButtons from "./ActionButtons";
 import PendingImages from "./PendingImages";
@@ -45,9 +45,8 @@ const InputArea = ({
         onRemoveImage={onRemovePendingImage}
       />
 
-      {/* Message input with action buttons - optimized for iOS */}
-      <div className="flex gap-2 items-end">
-        {/* Action buttons to the left */}
+      {/* Action buttons above textarea */}
+      <div className="flex justify-center">
         <ActionButtons
           isRecording={isRecording}
           isLoading={isLoading}
@@ -55,16 +54,20 @@ const InputArea = ({
           onVoiceRecording={onVoiceRecording}
           onStartCamera={onStartCamera}
         />
+      </div>
 
+      {/* Message input with send button */}
+      <div className="flex gap-2 items-end">
         {/* Text input */}
         <div className="flex-1 relative">
-          <Input 
+          <Textarea 
             value={inputValue} 
             onChange={e => setInputValue(e.target.value)} 
             onKeyPress={onKeyPress} 
             placeholder="Skriv ditt meddelande här..." 
-            className="pl-4 pr-14 py-3 bg-muted border-0 rounded-full text-base focus:ring-2 focus:ring-primary/20 min-h-[48px] resize-none"
+            className="pl-4 pr-14 py-3 bg-muted border-0 rounded-2xl text-base focus:ring-2 focus:ring-primary/20 min-h-[80px] resize-none"
             disabled={isLoading}
+            rows={2}
             style={{ fontSize: '16px' }} // Prevents zoom on iOS
           />
           
@@ -72,7 +75,7 @@ const InputArea = ({
           <Button 
             size="sm" 
             variant="ghost" 
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 p-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-transform" 
+            className="absolute right-1 bottom-1 h-10 w-10 p-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-transform" 
             onClick={onSendMessage} 
             disabled={!inputValue.trim() && pendingImages.length === 0 || isLoading}
           >
