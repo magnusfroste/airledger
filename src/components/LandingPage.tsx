@@ -247,7 +247,7 @@ const LandingPage = () => {
             Redo att förenkla din bokföring?
           </h2>
           <p className="text-xl opacity-90 max-w-2xl mx-auto">
-            Börja prata svenska med din AI-assistent redan idag. Gå med i tusentals svenska småföretag som förenklar sin bokföring.
+            Börja prata Svenska med din AI-assistent redan idag. Gör som 1000-tals Svenska småföretagare, få en bättre koll med AI assistans! 
           </p>
           <Button 
             onClick={handleGetStarted}
@@ -263,7 +263,7 @@ const LandingPage = () => {
       {/* Footer */}
       <footer className="py-8 px-6 border-t bg-background">
         <div className="max-w-6xl mx-auto text-center text-muted-foreground">
-          <p>© 2024 AirLedger. Byggd för svenska småföretag.</p>
+          <p>© 2025 AirLedger. Underlättar för Svenska småföretagare.</p>
         </div>
       </footer>
     </div>
