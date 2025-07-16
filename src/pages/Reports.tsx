@@ -52,6 +52,7 @@ const Reports = () => {
           break;
         case "current-year":
           startDate = new Date(startDate.getFullYear(), 0, 1);
+          endDate = new Date(startDate.getFullYear(), 11, 31);
           break;
         case "last-year":
           const lastYear = startDate.getFullYear() - 1;
