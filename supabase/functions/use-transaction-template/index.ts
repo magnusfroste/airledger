@@ -80,15 +80,67 @@ serve(async (req) => {
 
     console.log('Found template:', template.template_name)
 
-    // Create transaction entries based on template
+    // Create transaction entries based on template with VAT calculation
     const templateEntries = template.template_entries as any[]
-    const entries = templateEntries.map((entry: any) => ({
-      accountCode: entry.account_code,
-      accountName: entry.account_name,
-      debitAmount: entry.type === 'debit' ? amount : 0,
-      creditAmount: entry.type === 'credit' ? amount : 0,
-      description: entry.description || description || template.description
-    }))
+    
+    // Check if template has VAT calculation entries
+    const hasVatCalculation = templateEntries.some((entry: any) => entry.vat_calculation)
+    
+    let entries: any[]
+    
+    if (hasVatCalculation) {
+      // Calculate VAT amounts for templates with VAT
+      const vatRate = 0.25 // 25% Swedish VAT
+      const totalAmount = parseFloat(amount.toString())
+      const excludingVat = totalAmount / (1 + vatRate) // Amount excluding VAT
+      const vatAmount = totalAmount - excludingVat // VAT amount only
+      
+      console.log('VAT Calculation:', { totalAmount, excludingVat, vatAmount })
+      
+      entries = templateEntries.map((entry: any) => {
+        let debitAmount = 0
+        let creditAmount = 0
+        
+        if (entry.type === 'debit') {
+          if (entry.vat_calculation === 'exclude_vat') {
+            debitAmount = excludingVat
+          } else if (entry.vat_calculation === 'vat_only') {
+            debitAmount = vatAmount
+          } else if (entry.vat_calculation === 'total_amount') {
+            debitAmount = totalAmount
+          } else {
+            debitAmount = totalAmount // fallback
+          }
+        } else if (entry.type === 'credit') {
+          if (entry.vat_calculation === 'exclude_vat') {
+            creditAmount = excludingVat
+          } else if (entry.vat_calculation === 'vat_only') {
+            creditAmount = vatAmount
+          } else if (entry.vat_calculation === 'total_amount') {
+            creditAmount = totalAmount
+          } else {
+            creditAmount = totalAmount // fallback
+          }
+        }
+        
+        return {
+          accountCode: entry.account_code,
+          accountName: entry.account_name,
+          debitAmount,
+          creditAmount,
+          description: entry.description || description || template.description
+        }
+      })
+    } else {
+      // For templates without VAT calculation, use original logic
+      entries = templateEntries.map((entry: any) => ({
+        accountCode: entry.account_code,
+        accountName: entry.account_name,
+        debitAmount: entry.type === 'debit' ? amount : 0,
+        creditAmount: entry.type === 'credit' ? amount : 0,
+        description: entry.description || description || template.description
+      }))
+    }
 
     console.log('Generated entries from template:', entries)
 

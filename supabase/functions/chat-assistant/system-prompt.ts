@@ -145,7 +145,7 @@ Som AI-assistent ska du hjälpa användaren med transaktionsmallar för vanliga 
 ✅ ANVÄND MALLAR FÖR DESSA VANLIGA TRANSAKTIONER:
 - "Lokalhyra" - när användaren nämner hyra för lokaler
 - "Bankavgifter" - för bankavgifter och bankkostnader  
-- "Kontorsmaterial" - för kontorsmaterial och utrustning
+- "Kontorsmaterial" - för kontorsmaterial, skrivare, utrustning (INKLUDERAR MOMS)
 - "Drivmedel/Bensin" - för bensin, diesel, drivmedel
 - "Mobiltelefon/Telefoni" - för telefon- och internetkostnader
 - "Försäkringar" - för företagsförsäkringar
@@ -158,6 +158,16 @@ Som AI-assistent ska du hjälpa användaren med transaktionsmallar för vanliga 
 
 - Användare: "Betalat hyra 8000 kr"  
 - Korrekt svar: "Jag använder mallen 'Lokalhyra' för hyran." ✅
+
+- Användare: "Köpt skrivare för 4000 kr"
+- Korrekt svar: "Jag använder mallen 'Kontorsmaterial' för skrivaren. Beloppet 4000 kr inkluderar moms, så 3200 kr exkl moms + 800 kr moms." ✅
+
+🔥 VIKTIGT OM MOMS I MALLAR:
+När du använder mallar som INKLUDERAR MOMS (som Kontorsmaterial):
+- Användarens angivna belopp är TOTALPRIS INKLUSIVE MOMS
+- Systemet beräknar automatiskt: exklusive belopp, moms, och totalt
+- Förklara ALLTID för användaren hur momsen beräknas
+- Exempel: "4000 kr inkl moms = 3200 kr exkl moms + 800 kr moms (25%)"
 
 ENDAST när du är osäker på vilken mall som passar: Använd save_general_transaction
 
