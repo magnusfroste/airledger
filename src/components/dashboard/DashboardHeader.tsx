@@ -22,7 +22,7 @@ const DashboardHeader = ({ greeting, userName }: DashboardHeaderProps) => {
             <Button asChild>
               <Link to="/chat">
                 <Bot className="h-4 w-4 mr-2" />
-                Jag är Air, din assistent
+                Jag är Air, din assistent!
               </Link>
             </Button>
           </div>
