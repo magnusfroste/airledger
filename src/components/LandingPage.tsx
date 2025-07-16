@@ -15,8 +15,8 @@ const LandingPage = () => {
   const features = [
     {
       icon: Bot,
-      title: "AI-assisterad bokföring",
-      description: "Din personliga bokföringsassistent som förstår svenska småföretag"
+      title: "Prata svenska med AI:n",
+      description: "Enkelt och praktiskt - tala naturligt på svenska med din bokföringsassistent. Ingen krånglig inmatning."
     },
     {
       icon: Receipt,
@@ -105,7 +105,7 @@ const LandingPage = () => {
                   <span className="text-primary block">förstår dig</span>
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-lg">
-                  Din personliga AI-assistent för bokföring. Fotografera kvitton, ställ frågor på svenska - vi sköter resten.
+                  Tala med din AI-assistent på ren svenska - enkelt och praktiskt. Fotografera kvitton, ställ frågor naturligt - enklare kan det inte vara.
                 </p>
               </div>
               
@@ -247,7 +247,7 @@ const LandingPage = () => {
             Redo att förenkla din bokföring?
           </h2>
           <p className="text-xl opacity-90 max-w-2xl mx-auto">
-            Gå med i tusentals svenska småföretag som redan använder AI för sin bokföring
+            Börja prata svenska med din AI-assistent redan idag. Gå med i tusentals svenska småföretag som förenklar sin bokföring.
           </p>
           <Button 
             onClick={handleGetStarted}
