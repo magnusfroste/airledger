@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ZoomIn, ZoomOut, RotateCw, Download, X } from "lucide-react";
 import { ImageStorageService } from "@/lib/imageStorage";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ReceiptImageViewerProps {
   open: boolean;
@@ -35,6 +36,7 @@ const ReceiptImageViewer = ({
   metadata, 
   analysis 
 }: ReceiptImageViewerProps) => {
+  const isMobile = useIsMobile();
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -83,36 +85,40 @@ const ReceiptImageViewer = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[95vh] p-0">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="flex items-center justify-between">
+      <DialogContent className={isMobile ? "max-w-full max-h-[100vh] p-0 m-0 rounded-none" : "max-w-5xl max-h-[95vh] p-0"}>
+        <DialogHeader className={isMobile ? "p-4 pb-0" : "p-6 pb-0"}>
+          <DialogTitle className={isMobile ? "flex flex-col gap-3" : "flex items-center justify-between"}>
             <span>Kvitto/Faktura</span>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleZoomOut}>
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <span className="text-sm text-muted-foreground min-w-[60px] text-center">
-                {Math.round(zoom * 100)}%
-              </span>
-              <Button variant="outline" size="sm" onClick={handleZoomIn}>
-                <ZoomIn className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleRotate}>
-                <RotateCw className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload}>
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-                <X className="h-4 w-4" />
-              </Button>
+            <div className={isMobile ? "flex items-center justify-between w-full" : "flex items-center gap-2"}>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size={isMobile ? "default" : "sm"} onClick={handleZoomOut}>
+                  <ZoomOut className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
+                </Button>
+                <span className="text-sm text-muted-foreground min-w-[60px] text-center">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <Button variant="outline" size={isMobile ? "default" : "sm"} onClick={handleZoomIn}>
+                  <ZoomIn className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
+                </Button>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size={isMobile ? "default" : "sm"} onClick={handleRotate}>
+                  <RotateCw className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
+                </Button>
+                <Button variant="outline" size={isMobile ? "default" : "sm"} onClick={handleDownload}>
+                  <Download className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
+                </Button>
+                <Button variant="outline" size={isMobile ? "default" : "sm"} onClick={() => onOpenChange(false)}>
+                  <X className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
+                </Button>
+              </div>
             </div>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="p-6 pt-0 flex gap-6 h-[calc(95vh-120px)]">
+        <div className={isMobile ? "p-4 pt-0 flex flex-col gap-4 h-[calc(100vh-140px)]" : "p-6 pt-0 flex gap-6 h-[calc(95vh-120px)]"}>
           {/* Image Display */}
-          <div className="flex-1 bg-gray-100 rounded-lg overflow-hidden relative">
+          <div className={isMobile ? "flex-1 bg-gray-100 rounded-lg overflow-hidden relative min-h-[50vh]" : "flex-1 bg-gray-100 rounded-lg overflow-hidden relative"}>
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -121,7 +127,7 @@ const ReceiptImageViewer = ({
             
             {!imageUrl && !loading && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <Button onClick={loadImage} variant="outline">
+                <Button onClick={loadImage} variant="outline" size={isMobile ? "default" : "sm"}>
                   Ladda bild
                 </Button>
               </div>
@@ -143,7 +149,7 @@ const ReceiptImageViewer = ({
           </div>
 
           {/* Sidebar with metadata and analysis */}
-          <div className="w-80 space-y-4 overflow-y-auto">
+          <div className={isMobile ? "w-full space-y-4 max-h-[40vh] overflow-y-auto" : "w-80 space-y-4 overflow-y-auto"}>
             {/* Analysis Results */}
             {analysis && (
               <div className="bg-blue-50 p-4 rounded-lg space-y-3">
@@ -192,7 +198,7 @@ const ReceiptImageViewer = ({
                 <div className="text-xs space-y-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Filnamn:</span>
-                    <span className="text-right">{metadata.originalName}</span>
+                    <span className="text-right truncate max-w-[150px]">{metadata.originalName}</span>
                   </div>
                   
                   <div className="flex justify-between">
