@@ -69,7 +69,7 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
       suggestions: [
         "Vad händer vid 0% moms?",
         "Kan du hantera utländska kvitton?",
-        "Kom igång nu!"
+        "Kom igång gratis nu!"
       ]
     },
     {
@@ -78,7 +78,7 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
       suggestions: [
         "Visa mig kvittoanalys!",
         "Hur fungerar BAS-kontoplanen?",
-        "Kom igång nu!"
+        "Kom igång gratis nu!"
       ]
     },
     {
@@ -122,7 +122,7 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
       aiResponse: "Ja, du har full kontroll över din kontoplan! ⚙️\n\n**Vad du kan göra:**\n• **Lägga till egna konton** - skapa specialkonton för ditt företag\n• **Döpa om konton** - t.ex. \"6110 Kontorsmaterial\" → \"6110 Papper & pennor\"\n• **Inaktivera konton** du inte använder\n• **Sätta standardkonton** för återkommande leverantörer\n\n**BAS-standarden finns kvar** som grund, men du anpassar efter dina behov!\n\n**Exempel på anpassningar:**\n• Frisörsalong: \"7391 Hårvårdsprodukter\"\n• Restaurang: \"4010 Inköp råvaror\"\n• IT-konsult: \"6214 Utbildning & certifieringar\"\n\n**Smart tipps:** Jag lär mig dina vanor och föreslår dina favoritkonton! 🎯",
       suggestions: [
         "Vad kan du bokföra åt mig?",
-        "Kom igång nu!",
+        "Kom igång gratis nu!",
         "Hur fungerar kvittoanalys?"
       ]
     },
@@ -141,7 +141,7 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
       suggestions: [
         "Kan du hantera utländska kvitton?",
         "Berätta mer om BAS-kontoplanen",
-        "Kom igång nu!"
+        "Kom igång gratis nu!"
       ]
     },
     {
