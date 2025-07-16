@@ -112,7 +112,7 @@ const LandingPage = () => {
                   <span className="text-primary block">förstår dig</span>
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-lg">
-                  Tala med din 24/7 bokföringsassistent på ren Svenska - enkelt och praktiskt. Fotografera kvitton, ställ frågor naturligt - enklare kan det inte vara.
+                  Tala med din bokföringsassistent 24/7 - enkelt och praktiskt. Fotografera kvitton, ställ frågor naturligt - enklare kan det inte vara.
                 </p>
               </div>
               
