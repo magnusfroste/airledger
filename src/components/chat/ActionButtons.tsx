@@ -34,17 +34,6 @@ const ActionButtons = ({
         variant="ghost" 
         size="sm" 
         className="h-12 w-12 p-0 rounded-full bg-muted/50 hover:bg-muted/70" 
-        onClick={handleFileUpload}
-        disabled={isLoading} 
-        title="Ladda upp bilder"
-      >
-        <Paperclip className="h-5 w-5" />
-      </Button>
-      
-      <Button 
-        variant="ghost" 
-        size="sm" 
-        className="h-12 w-12 p-0 rounded-full bg-muted/50 hover:bg-muted/70" 
         onClick={onStartCamera} 
         disabled={isLoading} 
         title="Ta foto"
@@ -61,6 +50,17 @@ const ActionButtons = ({
         title="Spela in röst"
       >
         {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+      </Button>
+      
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="h-12 w-12 p-0 rounded-full bg-muted/50 hover:bg-muted/70" 
+        onClick={handleFileUpload}
+        disabled={isLoading} 
+        title="Ladda upp bilder"
+      >
+        <Paperclip className="h-5 w-5" />
       </Button>
     </div>
   );
