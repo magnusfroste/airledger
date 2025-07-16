@@ -21,6 +21,7 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
   const [isTyping, setIsTyping] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
   // Prevent background scroll on mobile when chat is open
@@ -97,7 +98,13 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Scroll to bottom within the ScrollArea only, not the entire page
+    if (messagesEndRef.current && scrollAreaRef.current) {
+      const scrollArea = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollArea) {
+        scrollArea.scrollTop = scrollArea.scrollHeight;
+      }
+    }
   }, [messages, isTyping]);
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -204,7 +211,7 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
         </div>
 
         {/* Messages */}
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
           <div className="space-y-4">
         {messages.map((message) => (
           <div
