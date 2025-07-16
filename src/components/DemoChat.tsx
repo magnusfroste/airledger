@@ -70,6 +70,15 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
         "Kan du hantera utländska kvitton?",
         "Kom igång nu!"
       ]
+    },
+    {
+      trigger: "Vad kan du bokföra åt mig?",
+      aiResponse: "Jag kan hjälpa dig bokföra massa olika saker! 💼\n\n**Kvitton & Fakturor:**\n• 📸 Fotografera kvitton - jag läser allt automatiskt\n• 📄 Leverantörsfakturor\n• 🧾 Inköpskvitton från butiker\n• ⛽ Bensinkvitton och reseräkningar\n\n**Olika transaktioner:**\n• 💳 Bankbetalningar\n• 💰 Kontantköp  \n• 🏦 Överföringar mellan konton\n• 📱 Swish-betalningar\n\n**Speciella poster:**\n• 🏠 Hyror och lokalkostnader\n• ⚡ El, vatten, internet\n• 📞 Telefon och IT-tjänster\n• 🚗 Bilkostnader och transport\n\nVilken typ av kvitto eller transaktion vill du börja med?",
+      suggestions: [
+        "Visa mig kvittoanalys",
+        "Hur fungerar BAS-kontoplanen?",
+        "Kom igång nu!"
+      ]
     }
   ];
 
@@ -265,8 +274,25 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
           </div>
         </ScrollArea>
 
+        {/* Action Button */}
+        {!isTyping && messages.length === 1 && (
+          <div className="p-4 border-t border-border flex-shrink-0">
+            <Button
+              variant="default"
+              size={isMobile ? "default" : "sm"}
+              onClick={() => handleSuggestionClick("Vad kan du bokföra åt mig?")}
+              className={cn(
+                isMobile ? "text-sm min-h-[44px] px-4" : "text-xs",
+                "w-full touch-manipulation"
+              )}
+            >
+              Vad jag kan bokföra åt dig?
+            </Button>
+          </div>
+        )}
+
         {/* Suggestions */}
-        {!isTyping && (
+        {!isTyping && messages.length > 1 && (
           <div className="p-4 border-t border-border flex-shrink-0">
             <div className="flex flex-wrap gap-2">
               {getCurrentSuggestions().map((suggestion, index) => (
