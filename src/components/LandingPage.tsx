@@ -1,15 +1,26 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Bot, Check, Receipt, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import heroImage from "@/assets/hero-image.jpg";
+import DemoChat from "@/components/DemoChat";
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [showDemo, setShowDemo] = useState(false);
 
   const handleGetStarted = () => {
     navigate("/auth");
+  };
+
+  const handleShowDemo = () => {
+    setShowDemo(true);
+  };
+
+  const handleCloseDemo = () => {
+    setShowDemo(false);
   };
 
   const features = [
@@ -117,7 +128,12 @@ const LandingPage = () => {
                 >
                   Börja gratis idag
                 </Button>
-                <Button variant="outline" size="lg" className="text-lg px-8 py-6">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="text-lg px-8 py-6"
+                  onClick={handleShowDemo}
+                >
                   Se hur det fungerar
                 </Button>
               </div>
@@ -135,20 +151,26 @@ const LandingPage = () => {
             </div>
 
             <div className="relative">
-              <img 
-                src={heroImage} 
-                alt="Air Ledger Dashboard" 
-                className="rounded-2xl shadow-2xl"
-              />
-              <div className="absolute -bottom-6 -left-6 bg-background border rounded-xl p-4 shadow-lg">
-                <div className="flex items-center gap-3">
-                  <Bot className="w-8 h-8 text-primary" />
-                  <div>
-                    <p className="font-semibold text-sm">AI-assistent</p>
-                    <p className="text-xs text-muted-foreground">Alltid redo att hjälpa</p>
+              {showDemo ? (
+                <DemoChat onClose={handleCloseDemo} />
+              ) : (
+                <>
+                  <img 
+                    src={heroImage} 
+                    alt="Air Ledger Dashboard" 
+                    className="rounded-2xl shadow-2xl"
+                  />
+                  <div className="absolute -bottom-6 -left-6 bg-background border rounded-xl p-4 shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <Bot className="w-8 h-8 text-primary" />
+                      <div>
+                        <p className="font-semibold text-sm">AI-assistent</p>
+                        <p className="text-xs text-muted-foreground">Alltid redo att hjälpa</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -187,7 +209,7 @@ const LandingPage = () => {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-20 px-6">
+      <section className="py-20 px-6" data-section="pricing">
         <div className="max-w-4xl mx-auto">
           <div className="text-center space-y-4 mb-16">
             <h2 className="text-3xl lg:text-4xl font-bold">
