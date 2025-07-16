@@ -76,9 +76,81 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
       trigger: "Vad kan du bokföra åt mig?",
       aiResponse: "Jag kan hjälpa dig bokföra massa olika saker! 💼\n\n**Kvitton & Fakturor:**\n• 📸 Fotografera kvitton - jag läser allt automatiskt\n• 📄 Leverantörsfakturor\n• 🧾 Inköpskvitton från butiker\n• ⛽ Bensinkvitton och reseräkningar\n\n**Olika transaktioner:**\n• 💳 Bankbetalningar\n• 💰 Kontantköp  \n• 🏦 Överföringar mellan konton\n• 📱 Swish-betalningar\n\n**Speciella poster:**\n• 🏠 Hyror och lokalkostnader\n• ⚡ El, vatten, internet\n• 📞 Telefon och IT-tjänster\n• 🚗 Bilkostnader och transport\n\nVilken typ av kvitto eller transaktion vill du börja med?",
       suggestions: [
-        "Visa mig kvittoanalys",
+        "Visa mig kvittoanalys!",
         "Hur fungerar BAS-kontoplanen?",
         "Kom igång nu!"
+      ]
+    },
+    {
+      trigger: "Vilka kvitton kan du läsa?",
+      aiResponse: "Jag kan läsa nästan alla typer av kvitton! 👀\n\n**Butiker & Restauranger:**\n• ICA, Coop, Willys - alla matvarukedjor\n• McDonald's, Max, lokala restauranger\n• Apoteket, systembolaget, bensinstationer\n\n**Teknik & Utrustning:**\n• MediaMarkt, Elgiganten, NetOnNet\n• Apple Store, Samsung, mobilbutiker\n• Webhallen, Komplett, IT-återförsäljare\n\n**Tjänster & Online:**\n• Taxi, Uber, kollektivtrafik\n• Amazon, Zalando, online-shopping\n• SaaS-tjänster, webbhotell, domäner\n\n**Speciella kvitton:**\n• Handskrivna kvitton (ibland)\n• Utländska kvitton (med översättning)\n• PDF-fakturor och e-kvitton\n\nJu tydligare kvittot är, desto bättre läser jag det! 📸✨",
+      suggestions: [
+        "Vad händer med moms?",
+        "Kan du hantera utländska kvitton?",
+        "Berätta mer om BAS-kontoplanen"
+      ]
+    },
+    {
+      trigger: "Vad händer med moms?",
+      aiResponse: "Moms hanterar jag automatiskt! 🧮\n\n**Vad jag gör:**\n• **Identifierar momssatsen** från kvittot (25%, 12%, 6%, 0%)\n• **Delar upp beloppet** i netto + moms\n• **Väljer rätt momskonto** automatiskt\n• **Hanterar avdragsgill moms** för företag\n\n**Exempel från ICA-kvitto på 250kr:**\n```\nMat & dryck: 200kr (netto)\nMoms 25%: 50kr\nTotalt: 250kr\n```\n\n**Bokförs som:**\n• 200kr → 6420 (Representation, ej avdragsgill)\n• 50kr → 2645 (Ingående moms 25%, ej avdragsgill)\n\n**Smart momsuträkning** - inget mer huvudräkning! 🎯",
+      suggestions: [
+        "Vad händer vid 0% moms?",
+        "Berätta mer om BAS-kontoplanen",
+        "Visa mig kvittoanalys!"
+      ]
+    },
+    {
+      trigger: "Berätta mer om BAS-kontoplanen",
+      aiResponse: "BAS är bokföringsstandarden i Sverige! 📚\n\n**Viktiga kontotyper:**\n\n**Tillgångar (1000-1999):**\n• 1910 - Kassa\n• 1930 - Bankkonto\n• 1510 - Kundfordringar\n\n**Skulder (2000-2999):**\n• 2440 - Leverantörsskulder\n• 2641 - Ingående moms 25%\n• 2611 - Utgående moms 25%\n\n**Kostnader (4000-7999):**\n• 6110 - Kontorsmaterial\n• 6420 - Representation\n• 7510 - Arbetskläder\n\n**Intäkter (3000-3999):**\n• 3010 - Försäljning varor\n• 3740 - Öres- och kronutjämning\n\nJag känner alla 100+ konton och föreslår alltid rätt! 🎯",
+      suggestions: [
+        "Hur väljer du rätt BAS-konto?",
+        "Kan jag ändra kontoplanen?",
+        "Kom igång nu!"
+      ]
+    },
+    {
+      trigger: "Hur väljer du rätt BAS-konto?",
+      aiResponse: "Jag analyserar kvittot smart och väljer perfekt konto! 🤖\n\n**Min process:**\n1. **Läser leverantören** - \"ICA\" = mat/dryck\n2. **Analyserar produkterna** - \"Papper A4\" = kontorsmaterial\n3. **Kontrollerar sammanhanget** - företagskvitto vs privat\n4. **Matchar mot BAS-regler** - svensk bokföringsstandard\n\n**Exempel:**\n• 📋 **Kontorsmaterial** → 6110\n• 🍕 **Kundmiddag** → 6420 (Representation)\n• ⚡ **Elräkning** → 7390 (El)\n• 🚗 **Bensin** → 6212 (Bränslekostnader)\n• 📱 **Mobilabonnemang** → 6230 (Telefon)\n\n**Osäker?** Jag frågar alltid om du vill ändra! Du har alltid sista ordet. ✅",
+      suggestions: [
+        "Kan jag ändra kontoplanen?",
+        "Vad händer med moms?",
+        "Visa mig kvittoanalys!"
+      ]
+    },
+    {
+      trigger: "Kan jag ändra kontoplanen?",
+      aiResponse: "Ja, du har full kontroll över din kontoplan! ⚙️\n\n**Vad du kan göra:**\n• **Lägga till egna konton** - skapa specialkonton för ditt företag\n• **Döpa om konton** - t.ex. \"6110 Kontorsmaterial\" → \"6110 Papper & pennor\"\n• **Inaktivera konton** du inte använder\n• **Sätta standardkonton** för återkommande leverantörer\n\n**BAS-standarden finns kvar** som grund, men du anpassar efter dina behov!\n\n**Exempel på anpassningar:**\n• Frisörsalong: \"7391 Hårvårdsprodukter\"\n• Restaurang: \"4010 Inköp råvaror\"\n• IT-konsult: \"6214 Utbildning & certifieringar\"\n\n**Smart tipps:** Jag lär mig dina vanor och föreslår dina favoritkonton! 🎯",
+      suggestions: [
+        "Vad kan du bokföra åt mig?",
+        "Kom igång nu!",
+        "Hur fungerar kvittoanalys?"
+      ]
+    },
+    {
+      trigger: "Visa mig kvittoanalys!",
+      aiResponse: "Perfekt! Här ser du hur det funkar i praktiken! 📸\n\n**Steg-för-steg:**\n\n1. **📱 Ta foto** av kvittot (eller ladda upp från galleriet)\n\n2. **🤖 Jag läser automatiskt:**\n   • Datum: 2024-01-15\n   • Leverantör: ICA Maxi\n   • Belopp: 127 kr\n   • Produkter: Kaffe, mjölk\n\n3. **💡 Föreslår bokföring:**\n   • Konto: 6420 (Representation)\n   • Netto: 102 kr\n   • Moms: 25 kr (25%)\n   • Kommentar: \"Kundmöte - kaffe\"\n\n4. **✅ Du bekräftar** (eller ändrar om du vill)\n\n5. **🎉 Klart!** Bokförd på 30 sekunder!\n\nVill du prova på riktigt?",
+      suggestions: [
+        "Kom igång gratis nu!",
+        "Vad händer vid 0% moms?",
+        "Kan du hantera utländska kvitton?"
+      ]
+    },
+    {
+      trigger: "Vad händer vid 0% moms?",
+      aiResponse: "Bra fråga! 0% moms händer oftare än man tror! 📊\n\n**Vanliga 0% moms-fall:**\n• 📚 **Böcker & tidningar** - kulturstöd\n• 🎫 **Kollektivtrafik** - SL-kort, tågbiljetter\n• 💊 **Receptfria mediciner** - vissa apoteksköp\n• 🌍 **EU-handel** - vissa tjänster\n• 🏥 **Vårdtjänster** - läkarbesök, tandläkare\n\n**Så hanterar jag det:**\n• **Identifierar 0% automatiskt** från kvittot\n• **Ingen momspost** skapas (såklart!)\n• **Hela beloppet** på kostnadskontot\n• **Speciell markering** \"Momsfritt köp\"\n\n**Exempel - SL-månadskort 970kr:**\n• 970kr → 6250 (Kollektivtrafik)\n• 0kr moms → ingen momspost\n\nIngen moms att krångla med! 🎉",
+      suggestions: [
+        "Kan du hantera utländska kvitton?",
+        "Berätta mer om BAS-kontoplanen",
+        "Kom igång nu!"
+      ]
+    },
+    {
+      trigger: "Kan du hantera utländska kvitton?",
+      aiResponse: "Ja! Jag klarar kvitton från många länder! 🌍\n\n**Länder jag kan läsa:**\n• 🇬🇧 **Storbritannien** - pund → svenska kronor\n• 🇩🇪 **Tyskland** - euro → svenska kronor  \n• 🇺🇸 **USA** - dollar → svenska kronor\n• 🇩🇰 **Danmark/Norge** - danska/norska kronor\n• Och många fler EU-länder!\n\n**Vad jag gör automatiskt:**\n• **Översätter texten** till svenska\n• **Konverterar valutan** (aktuell kurs)\n• **Hanterar utländsk moms** korrekt\n• **Föreslår rätt BAS-konto** på svenska\n\n**Exempel - tysk restaurang:**\n• Original: \"Restaurant Berlin - 45,50 EUR\"\n• Blir: \"Restaurang Berlin - 523 kr\"\n• Konto: 6420 (Representation)\n• Kommentar: \"Affärsresa Tyskland\"\n\nResa utomlands? Inga problem! ✈️",
+      suggestions: [
+        "Vad händer vid 0% moms?",
+        "Kom igång gratis nu!",
+        "Ställ en annan fråga"
       ]
     }
   ];
