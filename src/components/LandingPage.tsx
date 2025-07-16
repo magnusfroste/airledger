@@ -16,7 +16,7 @@ const LandingPage = () => {
     {
       icon: Bot,
       title: "Prata svenska med AI:n",
-      description: "Enkelt och praktiskt - tala naturligt på svenska med din bokföringsassistent. Ingen krånglig inmatning."
+      description: "Enkelt och praktiskt - tala naturligt på Svenska med Air, din bokföringsassistent. Ingen krånglig inmatning."
     },
     {
       icon: Receipt,
@@ -26,7 +26,7 @@ const LandingPage = () => {
     {
       icon: BarChart3,
       title: "BAS-kontoplanen",
-      description: "Byggd för svenska företag med korrekt kontoplan från början"
+      description: "Byggd för Svenska företag med korrekt kontoplan från början"
     }
   ];
 
