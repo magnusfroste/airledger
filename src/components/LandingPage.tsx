@@ -1,15 +1,22 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Bot, Check, Receipt, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import heroImage from "@/assets/hero-image.jpg";
+import DemoChat from "@/components/DemoChat";
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [showDemo, setShowDemo] = useState(false);
 
   const handleGetStarted = () => {
     navigate("/auth");
+  };
+
+  const handleDemo = () => {
+    setShowDemo(true);
   };
 
   const features = [
@@ -117,7 +124,12 @@ const LandingPage = () => {
                 >
                   Börja gratis idag
                 </Button>
-                <Button variant="outline" size="lg" className="text-lg px-8 py-6">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="text-lg px-8 py-6"
+                  onClick={handleDemo}
+                >
                   Se hur det fungerar
                 </Button>
               </div>
@@ -266,6 +278,11 @@ const LandingPage = () => {
           <p>© 2025 AirLedger. Underlättar för Svenska småföretagare.</p>
         </div>
       </footer>
+
+      {/* Demo Chat Modal */}
+      {showDemo && (
+        <DemoChat onClose={() => setShowDemo(false)} />
+      )}
     </div>
   );
 };
