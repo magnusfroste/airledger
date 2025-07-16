@@ -74,7 +74,7 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
     },
     {
       trigger: "Vad kan du bokföra åt mig?",
-      aiResponse: "Jag kan hjälpa dig bokföra massa olika saker! 💼\n\n**Kvitton & Fakturor:**\n• 📸 Fotografera kvitton - jag läser allt automatiskt\n• 📄 Leverantörsfakturor\n• 🧾 Inköpskvitton från butiker\n• ⛽ Bensinkvitton och reseräkningar\n\n**Olika transaktioner:**\n• 💳 Bankbetalningar\n• 💰 Kontantköp  \n• 🏦 Överföringar mellan konton\n• 📱 Swish-betalningar\n\n**Speciella poster:**\n• 🏠 Hyror och lokalkostnader\n• ⚡ El, vatten, internet\n• 📞 Telefon och IT-tjänster\n• 🚗 Bilkostnader och transport\n\nVilken typ av kvitto eller transaktion vill du börja med?",
+      aiResponse: "Jag kan hjälpa dig bokföra massa olika saker! 💼\n\n**Kvitton & Fakturor:**\n• 📸 Fotografera kvitton - jag läser allt automatiskt\n• 📄 Leverantörsfakturor\n• 🧾 Inköpskvitton från butiker\n• ⛽ Bensinkvitton och reseräkningar\n• 📋 **Utställda fakturor** - bokför automatiskt när du säger till\n\n**Olika transaktioner:**\n• 💳 Bankbetalningar\n• 💰 Kontantköp  \n• 🏦 Överföringar mellan konton\n• 📱 Swish-betalningar\n• 💸 **Fakturabetalningar** - kontera när kunden betalar\n\n**Speciella poster:**\n• 🏠 Hyror och lokalkostnader\n• ⚡ El, vatten, internet\n• 📞 Telefon och IT-tjänster\n• 🚗 Bilkostnader och transport\n\n**Smart fakturahantering:**\nSäg bara \"Jag har fått betalt för faktura 123\" så konterar jag automatiskt från kundreskontra till bankkonto! 🎯\n\nVilken typ av kvitto eller transaktion vill du börja med?",
       suggestions: [
         "Visa mig kvittoanalys!",
         "Hur fungerar BAS-kontoplanen?",
