@@ -261,7 +261,7 @@ const Dashboard = () => {
       <DashboardHeader greeting={greeting} userName={userName} />
 
       {/* Main Content with Tabs */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-8 pb-20 sm:pb-6">
         {/* Quota Warning */}
         {subscription && (
           <div className="mb-6">
