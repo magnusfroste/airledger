@@ -16,13 +16,13 @@ const DashboardHeader = ({ greeting, userName }: DashboardHeaderProps) => {
             <h1 className="text-2xl font-semibold text-gray-900">
               {greeting}, {userName}! 👋
             </h1>
-            <p className="text-gray-600 mt-1">Här är din ekonomiska översikt</p>
+            <p className="text-gray-600 mt-1">Din översikt</p>
           </div>
           <div className="flex items-center space-x-3">
             <Button asChild>
               <Link to="/chat">
                 <Bot className="h-4 w-4 mr-2" />
-                Bokföringsassistent
+                Jag är Air, din assistent
               </Link>
             </Button>
           </div>
