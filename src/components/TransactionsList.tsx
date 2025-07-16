@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Receipt, FileText, ChevronRight, Calendar, Building, Trash2, Edit, Download, Upload, FileSpreadsheet, Image } from "lucide-react";
+import { Search, Receipt, FileText, ChevronRight, Calendar, Building, Trash2, Edit, Download, Upload, FileSpreadsheet, Image, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -48,6 +48,7 @@ const TransactionsList = () => {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importLoading, setImportLoading] = useState(false);
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
   
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -499,24 +500,29 @@ const TransactionsList = () => {
               <h1 className={`font-semibold text-gray-900 ${isMobile ? 'text-2xl' : 'text-3xl'}`}>Transaktioner</h1>
               <p className="text-gray-600 mt-1">{filteredTransactions.length} transaktioner</p>
             </div>
-            <div className={`flex items-center ${isMobile ? 'flex-col space-y-2 w-full' : 'space-x-3'}`}>
+            <div className={`flex items-center ${isMobile ? 'flex-row space-x-2 w-full justify-end' : 'space-x-3'}`}>
               {/* Export Button */}
               <Button 
                 onClick={handleExportCSV} 
                 variant="outline" 
-                className={`gap-2 ${isMobile ? 'w-full' : ''}`}
+                size="sm"
+                className="p-2"
                 disabled={transactions.length === 0}
+                title="Exportera transaktioner som CSV"
               >
                 <Download className="h-4 w-4" />
-                {isMobile ? 'Exportera' : 'Exportera CSV'}
               </Button>
               
               {/* Import Dialog */}
               <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className={`gap-2 ${isMobile ? 'w-full' : ''}`}>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="p-2"
+                    title="Importera transaktioner från CSV"
+                  >
                     <Upload className="h-4 w-4" />
-                    {isMobile ? 'Importera' : 'Importera CSV'}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-6xl">
@@ -610,6 +616,89 @@ const TransactionsList = () => {
                       }}>
                         Avbryt
                       </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              
+              {/* Info Button */}
+              <Dialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="p-2"
+                    title="Information om transaktioner"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Info className="h-5 w-5" />
+                      Transaktioner - Hjälp
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                          <Download className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Exportera CSV</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Exportera alla dina transaktioner och bokföringsposter till en CSV-fil. 
+                            Filen innehåller datum, beskrivning, kontokoder, debet/kredit-belopp och mer.
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-green-100 rounded-lg">
+                          <Upload className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Importera CSV</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Importera transaktioner från en CSV-fil. Filen måste innehålla kolumnerna: 
+                            transaction_date, description, transaction_type, account_code, account_name, 
+                            debit_amount, credit_amount. Systemet validerar alla rader innan import.
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                          <FileSpreadsheet className="h-4 w-4 text-purple-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Ladda ner mall</h4>
+                          <p className="text-sm text-muted-foreground">
+                            För att skapa en egen CSV-fil, exportera först några befintliga transaktioner 
+                            för att få rätt format. Du kan också använda chatt-funktionen för att lägga 
+                            till transaktioner enkelt.
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-orange-100 rounded-lg">
+                          <Receipt className="h-4 w-4 text-orange-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Lägga till transaktioner</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Du kan lägga till transaktioner på flera sätt:
+                          </p>
+                          <ul className="text-sm text-muted-foreground mt-2 space-y-1">
+                            <li>• Använd chatt-funktionen och berätta vad du gjort</li>
+                            <li>• Fotografera eller ladda upp kvitton för automatisk analys</li>
+                            <li>• Importera från CSV-fil med flera transaktioner</li>
+                          </ul>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </DialogContent>
