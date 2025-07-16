@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Receipt, FileText, ChevronRight, Calendar, Building, Trash2, Edit, Download, Upload, FileSpreadsheet, Image } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import TransactionEditDialog from "./TransactionEditDialog";
 import ReceiptThumbnail from "./ReceiptThumbnail";
 
@@ -49,6 +50,7 @@ const TransactionsList = () => {
   const [importLoading, setImportLoading] = useState(false);
   
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchTransactions();
@@ -491,30 +493,30 @@ const TransactionsList = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold text-gray-900">Transaktioner</h1>
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-8">
+          <div className={`flex items-center justify-between ${isMobile ? 'flex-col space-y-4' : ''}`}>
+            <div className={isMobile ? 'w-full text-center' : ''}>
+              <h1 className={`font-semibold text-gray-900 ${isMobile ? 'text-2xl' : 'text-3xl'}`}>Transaktioner</h1>
               <p className="text-gray-600 mt-1">{filteredTransactions.length} transaktioner</p>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className={`flex items-center ${isMobile ? 'flex-col space-y-2 w-full' : 'space-x-3'}`}>
               {/* Export Button */}
               <Button 
                 onClick={handleExportCSV} 
                 variant="outline" 
-                className="gap-2"
+                className={`gap-2 ${isMobile ? 'w-full' : ''}`}
                 disabled={transactions.length === 0}
               >
                 <Download className="h-4 w-4" />
-                Exportera CSV
+                {isMobile ? 'Exportera' : 'Exportera CSV'}
               </Button>
               
               {/* Import Dialog */}
               <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" className={`gap-2 ${isMobile ? 'w-full' : ''}`}>
                     <Upload className="h-4 w-4" />
-                    Importera CSV
+                    {isMobile ? 'Importera' : 'Importera CSV'}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-6xl">
@@ -618,10 +620,10 @@ const TransactionsList = () => {
       </div>
 
       {/* Filters */}
-      <div className="max-w-6xl mx-auto px-6 py-6">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center space-x-4">
-            <div className="relative flex-1 max-w-md">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Sök transaktioner..."
@@ -635,23 +637,26 @@ const TransactionsList = () => {
       </div>
 
       {/* Transactions List */}
-      <div className="max-w-6xl mx-auto px-6 pb-8">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 pb-8">
         <div className="space-y-4">
           {filteredTransactions.map((transaction) => (
             <Card key={transaction.id} className="bg-white border border-gray-200 hover:shadow-md transition-shadow">
               <CardContent className="p-0">
                 <div
-                  className="p-6 cursor-pointer"
+                  className={`cursor-pointer ${isMobile ? 'p-4' : 'p-6'}`}
                   onClick={() => setExpandedTransaction(
                     expandedTransaction === transaction.id ? null : transaction.id
                   )}
                 >
-                  <div className="flex items-center justify-between">
-                     <div className="flex items-center space-x-4">
-                       {getTransactionIcon(transaction)}
+                  <div className={`flex items-center justify-between ${isMobile ? 'flex-col space-y-3' : ''}`}>
+                     <div className={`flex items-center ${isMobile ? 'w-full' : 'space-x-4'}`}>
+                       {!isMobile && getTransactionIcon(transaction)}
                        <div className="flex-1">
-                         <div className="flex items-center gap-2">
-                           <h3 className="font-medium text-gray-900">{transaction.description}</h3>
+                         <div className={`flex items-center gap-2 ${isMobile ? 'justify-between' : ''}`}>
+                           <div className="flex items-center gap-2">
+                             {isMobile && getTransactionIcon(transaction)}
+                             <h3 className={`font-medium text-gray-900 ${isMobile ? 'text-sm' : ''}`}>{transaction.description}</h3>
+                           </div>
                            {(transaction.image_metadata || transaction.image_url) && (
                              <ReceiptThumbnail
                                imagePath={transaction.image_metadata?.storagePath || transaction.image_url}
@@ -663,106 +668,139 @@ const TransactionsList = () => {
                              />
                            )}
                          </div>
-                         <div className="flex items-center space-x-4 mt-1">
-                           <span className="text-sm text-gray-500">{formatDate(transaction.transaction_date)}</span>
-                           {transaction.analysis_data?.vendor && (
-                             <span className="text-sm text-gray-500">• {transaction.analysis_data.vendor}</span>
+                         <div className={`flex items-center mt-1 ${isMobile ? 'justify-between' : 'space-x-4'}`}>
+                           <div className="flex items-center space-x-2">
+                             <span className="text-sm text-gray-500">{formatDate(transaction.transaction_date)}</span>
+                             {transaction.analysis_data?.vendor && !isMobile && (
+                               <span className="text-sm text-gray-500">• {transaction.analysis_data.vendor}</span>
+                             )}
+                           </div>
+                           {isMobile && (
+                             <span className={`text-lg font-semibold ${
+                               transaction.transaction_type === 'income' ? 'text-green-600' : 'text-gray-900'
+                             }`}>
+                               {transaction.transaction_type === 'income' ? '+' : ''}
+                               {formatAmount(transaction.total_amount)}
+                             </span>
                            )}
                          </div>
+                         {isMobile && transaction.analysis_data?.vendor && (
+                           <div className="mt-1">
+                             <span className="text-sm text-gray-500">{transaction.analysis_data.vendor}</span>
+                           </div>
+                         )}
+                       </div>
+                      </div>
+                     
+                     <div className={`flex items-center ${isMobile ? 'w-full justify-between' : 'space-x-4'}`}>
+                       {!isMobile && (
+                         <span className={`text-lg font-semibold ${
+                           transaction.transaction_type === 'income' ? 'text-green-600' : 'text-gray-900'
+                         }`}>
+                           {transaction.transaction_type === 'income' ? '+' : ''}
+                           {formatAmount(transaction.total_amount)}
+                         </span>
+                       )}
+                       <div className="flex items-center space-x-2">
+                         <Button
+                           variant="ghost"
+                           size={isMobile ? "sm" : "sm"}
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             setEditingTransaction(transaction);
+                           }}
+                           className={`text-blue-600 hover:text-blue-700 hover:bg-blue-50 ${isMobile ? 'p-2' : ''}`}
+                         >
+                           <Edit className="h-4 w-4" />
+                         </Button>
+                         <Button
+                           variant="ghost"
+                           size={isMobile ? "sm" : "sm"}
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             deleteTransaction(transaction.id);
+                           }}
+                           className={`text-red-600 hover:text-red-700 hover:bg-red-50 ${isMobile ? 'p-2' : ''}`}
+                         >
+                           <Trash2 className="h-4 w-4" />
+                         </Button>
+                         <ChevronRight className={`h-5 w-5 text-gray-400 transition-transform ${
+                           expandedTransaction === transaction.id ? 'rotate-90' : ''
+                         }`} />
                        </div>
                      </div>
-                    
-                    <div className="flex items-center space-x-4">
-                      <span className={`text-lg font-semibold ${
-                        transaction.transaction_type === 'income' ? 'text-green-600' : 'text-gray-900'
-                      }`}>
-                        {transaction.transaction_type === 'income' ? '+' : ''}
-                        {formatAmount(transaction.total_amount)}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTransaction(transaction);
-                        }}
-                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteTransaction(transaction.id);
-                        }}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      <ChevronRight className={`h-5 w-5 text-gray-400 transition-transform ${
-                        expandedTransaction === transaction.id ? 'rotate-90' : ''
-                      }`} />
-                    </div>
                   </div>
                 </div>
 
                  {/* Expanded Content - Accounting Entries */}
                 {expandedTransaction === transaction.id && transaction.entries.length > 0 && (
                   <div className="border-t border-gray-100 bg-gray-50">
-                    <div className="p-6">
+                    <div className={isMobile ? 'p-4' : 'p-6'}>
                       {/* Image thumbnail if available */}
                       {(transaction.image_metadata || transaction.image_url) && (
-                        <div className="mb-6">
-                          <h4 className="font-medium text-gray-900 mb-3">Bifogad bild</h4>
+                        <div className={isMobile ? 'mb-4' : 'mb-6'}>
+                          <h4 className={`font-medium text-gray-900 mb-3 ${isMobile ? 'text-sm' : ''}`}>Bifogad bild</h4>
                           <div className="w-fit">
                             <ReceiptThumbnail
                               imagePath={transaction.image_metadata?.storagePath || transaction.image_url}
                               thumbnailPath={transaction.image_metadata?.thumbnailPath}
                               metadata={transaction.image_metadata}
                               analysis={transaction.analysis_data}
-                              compact={false}
-                              showActions={true}
+                              compact={isMobile}
+                              showActions={!isMobile}
                             />
                           </div>
                         </div>
                       )}
                       
-                      <h4 className="font-medium text-gray-900 mb-4">Kontering</h4>
-                      <div className="space-y-3">
+                      <h4 className={`font-medium text-gray-900 mb-4 ${isMobile ? 'text-sm' : ''}`}>Kontering</h4>
+                      <div className={isMobile ? 'space-y-2' : 'space-y-3'}>
                         {transaction.entries.map((entry) => (
-                          <div key={entry.id} className="flex items-center justify-between py-3 px-4 bg-white rounded-lg border border-gray-200">
-                            <div className="flex items-center space-x-4">
-                              <div className="w-12 h-8 bg-blue-100 rounded-md flex items-center justify-center">
-                                <span className="text-xs font-medium text-blue-800">{entry.account_code}</span>
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-900">{entry.account_name}</p>
-                                <p className="text-sm text-gray-500">{entry.description}</p>
-                              </div>
-                            </div>
-                            
-                            <div className="text-right">
-                              {entry.debit_amount > 0 && (
-                                <div className="text-sm">
-                                  <span className="text-gray-500">Debet:</span>
-                                  <span className="font-medium text-gray-900 ml-2">{formatAmount(entry.debit_amount)}</span>
+                          <div key={entry.id} className={`bg-white rounded-lg border border-gray-200 ${
+                            isMobile ? 'p-3' : 'py-3 px-4'
+                          }`}>
+                            <div className={`flex ${isMobile ? 'flex-col space-y-2' : 'items-center justify-between'}`}>
+                              <div className={`flex items-center ${isMobile ? 'space-x-2' : 'space-x-4'}`}>
+                                <div className={`bg-blue-100 rounded-md flex items-center justify-center ${
+                                  isMobile ? 'w-10 h-6' : 'w-12 h-8'
+                                }`}>
+                                  <span className={`font-medium text-blue-800 ${isMobile ? 'text-xs' : 'text-xs'}`}>
+                                    {entry.account_code}
+                                  </span>
                                 </div>
-                              )}
-                              {entry.credit_amount > 0 && (
-                                <div className="text-sm">
-                                  <span className="text-gray-500">Kredit:</span>
-                                  <span className="font-medium text-gray-900 ml-2">{formatAmount(entry.credit_amount)}</span>
+                                <div className="flex-1">
+                                  <p className={`font-medium text-gray-900 ${isMobile ? 'text-sm' : ''}`}>
+                                    {entry.account_name}
+                                  </p>
+                                  {entry.description && (
+                                    <p className={`text-gray-500 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                                      {entry.description}
+                                    </p>
+                                  )}
                                 </div>
-                              )}
+                              </div>
+                              
+                              <div className={`${isMobile ? 'flex justify-between text-sm' : 'text-right'}`}>
+                                {entry.debit_amount > 0 && (
+                                  <div className={isMobile ? 'text-sm' : 'text-sm'}>
+                                    <span className="text-gray-500">Debet:</span>
+                                    <span className="font-medium text-gray-900 ml-2">{formatAmount(entry.debit_amount)}</span>
+                                  </div>
+                                )}
+                                {entry.credit_amount > 0 && (
+                                  <div className={isMobile ? 'text-sm' : 'text-sm'}>
+                                    <span className="text-gray-500">Kredit:</span>
+                                    <span className="font-medium text-gray-900 ml-2">{formatAmount(entry.credit_amount)}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                       
                       {/* Balance Check */}
-                      <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                      <div className={`mt-4 p-4 bg-blue-50 rounded-lg ${isMobile ? 'text-sm' : ''}`}>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Total Debet:</span>
                           <span className="font-medium">
