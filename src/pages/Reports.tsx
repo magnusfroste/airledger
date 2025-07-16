@@ -60,7 +60,7 @@ const Reports = () => {
           break;
       }
 
-      // Fetch all entries for the period
+      // Fetch all entries for the period - using created_at like Dashboard
       const { data: entries, error } = await supabase
         .from('airledger_entries')
         .select(`
@@ -68,14 +68,14 @@ const Reports = () => {
           account_name,
           debit_amount,
           credit_amount,
+          created_at,
           airledger_transactions!inner(
-            user_id,
-            transaction_date
+            user_id
           )
         `)
         .eq('airledger_transactions.user_id', user.id)
-        .gte('airledger_transactions.transaction_date', startDate.toISOString().split('T')[0])
-        .lte('airledger_transactions.transaction_date', endDate.toISOString().split('T')[0]);
+        .gte('created_at', startDate.toISOString().split('T')[0])
+        .lte('created_at', endDate.toISOString().split('T')[0]);
 
       if (error) {
         throw error;
