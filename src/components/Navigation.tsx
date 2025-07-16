@@ -80,7 +80,7 @@ const Navigation = () => {
     },
     { 
       href: "/chat", 
-      label: "Assistent", 
+      label: "Air", 
       icon: Bot,
       badge: null
     },
