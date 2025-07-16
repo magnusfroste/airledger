@@ -22,18 +22,18 @@ const LandingPage = () => {
   const features = [
     {
       icon: Bot,
-      title: "Prata svenska med AI:n",
-      description: "Enkelt och praktiskt - tala naturligt på svenska med din bokföringsassistent. Ingen krånglig inmatning."
+      title: "Prata Svenska",
+      description: "Enkelt och praktiskt - tala naturligt på Svenska, ingen krånglig inmatning."
     },
     {
       icon: Receipt,
       title: "Automatisk kvittoanalys",
-      description: "Fotografera kvitton - AI:n sköter resten av bokföringen"
+      description: "Fotografera kvitton - Assistenten sköter resten av bokföringen"
     },
     {
       icon: BarChart3,
       title: "BAS-kontoplanen",
-      description: "Byggd för svenska företag med korrekt kontoplan från början"
+      description: "Byggd för Svenska företag med korrekt kontoplan från början"
     }
   ];
 
@@ -112,7 +112,7 @@ const LandingPage = () => {
                   <span className="text-primary block">förstår dig</span>
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-lg">
-                  Tala med din AI-assistent på ren svenska - enkelt och praktiskt. Fotografera kvitton, ställ frågor naturligt - enklare kan det inte vara.
+                  Tala med din 24/7 bokföringsassistent på ren Svenska - enkelt och praktiskt. Fotografera kvitton, ställ frågor naturligt - enklare kan det inte vara.
                 </p>
               </div>
               
@@ -174,7 +174,7 @@ const LandingPage = () => {
               Bokföring som faktiskt fungerar
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Skapad för Svenska småföretagare, Air assistenten förstår BAS-kontoplanen och Svensk bokföring
+              Skapad för Svenska småföretagare, en assistent som förstår BAS-kontoplanen och Svensk bokföring
             </p>
           </div>
 
