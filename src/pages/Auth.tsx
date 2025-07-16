@@ -132,7 +132,7 @@ const Auth = () => {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground font-bold text-xl mx-auto mb-4">
             AL
           </div>
-          <h1 className="text-2xl font-semibold text-foreground">Air Ledger</h1>
+          <h1 className="text-2xl font-semibold text-foreground">AirLedger</h1>
           <p className="text-muted-foreground mt-2">AI-driven bokföring för småföretag</p>
         </div>
 

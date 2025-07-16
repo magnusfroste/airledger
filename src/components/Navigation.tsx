@@ -198,7 +198,7 @@ const Navigation = () => {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-xs">
               AL
             </div>
-            <h1 className="text-base font-medium text-foreground">Air Ledger</h1>
+            <h1 className="text-base font-medium text-foreground">AirLedger</h1>
           </div>
           
           <div className="flex items-center gap-2">

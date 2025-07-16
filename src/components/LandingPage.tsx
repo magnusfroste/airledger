@@ -82,7 +82,7 @@ const LandingPage = () => {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">AL</span>
             </div>
-            <span className="text-xl font-semibold">Air Ledger</span>
+            <span className="text-xl font-semibold">AirLedger</span>
           </div>
           <Button onClick={handleGetStarted} variant="default">
             Kom igång gratis
@@ -263,7 +263,7 @@ const LandingPage = () => {
       {/* Footer */}
       <footer className="py-8 px-6 border-t bg-background">
         <div className="max-w-6xl mx-auto text-center text-muted-foreground">
-          <p>© 2024 Air Ledger. Byggd för svenska småföretag.</p>
+          <p>© 2024 AirLedger. Byggd för svenska småföretag.</p>
         </div>
       </footer>
     </div>
