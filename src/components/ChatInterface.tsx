@@ -103,6 +103,7 @@ const ChatInterface = () => {
   // Send message handler
   const handleSendMessage = async () => {
     if (!inputValue.trim() && pendingImages.length === 0) return;
+    if (isLoading) return; // Prevent duplicate calls while loading
     
     // Upload images to permanent storage if any
     let uploadedImages: any[] = [];

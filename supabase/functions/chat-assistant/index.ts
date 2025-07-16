@@ -226,7 +226,7 @@ ${bookkeepingContext}`
     console.log('OpenAI response received')
     console.log('Tool calls:', response.choices[0].message.tool_calls?.length || 0)
 
-    let aiResponse = response.choices[0].message.content
+    let aiResponse = response.choices[0].message.content || ""
     const toolCalls = response.choices[0].message.tool_calls
 
     // Handle function calls
