@@ -1,33 +1,22 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Bot, Check, Receipt, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import heroImage from "@/assets/hero-image.jpg";
-import DemoChat from "@/components/DemoChat";
 
 const LandingPage = () => {
   const navigate = useNavigate();
-  const [showDemo, setShowDemo] = useState(false);
 
   const handleGetStarted = () => {
     navigate("/auth");
-  };
-
-  const handleShowDemo = () => {
-    setShowDemo(true);
-  };
-
-  const handleCloseDemo = () => {
-    setShowDemo(false);
   };
 
   const features = [
     {
       icon: Bot,
       title: "Prata svenska med AI:n",
-      description: "Enkelt och praktiskt - tala naturligt på Svenska med Air, din bokföringsassistent. Ingen krånglig inmatning."
+      description: "Enkelt och praktiskt - tala naturligt på svenska med din bokföringsassistent. Ingen krånglig inmatning."
     },
     {
       icon: Receipt,
@@ -37,7 +26,7 @@ const LandingPage = () => {
     {
       icon: BarChart3,
       title: "BAS-kontoplanen",
-      description: "Byggd för Svenska företag med korrekt kontoplan från början"
+      description: "Byggd för svenska företag med korrekt kontoplan från början"
     }
   ];
 
@@ -128,12 +117,7 @@ const LandingPage = () => {
                 >
                   Börja gratis idag
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="lg" 
-                  className="text-lg px-8 py-6"
-                  onClick={handleShowDemo}
-                >
+                <Button variant="outline" size="lg" className="text-lg px-8 py-6">
                   Se hur det fungerar
                 </Button>
               </div>
@@ -151,26 +135,20 @@ const LandingPage = () => {
             </div>
 
             <div className="relative">
-              {showDemo ? (
-                <DemoChat onClose={handleCloseDemo} />
-              ) : (
-                <>
-                  <img 
-                    src={heroImage} 
-                    alt="Air Ledger Dashboard" 
-                    className="rounded-2xl shadow-2xl"
-                  />
-                  <div className="absolute -bottom-6 -left-6 bg-background border rounded-xl p-4 shadow-lg">
-                    <div className="flex items-center gap-3">
-                      <Bot className="w-8 h-8 text-primary" />
-                      <div>
-                        <p className="font-semibold text-sm">AI-assistent</p>
-                        <p className="text-xs text-muted-foreground">Alltid redo att hjälpa</p>
-                      </div>
-                    </div>
+              <img 
+                src={heroImage} 
+                alt="AirLedger Dashboard" 
+                className="rounded-2xl shadow-2xl"
+              />
+              <div className="absolute -bottom-6 -left-6 bg-background border rounded-xl p-4 shadow-lg">
+                <div className="flex items-center gap-3">
+                  <Bot className="w-8 h-8 text-primary" />
+                  <div>
+                    <p className="font-semibold text-sm">AI-assistent</p>
+                    <p className="text-xs text-muted-foreground">Alltid redo att hjälpa</p>
                   </div>
-                </>
-              )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -184,7 +162,7 @@ const LandingPage = () => {
               Bokföring som faktiskt fungerar
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Bygg för svenska småföretag med AI som förstår BAS-kontoplanen och svensk bokföring
+              Skapad för Svenska småföretagare, Air assistenten förstår BAS-kontoplanen och Svensk bokföring
             </p>
           </div>
 
@@ -209,7 +187,7 @@ const LandingPage = () => {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-20 px-6" data-section="pricing">
+      <section className="py-20 px-6">
         <div className="max-w-4xl mx-auto">
           <div className="text-center space-y-4 mb-16">
             <h2 className="text-3xl lg:text-4xl font-bold">
