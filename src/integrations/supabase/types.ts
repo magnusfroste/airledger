@@ -1363,6 +1363,41 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_data_history: {
+        Row: {
+          connection_id: string
+          created_at: string
+          id: string
+          location: Json | null
+          odometer_km: number | null
+          poll_time: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          id?: string
+          location?: Json | null
+          odometer_km?: number | null
+          poll_time?: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          id?: string
+          location?: Json | null
+          odometer_km?: number | null
+          poll_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_data_history_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_states: {
         Row: {
           connection_id: string
