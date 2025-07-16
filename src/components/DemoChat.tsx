@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Bot, User, X, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DemoMessage {
   id: string;
@@ -19,6 +21,17 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
   const [isTyping, setIsTyping] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+
+  // Prevent background scroll on mobile when chat is open
+  useEffect(() => {
+    if (isMobile) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = 'unset';
+      };
+    }
+  }, [isMobile]);
 
   const demoSteps = [
     {
@@ -157,25 +170,42 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
   };
 
   return (
-    <div className="relative bg-background border border-border rounded-2xl shadow-2xl h-[600px] flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <Bot className="w-5 h-5 text-primary-foreground" />
+    <>
+      {/* Mobile Overlay */}
+      {isMobile && (
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
+      )}
+      
+      <div className={cn(
+        "relative bg-background border border-border shadow-2xl flex flex-col",
+        isMobile 
+          ? "fixed inset-4 z-50 rounded-2xl max-h-[calc(100vh-2rem)]" 
+          : "rounded-2xl h-[600px]"
+      )}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+              <Bot className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Air - Din AI-assistent</h3>
+              <p className="text-xs text-muted-foreground">Demo-läge</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold">Air - Din AI-assistent</h3>
-            <p className="text-xs text-muted-foreground">Demo-läge</p>
-          </div>
+          <Button 
+            variant="ghost" 
+            size={isMobile ? "default" : "sm"} 
+            onClick={onClose}
+            className={isMobile ? "h-10 w-10 p-0" : ""}
+          >
+            <X className={isMobile ? "w-5 h-5" : "w-4 h-4"} />
+          </Button>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          <X className="w-4 h-4" />
-        </Button>
-      </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Messages */}
+        <ScrollArea className="flex-1 p-4">
+          <div className="space-y-4">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -223,29 +253,34 @@ const DemoChat = ({ onClose }: DemoChatProps) => {
             </div>
           </div>
         )}
-        
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Suggestions */}
-      {!isTyping && (
-        <div className="p-4 border-t border-border">
-          <div className="flex flex-wrap gap-2">
-            {getCurrentSuggestions().map((suggestion, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                size="sm"
-                onClick={() => handleSuggestionClick(suggestion)}
-                className="text-xs"
-              >
-                {suggestion}
-              </Button>
-            ))}
+            
+            <div ref={messagesEndRef} />
           </div>
-        </div>
-      )}
-    </div>
+        </ScrollArea>
+
+        {/* Suggestions */}
+        {!isTyping && (
+          <div className="p-4 border-t border-border flex-shrink-0">
+            <div className="flex flex-wrap gap-2">
+              {getCurrentSuggestions().map((suggestion, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size={isMobile ? "default" : "sm"}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className={cn(
+                    isMobile ? "text-sm min-h-[44px] px-4" : "text-xs",
+                    "touch-manipulation"
+                  )}
+                >
+                  {suggestion}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 
