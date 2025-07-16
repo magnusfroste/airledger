@@ -32,8 +32,8 @@ const LandingPage = () => {
     },
     {
       icon: BarChart3,
-      title: "BAS-kontoplanen",
-      description: "Byggd för Svenska företag med korrekt kontoplan från början"
+      title: "Finansiell Översikt",
+      description: "En bra ekonomisk översikt, resultat och balansrapporter och huvudbok samt ingående balans."
     }
   ];
 
