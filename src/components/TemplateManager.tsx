@@ -21,7 +21,13 @@ import {
   Shield,
   Crown,
   Search,
-  Trash2
+  Trash2,
+  Download,
+  Upload,
+  CheckCircle,
+  AlertTriangle,
+  FileDown,
+  FileUp
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +68,10 @@ const TemplateManager = () => {
   const [isDeveloper, setIsDeveloper] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [importData, setImportData] = useState<any>(null);
+  const [validationResults, setValidationResults] = useState<any>(null);
 
   // New template form state
   const [newTemplate, setNewTemplate] = useState({
@@ -328,6 +338,129 @@ const TemplateManager = () => {
   // Get unique categories for filter dropdown
   const uniqueCategories = [...new Set(templates.map(t => t.category))].sort();
 
+  // Export/Import functions
+  const exportTemplates = async (exportType: 'selected' | 'system' | 'user' = 'selected') => {
+    try {
+      const templateIds = exportType === 'selected' ? selectedTemplates : undefined;
+      
+      const { data, error } = await supabase.functions.invoke('export-templates', {
+        body: { templateIds, exportType }
+      });
+
+      if (error) throw error;
+
+      // Create and download file
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `airledger-templates-${exportType}-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export slutförd",
+        description: `${data.template_count} mallar exporterade.`,
+      });
+
+      setSelectedTemplates([]);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Exportfel",
+        description: "Kunde inte exportera mallar.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        setImportData(data);
+        setShowImportDialog(true);
+      } catch (error) {
+        toast({
+          title: "Fel filformat",
+          description: "Kunde inte läsa JSON-filen.",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const importTemplates = async (conflictAction: 'skip' | 'overwrite' = 'skip') => {
+    try {
+      const { data, error } = await supabase.functions.invoke('import-templates', {
+        body: { importData, conflictAction }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Import slutförd",
+        description: `${data.imported} mallar importerade. ${data.skipped} hoppades över.`,
+      });
+
+      if (data.warnings && data.warnings.length > 0) {
+        console.warn('Import warnings:', data.warnings);
+      }
+
+      setShowImportDialog(false);
+      setImportData(null);
+      fetchTemplatesAndUsage();
+    } catch (error) {
+      console.error('Import error:', error);
+      toast({
+        title: "Importfel",
+        description: error.message || "Kunde inte importera mallar.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const validateTemplates = async (templateIds?: string[]) => {
+    try {
+      const ids = templateIds || (selectedTemplates.length > 0 ? selectedTemplates : undefined);
+      
+      const { data, error } = await supabase.functions.invoke('validate-templates', {
+        body: { templateIds: ids }
+      });
+
+      if (error) throw error;
+
+      setValidationResults(data);
+      
+      toast({
+        title: "Validering slutförd",
+        description: `${data.summary.total} mallar validerade. ${data.summary.errors} fel, ${data.summary.warnings} varningar.`,
+      });
+    } catch (error) {
+      console.error('Validation error:', error);
+      toast({
+        title: "Valideringsfel",
+        description: "Kunde inte validera mallar.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleTemplateSelection = (templateId: string) => {
+    setSelectedTemplates(prev => 
+      prev.includes(templateId) 
+        ? prev.filter(id => id !== templateId)
+        : [...prev, templateId]
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -344,31 +477,63 @@ const TemplateManager = () => {
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
-                <FileText className="h-6 w-6" />
-                Transaktionsmallar
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+                  <FileText className="h-6 w-6" />
+                  Transaktionsmallar
+                  {isDeveloper && (
+                    <Badge variant="secondary" className="ml-2 gap-1">
+                      <Crown className="h-3 w-3" />
+                      Utvecklare
+                    </Badge>
+                  )}
+                </h1>
+                <p className="text-gray-600 mt-1">
+                  Hantera och skapa mallar för återkommande transaktioner
+                  {isDeveloper && " • Systemmallar tillgängliga"}
+                </p>
+              </div>
+              <div className="flex gap-2">
                 {isDeveloper && (
-                  <Badge variant="secondary" className="ml-2 gap-1">
-                    <Crown className="h-3 w-3" />
-                    Utvecklare
-                  </Badge>
+                  <>
+                    {selectedTemplates.length > 0 && (
+                      <>
+                        <Button variant="outline" onClick={() => exportTemplates('selected')}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Exportera valda ({selectedTemplates.length})
+                        </Button>
+                        <Button variant="outline" onClick={() => validateTemplates()}>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Validera valda
+                        </Button>
+                      </>
+                    )}
+                    <Button variant="outline" onClick={() => exportTemplates('system')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      Exportera systemmallar
+                    </Button>
+                    <Button variant="outline" onClick={() => document.getElementById('import-file')?.click()}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Importera
+                    </Button>
+                    <input
+                      id="import-file"
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={handleFileImport}
+                    />
+                  </>
                 )}
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Hantera och skapa mallar för återkommande transaktioner
-                {isDeveloper && " • Systemmallar tillgängliga"}
-              </p>
-            </div>
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Skapa mall
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+                <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Skapa mall
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Skapa ny transaktionsmall</DialogTitle>
                 </DialogHeader>
@@ -662,9 +827,10 @@ const TemplateManager = () => {
                 )}
               </DialogContent>
             </Dialog>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-6 py-8">
@@ -890,6 +1056,67 @@ const TemplateManager = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Import Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Importera mallar</DialogTitle>
+          </DialogHeader>
+          {importData && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-medium text-blue-900">Import-information</h3>
+                <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
+                  <div>Version: {importData.version}</div>
+                  <div>Antal mallar: {importData.templates?.length || 0}</div>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-4 border-t">
+                <Button onClick={() => importTemplates('skip')} className="flex-1">
+                  <FileUp className="h-4 w-4 mr-2" />
+                  Importera (hoppa över konflikter)
+                </Button>
+                <Button onClick={() => importTemplates('overwrite')} variant="outline" className="flex-1">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Importera (skriv över konflikter)
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Validation Results Dialog */}
+      {validationResults && (
+        <Dialog open={!!validationResults} onOpenChange={() => setValidationResults(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Valideringsresultat</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-4 gap-4 text-center">
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{validationResults.summary.ok}</div>
+                  <div className="text-sm text-green-700">OK</div>
+                </div>
+                <div className="bg-yellow-50 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-yellow-600">{validationResults.summary.warnings}</div>
+                  <div className="text-sm text-yellow-700">Varningar</div>
+                </div>
+                <div className="bg-red-50 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-red-600">{validationResults.summary.errors}</div>
+                  <div className="text-sm text-red-700">Fel</div>
+                </div>
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{validationResults.summary.total}</div>
+                  <div className="text-sm text-blue-700">Totalt</div>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
