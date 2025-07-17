@@ -48,8 +48,11 @@ serve(async (req) => {
 
     const { importData, conflictAction = 'skip' } = await req.json();
 
+    console.log(`[IMPORT-TEMPLATES] Starting import for user ${user.email}, conflict action: ${conflictAction}`);
+
     if (!importData || !importData.templates) {
-      return new Response(JSON.stringify({ error: 'Invalid import data' }), {
+      console.error('[IMPORT-TEMPLATES] Invalid import data - missing templates');
+      return new Response(JSON.stringify({ error: 'Invalid import data - missing templates' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -57,45 +60,75 @@ serve(async (req) => {
 
     // Validate import data structure
     if (!importData.version || !Array.isArray(importData.templates)) {
-      return new Response(JSON.stringify({ error: 'Invalid import data format' }), {
+      console.error('[IMPORT-TEMPLATES] Invalid import data format:', { hasVersion: !!importData.version, templatesIsArray: Array.isArray(importData.templates) });
+      return new Response(JSON.stringify({ error: 'Invalid import data format - missing version or templates not array' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    console.log(`[IMPORT-TEMPLATES] Validating ${importData.templates.length} templates`);
+
     // Get chart of accounts for validation
-    const { data: accounts } = await supabaseClient
+    const { data: accounts, error: accountsError } = await supabaseClient
       .from('airledger_chart_of_accounts')
       .select('account_code, account_name');
 
+    if (accountsError) {
+      console.error('[IMPORT-TEMPLATES] Error fetching chart of accounts:', accountsError);
+      return new Response(JSON.stringify({ error: 'Failed to fetch chart of accounts' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const validAccountCodes = new Set(accounts?.map(a => a.account_code) || []);
+    console.log(`[IMPORT-TEMPLATES] Loaded ${validAccountCodes.size} valid account codes`);
 
     const validationErrors: string[] = [];
     const warnings: string[] = [];
     const validTemplates = [];
 
     // Validate each template
-    for (const template of importData.templates) {
+    for (let i = 0; i < importData.templates.length; i++) {
+      const template = importData.templates[i];
       const templateErrors: string[] = [];
 
+      console.log(`[IMPORT-TEMPLATES] Validating template ${i + 1}: ${template.template_name || 'unnamed'}`);
+
       // Required fields
-      if (!template.template_name) templateErrors.push('Missing template_name');
-      if (!template.description) templateErrors.push('Missing description');
-      if (!template.category) templateErrors.push('Missing category');
+      if (!template.template_name || typeof template.template_name !== 'string') {
+        templateErrors.push('Missing or invalid template_name');
+      }
+      if (!template.description || typeof template.description !== 'string') {
+        templateErrors.push('Missing or invalid description');
+      }
+      if (!template.category || typeof template.category !== 'string') {
+        templateErrors.push('Missing or invalid category');
+      }
       if (!template.template_entries || !Array.isArray(template.template_entries)) {
-        templateErrors.push('Missing or invalid template_entries');
+        templateErrors.push('Missing or invalid template_entries (must be array)');
+      }
+      if (template.template_entries && template.template_entries.length === 0) {
+        templateErrors.push('template_entries cannot be empty');
       }
 
       // Validate template entries
-      if (template.template_entries) {
+      if (template.template_entries && Array.isArray(template.template_entries)) {
         let totalDebit = 0;
         let totalCredit = 0;
         
-        for (const entry of template.template_entries) {
-          if (!entry.account_code) templateErrors.push('Entry missing account_code');
-          if (!entry.account_name) templateErrors.push('Entry missing account_name');
+        for (let j = 0; j < template.template_entries.length; j++) {
+          const entry = template.template_entries[j];
+          
+          if (!entry.account_code || typeof entry.account_code !== 'string') {
+            templateErrors.push(`Entry ${j + 1} missing or invalid account_code`);
+          }
+          if (!entry.account_name || typeof entry.account_name !== 'string') {
+            templateErrors.push(`Entry ${j + 1} missing or invalid account_name`);
+          }
           if (!entry.type || !['debit', 'credit'].includes(entry.type)) {
-            templateErrors.push('Entry missing or invalid type (must be debit or credit)');
+            templateErrors.push(`Entry ${j + 1} missing or invalid type (must be debit or credit)`);
           }
 
           // Check if account exists in chart of accounts
@@ -122,25 +155,41 @@ serve(async (req) => {
     }
 
     if (validationErrors.length > 0) {
+      console.error('[IMPORT-TEMPLATES] Validation failed:', validationErrors);
       return new Response(JSON.stringify({ 
-        error: 'Validation failed', 
+        error: 'Template validation failed', 
         validationErrors,
-        warnings 
+        warnings,
+        validTemplates: validTemplates.length,
+        totalTemplates: importData.templates.length
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    console.log(`[IMPORT-TEMPLATES] Validation passed for ${validTemplates.length} templates`);
+
     // Check for existing templates
     const templateNames = validTemplates.map(t => t.template_name);
-    const { data: existingTemplates } = await supabaseClient
+    const { data: existingTemplates, error: existingError } = await supabaseClient
       .from('airledger_transaction_templates')
       .select('template_name')
+      .eq('user_id', user.id)
       .in('template_name', templateNames);
+
+    if (existingError) {
+      console.error('[IMPORT-TEMPLATES] Error checking existing templates:', existingError);
+      return new Response(JSON.stringify({ error: 'Failed to check existing templates' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const existingNames = new Set(existingTemplates?.map(t => t.template_name) || []);
     const conflicts = validTemplates.filter(t => existingNames.has(t.template_name));
+    
+    console.log(`[IMPORT-TEMPLATES] Found ${conflicts.length} conflicting templates`);
     
     let templatesToImport = validTemplates;
 
@@ -149,41 +198,62 @@ serve(async (req) => {
       if (conflictAction === 'skip') {
         templatesToImport = validTemplates.filter(t => !existingNames.has(t.template_name));
         warnings.push(`Skipped ${conflicts.length} templates due to name conflicts`);
+        console.log(`[IMPORT-TEMPLATES] Skipping ${conflicts.length} templates, importing ${templatesToImport.length}`);
       } else if (conflictAction === 'overwrite') {
         // Delete existing templates first
-        await supabaseClient
+        console.log(`[IMPORT-TEMPLATES] Deleting ${conflicts.length} existing templates for overwrite`);
+        const { error: deleteError } = await supabaseClient
           .from('airledger_transaction_templates')
           .delete()
+          .eq('user_id', user.id)
           .in('template_name', conflicts.map(t => t.template_name));
+
+        if (deleteError) {
+          console.error('[IMPORT-TEMPLATES] Error deleting existing templates:', deleteError);
+          return new Response(JSON.stringify({ error: 'Failed to delete existing templates' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
     }
 
     // Import templates
+    console.log(`[IMPORT-TEMPLATES] Importing ${templatesToImport.length} templates`);
     const importResults = [];
+    
     for (const template of templatesToImport) {
-      const { data, error } = await supabaseClient
-        .from('airledger_transaction_templates')
-        .insert({
-          user_id: user.id,
-          template_name: template.template_name,
-          description: template.description,
-          category: template.category,
-          keywords: template.keywords || [],
-          template_entries: template.template_entries,
-          is_system_template: template.is_system_template || false,
-          auto_suggest: template.auto_suggest !== false,
-          is_recurring: false,
-          usage_count: 0
-        })
-        .select()
-        .single();
+      try {
+        const { data, error } = await supabaseClient
+          .from('airledger_transaction_templates')
+          .insert({
+            user_id: user.id,
+            template_name: template.template_name,
+            description: template.description,
+            category: template.category,
+            keywords: template.keywords || [],
+            template_entries: template.template_entries,
+            is_system_template: template.is_system_template || false,
+            auto_suggest: template.auto_suggest !== false,
+            is_recurring: false,
+            usage_count: 0
+          })
+          .select()
+          .single();
 
-      if (error) {
-        warnings.push(`Failed to import template "${template.template_name}": ${error.message}`);
-      } else {
-        importResults.push(data);
+        if (error) {
+          console.error(`[IMPORT-TEMPLATES] Error importing template "${template.template_name}":`, error);
+          warnings.push(`Failed to import template "${template.template_name}": ${error.message}`);
+        } else {
+          importResults.push(data);
+        }
+      } catch (err) {
+        console.error(`[IMPORT-TEMPLATES] Exception importing template "${template.template_name}":`, err);
+        warnings.push(`Failed to import template "${template.template_name}": ${err.message}`);
       }
     }
+
+    console.log(`[IMPORT-TEMPLATES] Import completed: ${importResults.length} imported, ${conflicts.length} conflicts, ${warnings.length} warnings`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -191,7 +261,8 @@ serve(async (req) => {
       skipped: validTemplates.length - importResults.length,
       total_validated: validTemplates.length,
       warnings,
-      conflicts: conflicts.length
+      conflicts: conflicts.length,
+      conflictNames: conflicts.map(t => t.template_name)
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

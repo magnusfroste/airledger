@@ -72,6 +72,7 @@ serve(async (req) => {
       version: "1.0",
       exported_at: new Date().toISOString(),
       exported_by: user.email,
+      exported_user_id: user.id,
       export_type: exportType,
       template_count: templates?.length || 0,
       templates: templates?.map(template => ({
@@ -82,6 +83,7 @@ serve(async (req) => {
         template_entries: template.template_entries,
         is_system_template: template.is_system_template,
         auto_suggest: template.auto_suggest,
+        user_id: template.user_id,
         metadata: {
           usage_count: template.usage_count || 0,
           last_used_at: template.last_used_at,
@@ -89,6 +91,8 @@ serve(async (req) => {
         }
       })) || []
     };
+
+    console.log(`[EXPORT-TEMPLATES] Exporting ${templates?.length || 0} templates for user ${user.email}`);
 
     return new Response(JSON.stringify(exportData, null, 2), {
       headers: { 

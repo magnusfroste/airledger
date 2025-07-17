@@ -403,15 +403,61 @@ const TemplateManager = () => {
         body: { importData, conflictAction }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Import error:', error);
+        
+        // Handle validation errors with detailed messages
+        if (error.validationErrors) {
+          const errorMessage = error.validationErrors.slice(0, 3).join('\n');
+          const moreErrors = error.validationErrors.length > 3 ? 
+            `\n...och ${error.validationErrors.length - 3} fler fel` : '';
+          
+          toast({
+            title: "Mallvalidering misslyckades",
+            description: `${errorMessage}${moreErrors}`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Importfel",
+            description: error.message || "Kunde inte importera mallar.",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+
+      // Show success message with details
+      const successMessage = `${data.imported} mallar importerade`;
+      const details = [];
+      
+      if (data.skipped > 0) {
+        details.push(`${data.skipped} hoppades över`);
+      }
+      
+      if (data.warnings && data.warnings.length > 0) {
+        details.push(`${data.warnings.length} varningar`);
+      }
+      
+      const fullMessage = details.length > 0 ? 
+        `${successMessage} (${details.join(', ')})` : 
+        successMessage;
 
       toast({
         title: "Import slutförd",
-        description: `${data.imported} mallar importerade. ${data.skipped} hoppades över.`,
+        description: fullMessage,
       });
 
+      // Show warnings if any
       if (data.warnings && data.warnings.length > 0) {
         console.warn('Import warnings:', data.warnings);
+        // Show first few warnings
+        const warningMessage = data.warnings.slice(0, 2).join('\n');
+        toast({
+          title: "Importvarningar",
+          description: warningMessage,
+          variant: "default",
+        });
       }
 
       setShowImportDialog(false);
