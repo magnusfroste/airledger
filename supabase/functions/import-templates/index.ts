@@ -127,8 +127,9 @@ serve(async (req) => {
           if (!entry.account_name || typeof entry.account_name !== 'string') {
             templateErrors.push(`Entry ${j + 1} missing or invalid account_name`);
           }
-          if (!entry.type || !['debit', 'credit'].includes(entry.type)) {
-            templateErrors.push(`Entry ${j + 1} missing or invalid type (must be debit or credit)`);
+          // Type field is optional - only validate if present
+          if (entry.type && !['debit', 'credit'].includes(entry.type)) {
+            templateErrors.push(`Entry ${j + 1} invalid type (must be debit or credit)`);
           }
 
           // Check if account exists in chart of accounts
