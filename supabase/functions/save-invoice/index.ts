@@ -142,8 +142,8 @@ serve(async (req) => {
       },
       {
         transaction_id: transaction.id,
-        account_code: '2640',
-        account_name: 'Utgående moms',
+        account_code: '2610',
+        account_name: 'Utgående moms, 25%',
         debit_amount: 0,
         credit_amount: vatAmount, // VAT amount
         description: `Moms 25% på ${description}`
