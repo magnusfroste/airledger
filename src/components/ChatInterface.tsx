@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import TransactionConfirmDialog from "@/components/TransactionConfirmDialog";
@@ -14,7 +15,9 @@ import { useReceiptAnalysis } from "@/hooks/useReceiptAnalysis";
 const ChatInterface = () => {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isNearBottom, setIsNearBottom] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Custom hooks
   const { conversationId, limitMessagesInConversation, handleNewChat } = useConversation();
@@ -55,9 +58,21 @@ const ChatInterface = () => {
     handleTransactionConfirm
   } = useReceiptAnalysis();
 
-  // Scroll to bottom functionality
+  // Check if user is near bottom of messages
+  const checkIfNearBottom = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const threshold = 100; // pixels from bottom
+    const isNear = container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
+    setIsNearBottom(isNear);
+  };
+
+  // Smart scroll to bottom - only if user is near bottom
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   useEffect(() => {
@@ -66,10 +81,12 @@ const ChatInterface = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      scrollToBottom();
+      if (isNearBottom) {
+        scrollToBottom();
+      }
     }, 100);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isNearBottom]);
 
   // Handle camera photo capture
   const handleCameraCapture = (file: File) => {
@@ -233,7 +250,11 @@ const ChatInterface = () => {
   return (
     <div className="h-screen bg-background flex flex-col">
       {/* Messages Container - takes available space and allows scrolling */}
-      <div className="flex-1 overflow-hidden">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1"
+        onScroll={checkIfNearBottom}
+      >
         <MessageList
           messages={messages}
           isLoading={isLoading}

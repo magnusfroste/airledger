@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 import Message from "./Message";
@@ -44,7 +45,7 @@ const MessageList = ({
   onLoadOlderMessages 
 }: MessageListProps) => {
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4">
+    <div className="h-full overflow-y-auto px-4 py-4">
       {/* Load Older Messages Button */}
       {hasMoreMessages && (
         <div className="flex justify-center mb-4">
