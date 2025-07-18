@@ -565,7 +565,7 @@ const TemplateManager = () => {
                   <div>
                     <Label>Bokföringsposter</Label>
                     <div className="space-y-3 mt-2">
-                       {newTemplate.template_entries.map((entry, index) => <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
+                       {newTemplate.template_entries.map((entry, index) => <div key={index} className="grid grid-cols-5 gap-2 p-3 border rounded-lg">
                             <AccountSelector value={entry.account_code} onValueChange={(accountCode, accountName) => {
                           const newEntries = [...newTemplate.template_entries];
                           newEntries[index].account_code = accountCode;
@@ -600,6 +600,23 @@ const TemplateManager = () => {
                             template_entries: newEntries
                           }));
                         }} />
+                           {newTemplate.template_entries.length > 2 && (
+                             <Button
+                               type="button"
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => {
+                                 const newEntries = newTemplate.template_entries.filter((_, i) => i !== index);
+                                 setNewTemplate(prev => ({
+                                   ...prev,
+                                   template_entries: newEntries
+                                 }));
+                               }}
+                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                             >
+                               <Trash2 className="h-4 w-4" />
+                             </Button>
+                           )}
                          </div>)}
                       <Button type="button" variant="outline" onClick={() => {
                         setNewTemplate(prev => ({
@@ -686,7 +703,7 @@ const TemplateManager = () => {
                     <div>
                       <Label>Bokföringsposter</Label>
                       <div className="space-y-3 mt-2">
-                        {editingTemplate.template_entries.map((entry: any, index: number) => <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
+                        {editingTemplate.template_entries.map((entry: any, index: number) => <div key={index} className="grid grid-cols-5 gap-2 p-3 border rounded-lg">
                              <AccountSelector value={entry.account_code} onValueChange={(accountCode, accountName) => {
                           const newEntries = [...editingTemplate.template_entries];
                           newEntries[index].account_code = accountCode;
@@ -721,6 +738,23 @@ const TemplateManager = () => {
                             template_entries: newEntries
                           } : null);
                         }} />
+                            {editingTemplate.template_entries.length > 2 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newEntries = editingTemplate.template_entries.filter((_, i) => i !== index);
+                                  setEditingTemplate(prev => prev ? {
+                                    ...prev,
+                                    template_entries: newEntries
+                                  } : null);
+                                }}
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>)}
                         <Button type="button" variant="outline" onClick={() => {
                         setEditingTemplate(prev => prev ? {
