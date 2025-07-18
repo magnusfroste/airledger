@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings as SettingsIcon, User, Shield, Save, Crown, Calculator } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Settings as SettingsIcon, User, Shield, Save, Crown, Calculator, AlertTriangle, ExternalLink, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -272,31 +273,64 @@ const Settings = () => {
                 </Select>
               </div>
 
+              {/* Information about cash method */}
+              {preferences.accountingMethod === 'cash' && (
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800">
+                    <div className="space-y-2">
+                      <p className="font-medium">Viktigt om kontantmetoden (bokslutsmetoden)</p>
+                      <div className="text-sm space-y-1">
+                        <p>• <strong>3-miljonersregeln:</strong> Aktiebolag med nettoomsättning över 3 miljoner SEK under räkenskapsåret får INTE använda kontantmetoden</p>
+                        <p>• Endast tillåten för enskilda näringsidkare och vissa små företag</p>
+                        <p>• Handelsbolag får använda kontantmetoden om alla delägare är fysiska personer</p>
+                      </div>
+                      <div className="flex items-center gap-2 mt-3 pt-2 border-t border-amber-200">
+                        <ExternalLink className="h-3 w-3" />
+                        <a 
+                          href="https://www.fortnox.se/fortnox-foretagsguide/driva-foretag/bokforing/bokforing" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs underline hover:no-underline"
+                        >
+                          Läs mer om bokföringsregler hos Fortnox
+                        </a>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="p-4 bg-muted/50 rounded-lg">
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm">
-                    {preferences.accountingMethod === 'cash' ? 'Kontantmetoden' : 'Fakturametoden'}
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <Info className="h-4 w-4" />
+                    {preferences.accountingMethod === 'cash' ? 'Kontantmetoden (Bokslutsmetoden)' : 'Fakturametoden (Periodmässig)'}
                   </h4>
                   <p className="text-xs text-muted-foreground">
                     {preferences.accountingMethod === 'cash' 
-                      ? 'Intäkter och kostnader bokförs när betalning sker. Fokus på kassaflöde och faktiska in- och utbetalningar.'
-                      : 'Intäkter och kostnader bokförs när de uppstår. Används av företag med omsättning över 40 miljoner kr/år.'
+                      ? 'Intäkter och kostnader bokförs när betalning sker. Fokus på kassaflöde och faktiska in- och utbetalningar. Kallas även "bokslutsmetoden".'
+                      : 'Intäkter och kostnader bokförs när de uppstår enligt prestationsprincipen. Standard för de flesta företag enligt BFN:s regelverk.'
                     }
                   </p>
                   <div className="mt-3">
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Passar för:</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">
+                      {preferences.accountingMethod === 'cash' ? 'Får användas av:' : 'Måste användas av:'}
+                    </p>
                     <ul className="text-xs text-muted-foreground space-y-0.5">
                       {preferences.accountingMethod === 'cash' ? (
                         <>
-                          <li>• Enskilda firmor och små företag</li>
-                          <li>• Omsättning under 40 miljoner kr/år</li>
-                          <li>• Enklare kassaflödesredovisning</li>
+                          <li>• Enskilda näringsidkare (oavsett omsättning)</li>
+                          <li>• Handelsbolag där alla delägare är fysiska personer</li>
+                          <li>• Aktiebolag med nettoomsättning UNDER 3 miljoner SEK</li>
+                          <li>• Enklare kassaflödesredovisning och bokslut</li>
                         </>
                       ) : (
                         <>
-                          <li>• Aktiebolag och handelsbolag</li>
-                          <li>• Företag med större omsättning</li>
-                          <li>• Krav på periodisering enligt BFN</li>
+                          <li>• Aktiebolag med nettoomsättning över 3 miljoner SEK</li>
+                          <li>• Alla börsnoterade företag</li>
+                          <li>• Företag som omfattas av årsredovisningslagen</li>
+                          <li>• Krav på periodisering enligt BFN och årsredovisningslagen</li>
                         </>
                       )}
                     </ul>
