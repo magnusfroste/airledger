@@ -227,7 +227,8 @@ const GeneralLedger = () => {
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', {
       style: 'currency',
-      currency: 'SEK'
+      currency: 'SEK',
+      maximumFractionDigits: 0
     }).format(amount);
   };
 
