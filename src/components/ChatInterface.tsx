@@ -231,20 +231,22 @@ const ChatInterface = () => {
   };
 
   return (
-    <div className="h-full bg-background flex flex-col">
-      {/* Messages Container */}
-      <MessageList
-        messages={messages}
-        isLoading={isLoading}
-        onNewChat={onNewChat}
-        messagesEndRef={messagesEndRef}
-        hasMoreMessages={hasMoreMessages}
-        loadingOlderMessages={loadingOlderMessages}
-        onLoadOlderMessages={loadOlderMessages}
-      />
+    <div className="h-screen bg-background flex flex-col">
+      {/* Messages Container - takes available space and allows scrolling */}
+      <div className="flex-1 overflow-hidden">
+        <MessageList
+          messages={messages}
+          isLoading={isLoading}
+          onNewChat={onNewChat}
+          messagesEndRef={messagesEndRef}
+          hasMoreMessages={hasMoreMessages}
+          loadingOlderMessages={loadingOlderMessages}
+          onLoadOlderMessages={loadOlderMessages}
+        />
+      </div>
 
-      {/* Input Area - Fixed at bottom with safe area padding */}
-      <div className="shrink-0 bg-background border-t border-border/20 pb-safe">
+      {/* Input Area - Fixed at bottom with bottom nav padding */}
+      <div className="shrink-0 bg-background border-t border-border/20 pb-20 sm:pb-4">
         <InputArea
           inputValue={inputValue}
           setInputValue={setInputValue}
