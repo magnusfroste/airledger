@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Navigation from "./components/Navigation";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PageLayout from "./components/PageLayout";
 import Index from "./pages/Index";
 import Chat from "./pages/Chat";
 import Transactions from "./pages/Transactions";
@@ -35,19 +36,19 @@ const App = () => (
               <ProtectedRoute>
                 <div className="min-h-screen bg-background">
                   <Navigation />
-                  <main className="h-[calc(100vh-48px-64px)]"> {/* Full height minus header and bottom nav */}
+                  <main className="min-h-[calc(100vh-112px)]"> {/* Full height minus header and bottom nav */}
                     <Routes>
                       <Route path="/chat" element={<Chat />} />
-                      <Route path="/transactions" element={<div className="pb-2"><Transactions /></div>} />
-                      <Route path="/templates" element={<div className="pb-2"><Templates /></div>} />
-                      <Route path="/settings" element={<div className="pb-2"><Settings /></div>} />
-                      <Route path="/reports" element={<div className="pb-2"><Reports /></div>} />
-                      <Route path="/balance-sheet" element={<div className="pb-2"><BalanceSheet /></div>} />
-                      <Route path="/opening-balances" element={<div className="pb-2"><OpeningBalances /></div>} />
-                      <Route path="/general-ledger" element={<div className="pb-2"><GeneralLedger /></div>} />
-                      <Route path="/subscription" element={<div className="pb-2"><Subscription /></div>} />
+                      <Route path="/transactions" element={<PageLayout><Transactions /></PageLayout>} />
+                      <Route path="/templates" element={<PageLayout><Templates /></PageLayout>} />
+                      <Route path="/settings" element={<PageLayout><Settings /></PageLayout>} />
+                      <Route path="/reports" element={<Reports />} />
+                      <Route path="/balance-sheet" element={<PageLayout><BalanceSheet /></PageLayout>} />
+                      <Route path="/opening-balances" element={<PageLayout><OpeningBalances /></PageLayout>} />
+                      <Route path="/general-ledger" element={<PageLayout><GeneralLedger /></PageLayout>} />
+                      <Route path="/subscription" element={<PageLayout><Subscription /></PageLayout>} />
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                      <Route path="*" element={<div className="pb-2"><NotFound /></div>} />
+                      <Route path="*" element={<PageLayout><NotFound /></PageLayout>} />
                     </Routes>
                   </main>
                 </div>

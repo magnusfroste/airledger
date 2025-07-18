@@ -21,7 +21,7 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
-        <main className="h-[calc(100vh-48px-64px)] pb-2"> {/* Full height minus header and bottom nav */}
+        <main className="min-h-[calc(100vh-112px)]"> {/* Full height minus header and bottom nav */}
           <Dashboard />
         </main>
       </div>
