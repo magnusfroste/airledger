@@ -67,6 +67,25 @@ serve(async (req) => {
       throw error;
     }
 
+    // Helper function to ensure template entries have type field
+    const processTemplateEntries = (entries: any[]) => {
+      return entries.map(entry => {
+        // If type field is missing, determine it from debit/credit amounts
+        if (!entry.type) {
+          const debitAmount = parseFloat(entry.debit_amount) || 0;
+          const creditAmount = parseFloat(entry.credit_amount) || 0;
+          
+          // Determine type based on which amount is greater than 0
+          if (debitAmount > 0 || (debitAmount === 0 && creditAmount === 0)) {
+            entry.type = 'debit';
+          } else if (creditAmount > 0) {
+            entry.type = 'credit';
+          }
+        }
+        return entry;
+      });
+    };
+
     // Create export data
     const exportData = {
       version: "1.0",
@@ -80,7 +99,7 @@ serve(async (req) => {
         description: template.description,
         category: template.category,
         keywords: template.keywords || [],
-        template_entries: template.template_entries,
+        template_entries: processTemplateEntries(template.template_entries || []),
         is_system_template: template.is_system_template,
         auto_suggest: template.auto_suggest,
         user_id: template.user_id,
