@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { BookOpen, Search, Filter, Plus, ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
 interface Account {
   account_code: string;
   account_name: string;
@@ -14,14 +13,12 @@ interface Account {
   account_category: string;
   normal_balance: string;
 }
-
 interface OpeningBalance {
   account_code: string;
   account_name: string;
   opening_balance: number;
   balance_type: string;
 }
-
 interface AccountBalance {
   account_code: string;
   account_name: string;
@@ -32,7 +29,6 @@ interface AccountBalance {
   current_balance: number;
   balance_type: string;
 }
-
 interface AccountEntry {
   id: string;
   transaction_id: string;
@@ -43,7 +39,6 @@ interface AccountEntry {
   transaction_date: string;
   transaction_description: string;
 }
-
 const GeneralLedger = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [openingBalances, setOpeningBalances] = useState<OpeningBalance[]>([]);
@@ -55,57 +50,53 @@ const GeneralLedger = () => {
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [accountEntries, setAccountEntries] = useState<Record<string, AccountEntry[]>>({});
   const [loadingEntries, setLoadingEntries] = useState<Set<string>>(new Set());
-  const { toast } = useToast();
-
+  const {
+    toast
+  } = useToast();
   useEffect(() => {
     fetchData();
   }, []);
-
   useEffect(() => {
     filterAccounts();
   }, [accountBalances, searchTerm, filterType]);
-
   const fetchData = async () => {
     try {
       setLoading(true);
-      
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: {
+          user
+        }
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       // Fetch chart of accounts
-      const { data: chartData, error: chartError } = await supabase
-        .from('airledger_chart_of_accounts')
-        .select('*')
-        .eq('is_active', true)
-        .order('account_code');
-
+      const {
+        data: chartData,
+        error: chartError
+      } = await supabase.from('airledger_chart_of_accounts').select('*').eq('is_active', true).order('account_code');
       if (chartError) throw chartError;
 
       // Fetch opening balances
-      const { data: openingData, error: openingError } = await supabase
-        .from('airledger_opening')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('account_code');
-
+      const {
+        data: openingData,
+        error: openingError
+      } = await supabase.from('airledger_opening').select('*').eq('user_id', user.id).order('account_code');
       if (openingError) throw openingError;
 
       // Fetch transaction entries to calculate current balances
-      const { data: entriesData, error: entriesError } = await supabase
-        .from('airledger_entries')
-        .select(`
+      const {
+        data: entriesData,
+        error: entriesError
+      } = await supabase.from('airledger_entries').select(`
           account_code,
           debit_amount,
           credit_amount,
           airledger_transactions!inner(user_id)
-        `)
-        .eq('airledger_transactions.user_id', user.id);
-
+        `).eq('airledger_transactions.user_id', user.id);
       if (entriesError) throw entriesError;
-
       setAccounts(chartData || []);
       setOpeningBalances(openingData || []);
-      
+
       // Calculate account balances
       calculateAccountBalances(chartData || [], openingData || [], entriesData || []);
     } catch (error) {
@@ -113,24 +104,22 @@ const GeneralLedger = () => {
       toast({
         title: "Fel",
         description: "Kunde inte ladda huvudboksdata",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
-  const calculateAccountBalances = (
-    chartAccounts: Account[], 
-    openingBals: OpeningBalance[], 
-    entries: any[]
-  ) => {
+  const calculateAccountBalances = (chartAccounts: Account[], openingBals: OpeningBalance[], entries: any[]) => {
     const balances: AccountBalance[] = [];
 
     // Group entries by account code
     const entriesByAccount = entries.reduce((acc, entry) => {
       if (!acc[entry.account_code]) {
-        acc[entry.account_code] = { debits: 0, credits: 0 };
+        acc[entry.account_code] = {
+          debits: 0,
+          credits: 0
+        };
       }
       acc[entry.account_code].debits += Number(entry.debit_amount || 0);
       acc[entry.account_code].credits += Number(entry.credit_amount || 0);
@@ -138,18 +127,15 @@ const GeneralLedger = () => {
     }, {});
 
     // Create balance entries for all accounts with activity
-    const accountsWithActivity = new Set([
-      ...openingBals.map(ob => ob.account_code),
-      ...Object.keys(entriesByAccount)
-    ]);
-
+    const accountsWithActivity = new Set([...openingBals.map(ob => ob.account_code), ...Object.keys(entriesByAccount)]);
     accountsWithActivity.forEach(accountCode => {
       const chartAccount = chartAccounts.find(acc => acc.account_code === accountCode);
       const openingBalance = openingBals.find(ob => ob.account_code === accountCode);
-      const entries = entriesByAccount[accountCode] || { debits: 0, credits: 0 };
-
+      const entries = entriesByAccount[accountCode] || {
+        debits: 0,
+        credits: 0
+      };
       if (!chartAccount && !openingBalance) return;
-
       const accountName = chartAccount?.account_name || openingBalance?.account_name || '';
       const accountType = chartAccount?.account_type || '';
       const normalBalance = chartAccount?.normal_balance || 'debit';
@@ -160,14 +146,11 @@ const GeneralLedger = () => {
       let currentBalance = 0;
       if (normalBalance === 'debit') {
         // For debit accounts: Opening + Debits - Credits
-        currentBalance = (openingBalanceType === 'debit' ? openingAmount : -openingAmount) + 
-                        entries.debits - entries.credits;
+        currentBalance = (openingBalanceType === 'debit' ? openingAmount : -openingAmount) + entries.debits - entries.credits;
       } else {
         // For credit accounts: Opening + Credits - Debits  
-        currentBalance = (openingBalanceType === 'credit' ? openingAmount : -openingAmount) + 
-                        entries.credits - entries.debits;
+        currentBalance = (openingBalanceType === 'credit' ? openingAmount : -openingAmount) + entries.credits - entries.debits;
       }
-
       balances.push({
         account_code: accountCode,
         account_name: accountName,
@@ -176,7 +159,7 @@ const GeneralLedger = () => {
         debit_total: entries.debits,
         credit_total: entries.credits,
         current_balance: currentBalance,
-        balance_type: currentBalance >= 0 ? normalBalance : (normalBalance === 'debit' ? 'credit' : 'debit')
+        balance_type: currentBalance >= 0 ? normalBalance : normalBalance === 'debit' ? 'credit' : 'debit'
       });
     });
 
@@ -184,46 +167,48 @@ const GeneralLedger = () => {
     balances.sort((a, b) => a.account_code.localeCompare(b.account_code));
     setAccountBalances(balances);
   };
-
   const filterAccounts = () => {
     let filtered = accountBalances;
-
     if (searchTerm) {
-      filtered = filtered.filter(account => 
-        account.account_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        account.account_name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      filtered = filtered.filter(account => account.account_code.toLowerCase().includes(searchTerm.toLowerCase()) || account.account_name.toLowerCase().includes(searchTerm.toLowerCase()));
     }
-
     if (filterType !== 'all') {
       filtered = filtered.filter(account => account.account_type === filterType);
     }
-
     setFilteredBalances(filtered);
   };
-
   const getAccountTypeColor = (type: string) => {
     switch (type) {
-      case 'asset': return 'bg-blue-100 text-blue-800';
-      case 'liability': return 'bg-red-100 text-red-800';
-      case 'equity': return 'bg-purple-100 text-purple-800';
-      case 'income': return 'bg-green-100 text-green-800';
-      case 'expense': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'asset':
+        return 'bg-blue-100 text-blue-800';
+      case 'liability':
+        return 'bg-red-100 text-red-800';
+      case 'equity':
+        return 'bg-purple-100 text-purple-800';
+      case 'income':
+        return 'bg-green-100 text-green-800';
+      case 'expense':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
-
   const getAccountTypeName = (type: string) => {
     switch (type) {
-      case 'asset': return 'Tillgång';
-      case 'liability': return 'Skuld';
-      case 'equity': return 'Eget kapital';
-      case 'income': return 'Intäkt';
-      case 'expense': return 'Kostnad';
-      default: return type;
+      case 'asset':
+        return 'Tillgång';
+      case 'liability':
+        return 'Skuld';
+      case 'equity':
+        return 'Eget kapital';
+      case 'income':
+        return 'Intäkt';
+      case 'expense':
+        return 'Kostnad';
+      default:
+        return type;
     }
   };
-
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', {
       style: 'currency',
@@ -231,34 +216,34 @@ const GeneralLedger = () => {
       maximumFractionDigits: 0
     }).format(amount);
   };
-
   const toggleAccountExpansion = async (accountCode: string) => {
     const newExpanded = new Set(expandedAccounts);
-    
     if (expandedAccounts.has(accountCode)) {
       newExpanded.delete(accountCode);
       setExpandedAccounts(newExpanded);
     } else {
       newExpanded.add(accountCode);
       setExpandedAccounts(newExpanded);
-      
+
       // Fetch entries for this account if not already loaded
       if (!accountEntries[accountCode]) {
         await fetchAccountEntries(accountCode);
       }
     }
   };
-
   const fetchAccountEntries = async (accountCode: string) => {
     try {
       setLoadingEntries(prev => new Set(prev).add(accountCode));
-      
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: {
+          user
+        }
+      } = await supabase.auth.getUser();
       if (!user) return;
-
-      const { data: entries, error } = await supabase
-        .from('airledger_entries')
-        .select(`
+      const {
+        data: entries,
+        error
+      } = await supabase.from('airledger_entries').select(`
           id,
           transaction_id,
           description,
@@ -270,13 +255,10 @@ const GeneralLedger = () => {
             description,
             user_id
           )
-        `)
-        .eq('account_code', accountCode)
-        .eq('airledger_transactions.user_id', user.id)
-        .order('created_at', { ascending: false });
-
+        `).eq('account_code', accountCode).eq('airledger_transactions.user_id', user.id).order('created_at', {
+        ascending: false
+      });
       if (error) throw error;
-
       const formattedEntries: AccountEntry[] = (entries || []).map(entry => ({
         id: entry.id,
         transaction_id: entry.transaction_id,
@@ -287,7 +269,6 @@ const GeneralLedger = () => {
         transaction_date: (entry.airledger_transactions as any).transaction_date,
         transaction_description: (entry.airledger_transactions as any).description
       }));
-
       setAccountEntries(prev => ({
         ...prev,
         [accountCode]: formattedEntries
@@ -297,7 +278,7 @@ const GeneralLedger = () => {
       toast({
         title: "Fel",
         description: "Kunde inte ladda kontobokningar",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoadingEntries(prev => {
@@ -307,14 +288,11 @@ const GeneralLedger = () => {
       });
     }
   };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('sv-SE');
   };
-
   if (loading) {
-    return (
-      <div className="container mx-auto px-6 py-8">
+    return <div className="container mx-auto px-6 py-8">
         <div className="flex items-center gap-3 mb-8">
           <BookOpen className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold">Huvudbok</h1>
@@ -323,12 +301,9 @@ const GeneralLedger = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Laddar huvudbok...</p>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="container mx-auto px-6 py-8">
+  return <div className="container mx-auto py-8 px-0">
       <div className="flex items-center gap-3 mb-8">
         <BookOpen className="h-8 w-8 text-primary" />
         <h1 className="text-3xl font-bold">Huvudbok</h1>
@@ -340,18 +315,9 @@ const GeneralLedger = () => {
           <div className="flex gap-4 items-center">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Sök konto..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+              <Input placeholder="Sök konto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-10" />
             </div>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 rounded-md border border-input bg-background"
-            >
+            <select value={filterType} onChange={e => setFilterType(e.target.value)} className="px-3 py-2 rounded-md border border-input bg-background">
               <option value="all">Alla kontotyper</option>
               <option value="asset">Tillgångar</option>
               <option value="liability">Skulder</option>
@@ -365,43 +331,28 @@ const GeneralLedger = () => {
 
       {/* Account Balances */}
       <div className="space-y-4">
-        {filteredBalances.length === 0 ? (
-          <Card>
+        {filteredBalances.length === 0 ? <Card>
             <CardContent className="pt-6 text-center py-12">
               <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Inga konton hittades</h3>
               <p className="text-muted-foreground">
-                {searchTerm || filterType !== 'all' 
-                  ? "Inga konton matchar dina sökkriterier"
-                  : "Inga konton med aktivitet eller ingående balanser"}
+                {searchTerm || filterType !== 'all' ? "Inga konton matchar dina sökkriterier" : "Inga konton med aktivitet eller ingående balanser"}
               </p>
             </CardContent>
-          </Card>
-        ) : (
-          filteredBalances.map((account) => (
-            <Card key={account.account_code} className="hover:shadow-md transition-shadow">
+          </Card> : filteredBalances.map(account => <Card key={account.account_code} className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
-                <div 
-                  className="flex items-center justify-between cursor-pointer"
-                  onClick={() => toggleAccountExpansion(account.account_code)}
-                >
+                <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleAccountExpansion(account.account_code)}>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="flex items-center gap-2">
-                        {expandedAccounts.has(account.account_code) ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        )}
+                        {expandedAccounts.has(account.account_code) ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                         <h3 className="text-lg font-semibold">
                           {account.account_code} - {account.account_name}
                         </h3>
                       </div>
-                      {account.account_type && (
-                        <Badge className={getAccountTypeColor(account.account_type)}>
+                      {account.account_type && <Badge className={getAccountTypeColor(account.account_type)}>
                           {getAccountTypeName(account.account_type)}
-                        </Badge>
-                      )}
+                        </Badge>}
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -425,15 +376,11 @@ const GeneralLedger = () => {
                       </div>
                       <div>
                         <span className="text-muted-foreground">Aktuellt saldo:</span>
-                        <div className={`font-bold text-lg ${
-                          account.current_balance >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
+                        <div className={`font-bold text-lg ${account.current_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {formatAmount(Math.abs(account.current_balance))}
-                          {account.current_balance < 0 && (
-                            <span className="text-xs ml-1">
+                          {account.current_balance < 0 && <span className="text-xs ml-1">
                               ({account.balance_type === 'debit' ? 'Kredit' : 'Debet'})
-                            </span>
-                          )}
+                            </span>}
                         </div>
                       </div>
                     </div>
@@ -441,28 +388,18 @@ const GeneralLedger = () => {
                 </div>
 
                 {/* Expanded account entries */}
-                {expandedAccounts.has(account.account_code) && (
-                  <div className="mt-6 pt-6 border-t border-border">
+                {expandedAccounts.has(account.account_code) && <div className="mt-6 pt-6 border-t border-border">
                     <h4 className="text-sm font-medium text-muted-foreground mb-4">
                       Kontobokningar
                     </h4>
                     
-                    {loadingEntries.has(account.account_code) ? (
-                      <div className="text-center py-4">
+                    {loadingEntries.has(account.account_code) ? <div className="text-center py-4">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
                         <p className="mt-2 text-sm text-muted-foreground">Laddar bokningar...</p>
-                      </div>
-                    ) : accountEntries[account.account_code]?.length === 0 ? (
-                      <div className="text-center py-4">
+                      </div> : accountEntries[account.account_code]?.length === 0 ? <div className="text-center py-4">
                         <p className="text-sm text-muted-foreground">Inga bokningar på detta konto</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-96 overflow-y-auto">
-                        {accountEntries[account.account_code]?.map((entry) => (
-                          <div 
-                            key={entry.id} 
-                            className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
-                          >
+                      </div> : <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {accountEntries[account.account_code]?.map(entry => <div key={entry.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="text-sm font-medium">
@@ -475,34 +412,23 @@ const GeneralLedger = () => {
                               <div className="text-sm text-muted-foreground">
                                 {entry.transaction_description}
                               </div>
-                              {entry.description && entry.description !== entry.transaction_description && (
-                                <div className="text-xs text-muted-foreground/80 mt-1">
+                              {entry.description && entry.description !== entry.transaction_description && <div className="text-xs text-muted-foreground/80 mt-1">
                                   {entry.description}
-                                </div>
-                              )}
+                                </div>}
                             </div>
                             <div className="text-right ml-4">
-                              {entry.debit_amount > 0 && (
-                                <div className="text-sm font-medium text-green-600">
+                              {entry.debit_amount > 0 && <div className="text-sm font-medium text-green-600">
                                   Debet: {formatAmount(entry.debit_amount)}
-                                </div>
-                              )}
-                              {entry.credit_amount > 0 && (
-                                <div className="text-sm font-medium text-blue-600">
+                                </div>}
+                              {entry.credit_amount > 0 && <div className="text-sm font-medium text-blue-600">
                                   Kredit: {formatAmount(entry.credit_amount)}
-                                </div>
-                              )}
+                                </div>}
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                          </div>)}
+                      </div>}
+                  </div>}
               </CardContent>
-            </Card>
-          ))
-        )}
+            </Card>)}
       </div>
 
       {/* Summary */}
@@ -533,8 +459,6 @@ const GeneralLedger = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
-
 export default GeneralLedger;
