@@ -1,4 +1,5 @@
 
+
 import { UserData } from './types.ts';
 
 export function buildBookkeepingContext(userData: UserData): string {
@@ -15,16 +16,31 @@ export function buildBookkeepingContext(userData: UserData): string {
     }
   }
 
-  // Available transaction templates
+  // Available transaction templates - FÖRBÄTTRAD MALLVISNING
   if (userData.templates && userData.templates.length > 0) {
     context += `\nTILLGÄNGLIGA TRANSAKTIONSMALLAR:\n`;
     userData.templates.forEach(template => {
       context += `- ${template.template_name}: ${template.description}\n`;
+      
+      // Visa mallens struktur för AI:n
+      if (template.template_entries && Array.isArray(template.template_entries)) {
+        context += `  Mallstruktur:\n`;
+        template.template_entries.forEach((entry: any) => {
+          const type = entry.type === 'debit' ? 'Debet' : 'Kredit';
+          context += `    ${type}: ${entry.account_code} ${entry.account_name}`;
+          if (entry.vat_calculation) {
+            context += ` (${entry.vat_calculation})`;
+          }
+          context += `\n`;
+        });
+      }
+      
       if (template.keywords && template.keywords.length > 0) {
         context += `  Nyckelord: ${template.keywords.join(', ')}\n`;
       }
+      context += `\n`;
     });
-    context += `\nAnvänd use_transaction_template funktionen för dessa vanliga transaktioner.\n`;
+    context += `VIKTIGT: Använd use_transaction_template för dessa vanliga transaktioner. Visa ALLTID mallens exakta poster med belopp innan bokföring!\n`;
   }
 
   // Recent transactions for context
@@ -57,3 +73,4 @@ export function buildBookkeepingContext(userData: UserData): string {
 
   return context;
 }
+

@@ -1,3 +1,4 @@
+
 import { FunctionCallArgs } from './types.ts';
 
 export async function handleFunctionCall(
@@ -56,13 +57,14 @@ export async function handleFunctionCall(
         const analysisData = transaction.analysis_data;
         
         response += `\n\n✅ Perfekt! Jag har bokfört fakturan till ${args.customerName}.\n\n` +
-          `**Belopp exkl. moms:** ${analysisData.amount_excl_vat} kr\n` +
-          `**Moms (25%):** ${analysisData.vat_amount} kr\n` +
-          `**Totalt inkl. moms:** ${analysisData.total_amount_incl_vat} kr\n\n` +
-          `**Bokföringsposter:**\n` +
+          `**Bokföringsposterna som skapades:**\n` +
           `• Debet: 1510 Kundfordringar ${analysisData.total_amount_incl_vat} kr\n` +
           `• Kredit: 3000 Försäljning ${analysisData.amount_excl_vat} kr\n` +
-          `• Kredit: 2640 Utgående moms ${analysisData.vat_amount} kr`;
+          `• Kredit: 2640 Utgående moms ${analysisData.vat_amount} kr\n\n` +
+          `**Beloppsfördelning:**\n` +
+          `Belopp exkl. moms: ${analysisData.amount_excl_vat} kr\n` +
+          `Moms (25%): ${analysisData.vat_amount} kr\n` +
+          `Totalt inkl. moms: ${analysisData.total_amount_incl_vat} kr`;
       } else {
         response += `\n\n❌ Ett okänt fel uppstod när jag försökte spara fakturan.`;
       }
@@ -90,8 +92,7 @@ export async function handleFunctionCall(
         console.log('Payment saved successfully');
         
         response += `\n\n✅ Perfekt! Jag har registrerat betalningen från ${args.customerName}.\n\n` +
-          `**Belopp:** ${args.amount} kr\n\n` +
-          `**Bokföringsposter:**\n` +
+          `**Bokföringsposterna som skapades:**\n` +
           `• Debet: 1930 Checkkonto ${args.amount} kr\n` +
           `• Kredit: 1510 Kundfordringar ${args.amount} kr\n\n` +
           `Kundfordringen har nu minskat och pengarna finns på ditt bankkonto.`;
@@ -125,7 +126,7 @@ export async function handleFunctionCall(
         response += `\n\n✅ Perfekt! Jag har bokfört transaktionen.\n\n` +
           `**Beskrivning:** ${args.description}\n` +
           `**Datum:** ${transaction.transaction_date}\n\n` +
-          `**Bokföringsposter:**\n` +
+          `**Bokföringsposterna som skapades:**\n` +
           args.entries.map((entry: any) => 
             `• ${entry.debitAmount > 0 ? 'Debet' : 'Kredit'}: ${entry.accountCode} ${entry.accountName} ${entry.debitAmount || entry.creditAmount} kr`
           ).join('\n');
@@ -157,26 +158,11 @@ export async function handleFunctionCall(
         console.log('Transaction template used successfully');
         const transaction = templateData.transaction;
         
-        // Record template usage for analytics
-        try {
-          await supabase
-            .from('airledger_template_usage')
-            .insert({
-              user_id: (await supabase.auth.getUser()).data.user?.id,
-              template_id: templateData.template_id, // This will come from the updated function
-              transaction_id: transaction.id,
-              used_at: new Date().toISOString()
-            });
-        } catch (usageError) {
-          console.error('Failed to record template usage:', usageError);
-          // Don't fail the main operation if usage tracking fails
-        }
-        
         response += `\n\n✅ Perfekt! Jag har använt mallen "${args.templateName}" för att bokföra transaktionen.\n\n` +
+          `**Mall:** ${templateData.template_used}\n` +
           `**Belopp:** ${args.amount} kr\n` +
-          `**Datum:** ${transaction.transaction_date}\n` +
-          `**Mall:** ${templateData.template_used}\n\n` +
-          `Transaktionen är nu bokförd enligt mallen.`;
+          `**Datum:** ${transaction.transaction_date}\n\n` +
+          `Transaktionen är nu bokförd enligt mallens struktur som jag visade tidigare.`;
       } else {
         response += `\n\n❌ Ett okänt fel uppstod när jag försökte använda transaktionsmallen.`;
       }

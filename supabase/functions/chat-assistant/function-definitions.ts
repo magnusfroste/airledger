@@ -1,24 +1,25 @@
 
+
 export const FUNCTION_DEFINITIONS = [
   {
     type: "function",
     function: {
       name: "use_transaction_template",
-      description: "PRIORITERA DENNA FUNKTION! Använd för vanliga återkommande transaktioner som hyra, el, telefon, försäkringar, löner, bankavgifter, etc. EXEMPEL: 'Betalat hyra 8000 kr', 'Bredband Telia 450 kr', 'Försäkring 1200 kr', 'Lön 35000 kr'. Kolla ALLTID först om det finns en passande mall!",
+      description: "PRIORITERA DENNA FUNKTION! Använd för vanliga återkommande transaktioner som hyra, el, telefon, försäkringar, löner, bankavgifter, etc. VIKTIGT: Visa ALLTID mallens exakta bokföringsposter för användaren INNAN du anropar denna funktion. Exempel på presentation: 'Enligt mallen Lokalhyra blir posterna: Debet 5010 Lokalhyror 8000 kr, Kredit 1930 Checkkonto 8000 kr. Bokför jag denna transaktion?'",
       parameters: {
         type: "object",
         properties: {
           templateName: {
             type: "string",
-            description: "Namnet på mallen att använda (t.ex. 'Lokalhyra', 'Telekommunikation', 'Försäkringar')"
+            description: "Namnet på mallen att använda (t.ex. 'Lokalhyra', 'Telekommunikation', 'Försäkringar'). MÅSTE matcha en befintlig mall från användarens tillgängliga mallar."
           },
           amount: {
             type: "number",
-            description: "Beloppet för transaktionen"
+            description: "Beloppet för transaktionen. Använd det exakta belopp som användaren anger."
           },
           description: {
             type: "string", 
-            description: "Specifik beskrivning för denna transaktion (valfritt)"
+            description: "Specifik beskrivning för denna transaktion (valfritt, ex: 'Hyra januari 2025')"
           },
           transactionDate: {
             type: "string",
@@ -37,7 +38,7 @@ export const FUNCTION_DEFINITIONS = [
     type: "function",
     function: {
       name: "save_invoice",
-      description: "ANVÄND DENNA NÄR: Användaren säger 'jag har fakturerat', 'skickat faktura', 'fakturerat X'. EXEMPEL: 'Jag har fakturerat Acme AB 10 000 kr för konsultuppdrag'",
+      description: "ANVÄND DENNA NÄR: Användaren säger 'jag har fakturerat', 'skickat faktura', 'fakturerat X'. EXEMPEL: 'Jag har fakturerat Acme AB 10 000 kr för konsultuppdrag'. Denna funktion skapar alltid samma bokföringsposter: Debet 1510 Kundfordringar, Kredit 3000 Försäljning, Kredit 2640 Utgående moms (vid 25% moms).",
       parameters: {
         type: "object",
         properties: {
@@ -74,7 +75,7 @@ export const FUNCTION_DEFINITIONS = [
     type: "function",
     function: {
       name: "save_payment",
-      description: "ANVÄND DENNA NÄR: Användaren säger 'fått betalning', 'X har betalat', 'inbetalning från kund'. EXEMPEL: 'Acme AB har betalat 12 500 kr'",
+      description: "ANVÄND DENNA NÄR: Användaren säger 'fått betalning', 'X har betalat', 'inbetalning från kund'. EXEMPEL: 'Acme AB har betalat 12 500 kr'. Denna funktion skapar alltid samma bokföringsposter: Debet 1930 Checkkonto, Kredit 1510 Kundfordringar.",
       parameters: {
         type: "object",
         properties: {
@@ -128,7 +129,7 @@ export const FUNCTION_DEFINITIONS = [
     type: "function",
     function: {
       name: "save_general_transaction",
-      description: "ANVÄND ENDAST NÄR: Ingen mall passar eller för komplexa transaktioner som kräver flera konton. EXEMPEL: Ovanliga transaktioner, investeringar, lån, eller specifika bokföringsposter som inte täcks av mallar.",
+      description: "ANVÄND ENDAST NÄR: Ingen mall passar eller för komplexa transaktioner som kräver flera konton. EXEMPEL: Ovanliga transaktioner, investeringar, lån, eller specifika bokföringsposter som inte täcks av mallar. VIKTIGT: Visa alltid de exakta posterna för användaren innan bokföring.",
       parameters: {
         type: "object",
         properties: {
@@ -180,3 +181,4 @@ export const FUNCTION_DEFINITIONS = [
     }
   }
 ];
+
