@@ -9,31 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  FileText, 
-  Plus, 
-  Clock, 
-  TrendingUp, 
-  Settings,
-  Calendar,
-  Hash,
-  Tag,
-  Shield,
-  Crown,
-  Search,
-  Trash2,
-  Download,
-  Upload,
-  CheckCircle,
-  AlertTriangle,
-  FileDown,
-  FileUp
-} from "lucide-react";
+import { FileText, Plus, Clock, TrendingUp, Settings, Calendar, Hash, Tag, Shield, Crown, Search, Trash2, Download, Upload, CheckCircle, AlertTriangle, FileDown, FileUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { AccountSelector } from "@/components/AccountSelector";
-
 interface TransactionTemplate {
   id: string;
   template_name: string;
@@ -47,7 +27,6 @@ interface TransactionTemplate {
   is_system_template: boolean;
   created_at: string;
 }
-
 interface TemplateUsage {
   id: string;
   template_id: string;
@@ -55,10 +34,13 @@ interface TemplateUsage {
   template_name: string;
   transaction_description: string;
 }
-
 const TemplateManager = () => {
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const {
+    user
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
   const [templates, setTemplates] = useState<TransactionTemplate[]>([]);
   const [templateUsage, setTemplateUsage] = useState<TemplateUsage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,17 +62,22 @@ const TemplateManager = () => {
     category: '',
     keywords: '',
     is_system_template: false,
-    template_entries: [
-      { account_code: '', account_name: '', type: 'debit', description: '' },
-      { account_code: '', account_name: '', type: 'credit', description: '' }
-    ]
+    template_entries: [{
+      account_code: '',
+      account_name: '',
+      type: 'debit',
+      description: ''
+    }, {
+      account_code: '',
+      account_name: '',
+      type: 'credit',
+      description: ''
+    }]
   });
-
   useEffect(() => {
     fetchTemplatesAndUsage();
     checkDeveloperStatus();
   }, []);
-
   const startEditTemplate = (template: TransactionTemplate) => {
     setEditingTemplate({
       ...template,
@@ -98,64 +85,49 @@ const TemplateManager = () => {
     });
     setShowEditDialog(true);
   };
-
   const updateTemplate = async () => {
     if (!editingTemplate) return;
-    
     try {
       if (!editingTemplate.template_name || !editingTemplate.description) {
         toast({
           title: "Ofullständiga uppgifter",
           description: "Fyll i mallnamn och beskrivning.",
-          variant: "destructive",
+          variant: "destructive"
         });
         return;
       }
-
-      const { error } = await supabase
-        .from('airledger_transaction_templates')
-        .update({
-          template_name: editingTemplate.template_name,
-          description: editingTemplate.description,
-          category: editingTemplate.category,
-          keywords: Array.isArray(editingTemplate.keywords) ? editingTemplate.keywords : [],
-          template_entries: editingTemplate.template_entries.filter(entry => 
-            entry.account_code && entry.account_name
-          ),
-        })
-        .eq('id', editingTemplate.id);
-
+      const {
+        error
+      } = await supabase.from('airledger_transaction_templates').update({
+        template_name: editingTemplate.template_name,
+        description: editingTemplate.description,
+        category: editingTemplate.category,
+        keywords: Array.isArray(editingTemplate.keywords) ? editingTemplate.keywords : [],
+        template_entries: editingTemplate.template_entries.filter(entry => entry.account_code && entry.account_name)
+      }).eq('id', editingTemplate.id);
       if (error) throw error;
-
       toast({
         title: "Mall uppdaterad",
-        description: `Mallen "${editingTemplate.template_name}" har uppdaterats.`,
+        description: `Mallen "${editingTemplate.template_name}" har uppdaterats.`
       });
-
       setShowEditDialog(false);
       setEditingTemplate(null);
       fetchTemplatesAndUsage();
-
     } catch (error) {
       console.error('Error updating template:', error);
       toast({
         title: "Fel vid uppdatering",
         description: "Kunde inte uppdatera mallen. Försök igen.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const checkDeveloperStatus = async () => {
     if (!user) return;
-    
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_developer')
-        .eq('id', user.id)
-        .single();
-      
+      const {
+        data: profile
+      } = await supabase.from('profiles').select('is_developer').eq('id', user.id).single();
       if (profile) {
         setIsDeveloper(profile.is_developer || false);
       }
@@ -163,43 +135,36 @@ const TemplateManager = () => {
       console.error('Error checking developer status:', error);
     }
   };
-
   const fetchTemplatesAndUsage = async () => {
     try {
       setLoading(true);
-      
-      // Fetch templates (both system and user-created)
-      const { data: templatesData, error: templatesError } = await supabase
-        .from('airledger_transaction_templates')
-        .select('*')
-        .order('usage_count', { ascending: false });
 
+      // Fetch templates (both system and user-created)
+      const {
+        data: templatesData,
+        error: templatesError
+      } = await supabase.from('airledger_transaction_templates').select('*').order('usage_count', {
+        ascending: false
+      });
       if (templatesError) throw templatesError;
 
       // Fetch template usage history with manual joins
-      const { data: usageData, error: usageError } = await supabase
-        .from('airledger_template_usage')
-        .select('*')
-        .order('used_at', { ascending: false })
-        .limit(20);
-
+      const {
+        data: usageData,
+        error: usageError
+      } = await supabase.from('airledger_template_usage').select('*').order('used_at', {
+        ascending: false
+      }).limit(20);
       let processedUsageData: TemplateUsage[] = [];
-      
       if (usageData && !usageError) {
         // Manually fetch template names and transaction descriptions
         for (const usage of usageData) {
-          const { data: template } = await supabase
-            .from('airledger_transaction_templates')
-            .select('template_name')
-            .eq('id', usage.template_id)
-            .single();
-          
-          const { data: transaction } = await supabase
-            .from('airledger_transactions')
-            .select('description')
-            .eq('id', usage.transaction_id)
-            .single();
-
+          const {
+            data: template
+          } = await supabase.from('airledger_transaction_templates').select('template_name').eq('id', usage.template_id).single();
+          const {
+            data: transaction
+          } = await supabase.from('airledger_transactions').select('description').eq('id', usage.transaction_id).single();
           processedUsageData.push({
             id: usage.id,
             template_id: usage.template_id,
@@ -209,57 +174,47 @@ const TemplateManager = () => {
           });
         }
       }
-
       if (usageError) throw usageError;
-
       setTemplates(templatesData || []);
       setTemplateUsage(processedUsageData);
-
     } catch (error) {
       console.error('Error fetching templates:', error);
       toast({
         title: "Fel vid laddning",
         description: "Kunde inte hämta malldata. Försök igen.",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
   const createTemplate = async () => {
     try {
       if (!newTemplate.template_name || !newTemplate.description) {
         toast({
           title: "Ofullständiga uppgifter",
           description: "Fyll i mallnamn och beskrivning.",
-          variant: "destructive",
+          variant: "destructive"
         });
         return;
       }
-
-      const { error } = await supabase
-        .from('airledger_transaction_templates')
-        .insert({
-          user_id: user?.id,
-          template_name: newTemplate.template_name,
-          description: newTemplate.description,
-          category: newTemplate.category,
-          keywords: newTemplate.keywords.split(',').map(k => k.trim()),
-          template_entries: newTemplate.template_entries.filter(entry => 
-            entry.account_code && entry.account_name
-          ),
-          is_system_template: isDeveloper ? newTemplate.is_system_template : false,
-          is_recurring: false
-        });
-
+      const {
+        error
+      } = await supabase.from('airledger_transaction_templates').insert({
+        user_id: user?.id,
+        template_name: newTemplate.template_name,
+        description: newTemplate.description,
+        category: newTemplate.category,
+        keywords: newTemplate.keywords.split(',').map(k => k.trim()),
+        template_entries: newTemplate.template_entries.filter(entry => entry.account_code && entry.account_name),
+        is_system_template: isDeveloper ? newTemplate.is_system_template : false,
+        is_recurring: false
+      });
       if (error) throw error;
-
       toast({
         title: "Mall skapad",
-        description: `Mallen "${newTemplate.template_name}" har skapats.`,
+        description: `Mallen "${newTemplate.template_name}" har skapats.`
       });
-
       setShowCreateDialog(false);
       setNewTemplate({
         template_name: '',
@@ -267,49 +222,48 @@ const TemplateManager = () => {
         category: '',
         keywords: '',
         is_system_template: false,
-        template_entries: [
-          { account_code: '', account_name: '', type: 'debit', description: '' },
-          { account_code: '', account_name: '', type: 'credit', description: '' }
-        ]
+        template_entries: [{
+          account_code: '',
+          account_name: '',
+          type: 'debit',
+          description: ''
+        }, {
+          account_code: '',
+          account_name: '',
+          type: 'credit',
+          description: ''
+        }]
       });
       fetchTemplatesAndUsage();
-
     } catch (error) {
       console.error('Error creating template:', error);
       toast({
         title: "Fel vid skapande",
         description: "Kunde inte skapa mallen. Försök igen.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const deleteTemplate = async (templateId: string, templateName: string) => {
     try {
-      const { error } = await supabase
-        .from('airledger_transaction_templates')
-        .delete()
-        .eq('id', templateId);
-
+      const {
+        error
+      } = await supabase.from('airledger_transaction_templates').delete().eq('id', templateId);
       if (error) throw error;
-
       toast({
         title: "Mall borttagen",
-        description: `Mallen "${templateName}" har tagits bort.`,
+        description: `Mallen "${templateName}" har tagits bort.`
       });
-
       fetchTemplatesAndUsage();
-
     } catch (error) {
       console.error('Error deleting template:', error);
       toast({
         title: "Fel vid borttagning",
         description: "Kunde inte ta bort mallen. Försök igen.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('sv-SE', {
       year: 'numeric',
@@ -322,16 +276,8 @@ const TemplateManager = () => {
 
   // Filter templates based on search term and category
   const filteredTemplates = templates.filter(template => {
-    const matchesSearch = !searchTerm || 
-      template.template_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      template.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      template.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (template.keywords && template.keywords.some(keyword => 
-        keyword.toLowerCase().includes(searchTerm.toLowerCase())
-      ));
-    
+    const matchesSearch = !searchTerm || template.template_name.toLowerCase().includes(searchTerm.toLowerCase()) || template.description.toLowerCase().includes(searchTerm.toLowerCase()) || template.category.toLowerCase().includes(searchTerm.toLowerCase()) || template.keywords && template.keywords.some(keyword => keyword.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
-    
     return matchesSearch && matchesCategory;
   });
 
@@ -342,15 +288,21 @@ const TemplateManager = () => {
   const exportTemplates = async (exportType: 'selected' | 'system' | 'user' = 'selected') => {
     try {
       const templateIds = exportType === 'selected' ? selectedTemplates : undefined;
-      
-      const { data, error } = await supabase.functions.invoke('export-templates', {
-        body: { templateIds, exportType }
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('export-templates', {
+        body: {
+          templateIds,
+          exportType
+        }
       });
-
       if (error) throw error;
 
       // Create and download file
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json'
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -359,29 +311,25 @@ const TemplateManager = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
       toast({
         title: "Export slutförd",
-        description: `${data.template_count} mallar exporterade.`,
+        description: `${data.template_count} mallar exporterade.`
       });
-
       setSelectedTemplates([]);
     } catch (error) {
       console.error('Export error:', error);
       toast({
         title: "Exportfel",
         description: "Kunde inte exportera mallar.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = e => {
       try {
         const data = JSON.parse(e.target?.result as string);
         setImportData(data);
@@ -390,38 +338,40 @@ const TemplateManager = () => {
         toast({
           title: "Fel filformat",
           description: "Kunde inte läsa JSON-filen.",
-          variant: "destructive",
+          variant: "destructive"
         });
       }
     };
     reader.readAsText(file);
   };
-
   const importTemplates = async (conflictAction: 'skip' | 'overwrite' = 'skip') => {
     try {
-      const { data, error } = await supabase.functions.invoke('import-templates', {
-        body: { importData, conflictAction }
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('import-templates', {
+        body: {
+          importData,
+          conflictAction
+        }
       });
-
       if (error) {
         console.error('Import error:', error);
-        
+
         // Handle validation errors with detailed messages
         if (error.validationErrors) {
           const errorMessage = error.validationErrors.slice(0, 3).join('\n');
-          const moreErrors = error.validationErrors.length > 3 ? 
-            `\n...och ${error.validationErrors.length - 3} fler fel` : '';
-          
+          const moreErrors = error.validationErrors.length > 3 ? `\n...och ${error.validationErrors.length - 3} fler fel` : '';
           toast({
             title: "Mallvalidering misslyckades",
             description: `${errorMessage}${moreErrors}`,
-            variant: "destructive",
+            variant: "destructive"
           });
         } else {
           toast({
             title: "Importfel",
             description: error.message || "Kunde inte importera mallar.",
-            variant: "destructive",
+            variant: "destructive"
           });
         }
         return;
@@ -430,22 +380,16 @@ const TemplateManager = () => {
       // Show success message with details
       const successMessage = `${data.imported} mallar importerade`;
       const details = [];
-      
       if (data.skipped > 0) {
         details.push(`${data.skipped} hoppades över`);
       }
-      
       if (data.warnings && data.warnings.length > 0) {
         details.push(`${data.warnings.length} varningar`);
       }
-      
-      const fullMessage = details.length > 0 ? 
-        `${successMessage} (${details.join(', ')})` : 
-        successMessage;
-
+      const fullMessage = details.length > 0 ? `${successMessage} (${details.join(', ')})` : successMessage;
       toast({
         title: "Import slutförd",
-        description: fullMessage,
+        description: fullMessage
       });
 
       // Show warnings if any
@@ -456,10 +400,9 @@ const TemplateManager = () => {
         toast({
           title: "Importvarningar",
           description: warningMessage,
-          variant: "default",
+          variant: "default"
         });
       }
-
       setShowImportDialog(false);
       setImportData(null);
       fetchTemplatesAndUsage();
@@ -468,58 +411,48 @@ const TemplateManager = () => {
       toast({
         title: "Importfel",
         description: error.message || "Kunde inte importera mallar.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const validateTemplates = async (templateIds?: string[]) => {
     try {
       const ids = templateIds || (selectedTemplates.length > 0 ? selectedTemplates : undefined);
-      
-      const { data, error } = await supabase.functions.invoke('validate-templates', {
-        body: { templateIds: ids }
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('validate-templates', {
+        body: {
+          templateIds: ids
+        }
       });
-
       if (error) throw error;
-
       setValidationResults(data);
-      
       toast({
         title: "Validering slutförd",
-        description: `${data.summary.total} mallar validerade. ${data.summary.errors} fel, ${data.summary.warnings} varningar.`,
+        description: `${data.summary.total} mallar validerade. ${data.summary.errors} fel, ${data.summary.warnings} varningar.`
       });
     } catch (error) {
       console.error('Validation error:', error);
       toast({
         title: "Valideringsfel",
         description: "Kunde inte validera mallar.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const toggleTemplateSelection = (templateId: string) => {
-    setSelectedTemplates(prev => 
-      prev.includes(templateId) 
-        ? prev.filter(id => id !== templateId)
-        : [...prev, templateId]
-    );
+    setSelectedTemplates(prev => prev.includes(templateId) ? prev.filter(id => id !== templateId) : [...prev, templateId]);
   };
-
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-gray-600">Laddar mallar...</p>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
+  return <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-6 py-8">
@@ -528,12 +461,10 @@ const TemplateManager = () => {
                 <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
                   <FileText className="h-6 w-6" />
                   Transaktionsmallar
-                  {isDeveloper && (
-                    <Badge variant="secondary" className="ml-2 gap-1">
+                  {isDeveloper && <Badge variant="secondary" className="ml-2 gap-1">
                       <Crown className="h-3 w-3" />
                       Utvecklare
-                    </Badge>
-                  )}
+                    </Badge>}
                 </h1>
                 <p className="text-gray-600 mt-1">
                   Hantera och skapa mallar för återkommande transaktioner
@@ -541,10 +472,8 @@ const TemplateManager = () => {
                 </p>
               </div>
               <div className="flex gap-2">
-                {isDeveloper && (
-                  <>
-                    {selectedTemplates.length > 0 && (
-                      <>
+                {isDeveloper && <>
+                    {selectedTemplates.length > 0 && <>
                         <Button variant="outline" onClick={() => exportTemplates('selected')}>
                           <Download className="h-4 w-4 mr-2" />
                           Exportera valda ({selectedTemplates.length})
@@ -553,8 +482,7 @@ const TemplateManager = () => {
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Validera valda
                         </Button>
-                      </>
-                    )}
+                      </>}
                     <Button variant="outline" onClick={() => exportTemplates('system')}>
                       <FileDown className="h-4 w-4 mr-2" />
                       Exportera systemmallar
@@ -563,15 +491,8 @@ const TemplateManager = () => {
                       <Upload className="h-4 w-4 mr-2" />
                       Importera
                     </Button>
-                    <input
-                      id="import-file"
-                      type="file"
-                      accept=".json"
-                      className="hidden"
-                      onChange={handleFileImport}
-                    />
-                  </>
-                )}
+                    <input id="import-file" type="file" accept=".json" className="hidden" onChange={handleFileImport} />
+                  </>}
                 <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
                   <DialogTrigger asChild>
                     <Button>
@@ -587,19 +508,17 @@ const TemplateManager = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="template-name">Mallnamn</Label>
-                      <Input
-                        id="template-name"
-                        value={newTemplate.template_name}
-                        onChange={(e) => setNewTemplate(prev => ({ ...prev, template_name: e.target.value }))}
-                        placeholder="t.ex. Månadsvis hyra"
-                      />
+                      <Input id="template-name" value={newTemplate.template_name} onChange={e => setNewTemplate(prev => ({
+                        ...prev,
+                        template_name: e.target.value
+                      }))} placeholder="t.ex. Månadsvis hyra" />
                     </div>
                     <div>
                       <Label htmlFor="category">Kategori</Label>
-                      <Select
-                        value={newTemplate.category}
-                        onValueChange={(value) => setNewTemplate(prev => ({ ...prev, category: value }))}
-                      >
+                      <Select value={newTemplate.category} onValueChange={value => setNewTemplate(prev => ({
+                        ...prev,
+                        category: value
+                      }))}>
                         <SelectTrigger>
                           <SelectValue placeholder="Välj kategori" />
                         </SelectTrigger>
@@ -618,70 +537,53 @@ const TemplateManager = () => {
                   
                   <div>
                     <Label htmlFor="description">Beskrivning</Label>
-                    <Textarea
-                      id="description"
-                      value={newTemplate.description}
-                      onChange={(e) => setNewTemplate(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Beskriv vad denna mall används till..."
-                    />
+                    <Textarea id="description" value={newTemplate.description} onChange={e => setNewTemplate(prev => ({
+                      ...prev,
+                      description: e.target.value
+                    }))} placeholder="Beskriv vad denna mall används till..." />
                   </div>
 
                   <div>
                     <Label htmlFor="keywords">Nyckelord (kommaseparerat)</Label>
-                    <Input
-                      id="keywords"
-                      value={newTemplate.keywords}
-                      onChange={(e) => setNewTemplate(prev => ({ ...prev, keywords: e.target.value }))}
-                      placeholder="hyra, lokaler, kontor"
-                    />
+                    <Input id="keywords" value={newTemplate.keywords} onChange={e => setNewTemplate(prev => ({
+                      ...prev,
+                      keywords: e.target.value
+                    }))} placeholder="hyra, lokaler, kontor" />
                   </div>
 
-                  {isDeveloper && (
-                    <div className="flex items-center space-x-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                      <input
-                        type="checkbox"
-                        id="is_system_template"
-                        checked={newTemplate.is_system_template}
-                        onChange={(e) => setNewTemplate(prev => ({ ...prev, is_system_template: e.target.checked }))}
-                        className="rounded"
-                      />
+                  {isDeveloper && <div className="flex items-center space-x-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                      <input type="checkbox" id="is_system_template" checked={newTemplate.is_system_template} onChange={e => setNewTemplate(prev => ({
+                      ...prev,
+                      is_system_template: e.target.checked
+                    }))} className="rounded" />
                       <Label htmlFor="is_system_template" className="text-orange-800 font-medium flex items-center gap-2">
                         <Shield className="h-4 w-4" />
                         Systemtemplate (tillgänglig för alla användare)
                       </Label>
-                    </div>
-                  )}
+                    </div>}
 
                   <div>
                     <Label>Bokföringsposter</Label>
                     <div className="space-y-3 mt-2">
-                       {newTemplate.template_entries.map((entry, index) => (
-                          <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
-                            <AccountSelector
-                              value={entry.account_code}
-                              onValueChange={(accountCode, accountName) => {
-                                const newEntries = [...newTemplate.template_entries];
-                                newEntries[index].account_code = accountCode;
-                                newEntries[index].account_name = accountName;
-                                setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
-                              }}
-                              placeholder="Välj konto"
-                              showAccountNumbers={isDeveloper}
-                            />
-                            <Input
-                              placeholder="Kontonamn"
-                              value={entry.account_name}
-                              disabled
-                              className="bg-gray-100"
-                            />
-                           <Select
-                             value={entry.type}
-                             onValueChange={(value) => {
-                               const newEntries = [...newTemplate.template_entries];
-                               newEntries[index].type = value;
-                               setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
-                             }}
-                           >
+                       {newTemplate.template_entries.map((entry, index) => <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
+                            <AccountSelector value={entry.account_code} onValueChange={(accountCode, accountName) => {
+                          const newEntries = [...newTemplate.template_entries];
+                          newEntries[index].account_code = accountCode;
+                          newEntries[index].account_name = accountName;
+                          setNewTemplate(prev => ({
+                            ...prev,
+                            template_entries: newEntries
+                          }));
+                        }} placeholder="Välj konto" showAccountNumbers={isDeveloper} />
+                            <Input placeholder="Kontonamn" value={entry.account_name} disabled className="bg-gray-100" />
+                           <Select value={entry.type} onValueChange={value => {
+                          const newEntries = [...newTemplate.template_entries];
+                          newEntries[index].type = value;
+                          setNewTemplate(prev => ({
+                            ...prev,
+                            template_entries: newEntries
+                          }));
+                        }}>
                              <SelectTrigger>
                                <SelectValue />
                              </SelectTrigger>
@@ -690,30 +592,26 @@ const TemplateManager = () => {
                                <SelectItem value="credit">Kredit</SelectItem>
                              </SelectContent>
                            </Select>
-                           <Input
-                             placeholder="Beskrivning"
-                             value={entry.description}
-                             onChange={(e) => {
-                               const newEntries = [...newTemplate.template_entries];
-                               newEntries[index].description = e.target.value;
-                               setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
-                             }}
-                           />
-                         </div>
-                       ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
+                           <Input placeholder="Beskrivning" value={entry.description} onChange={e => {
+                          const newEntries = [...newTemplate.template_entries];
+                          newEntries[index].description = e.target.value;
                           setNewTemplate(prev => ({
                             ...prev,
-                            template_entries: [
-                              ...prev.template_entries,
-                              { account_code: '', account_name: '', type: 'debit', description: '' }
-                            ]
+                            template_entries: newEntries
                           }));
-                        }}
-                      >
+                        }} />
+                         </div>)}
+                      <Button type="button" variant="outline" onClick={() => {
+                        setNewTemplate(prev => ({
+                          ...prev,
+                          template_entries: [...prev.template_entries, {
+                            account_code: '',
+                            account_name: '',
+                            type: 'debit',
+                            description: ''
+                          }]
+                        }));
+                      }}>
                         <Plus className="h-4 w-4 mr-2" />
                         Lägg till post
                       </Button>
@@ -738,24 +636,21 @@ const TemplateManager = () => {
                 <DialogHeader>
                   <DialogTitle>Redigera transaktionsmall</DialogTitle>
                 </DialogHeader>
-                {editingTemplate && (
-                  <div className="space-y-4">
+                {editingTemplate && <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="edit-template-name">Mallnamn</Label>
-                        <Input
-                          id="edit-template-name"
-                          value={editingTemplate.template_name}
-                          onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, template_name: e.target.value } : null)}
-                          placeholder="t.ex. Månadsvis hyra"
-                        />
+                        <Input id="edit-template-name" value={editingTemplate.template_name} onChange={e => setEditingTemplate(prev => prev ? {
+                        ...prev,
+                        template_name: e.target.value
+                      } : null)} placeholder="t.ex. Månadsvis hyra" />
                       </div>
                       <div>
                         <Label htmlFor="edit-category">Kategori</Label>
-                        <Select
-                          value={editingTemplate.category}
-                          onValueChange={(value) => setEditingTemplate(prev => prev ? { ...prev, category: value } : null)}
-                        >
+                        <Select value={editingTemplate.category} onValueChange={value => setEditingTemplate(prev => prev ? {
+                        ...prev,
+                        category: value
+                      } : null)}>
                           <SelectTrigger>
                             <SelectValue placeholder="Välj kategori" />
                           </SelectTrigger>
@@ -774,57 +669,42 @@ const TemplateManager = () => {
                     
                     <div>
                       <Label htmlFor="edit-description">Beskrivning</Label>
-                      <Textarea
-                        id="edit-description"
-                        value={editingTemplate.description}
-                        onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, description: e.target.value } : null)}
-                        placeholder="Beskriv vad denna mall används till..."
-                      />
+                      <Textarea id="edit-description" value={editingTemplate.description} onChange={e => setEditingTemplate(prev => prev ? {
+                      ...prev,
+                      description: e.target.value
+                    } : null)} placeholder="Beskriv vad denna mall används till..." />
                     </div>
 
                     <div>
                       <Label htmlFor="edit-keywords">Nyckelord (kommaseparerat)</Label>
-                      <Input
-                        id="edit-keywords"
-                        value={Array.isArray(editingTemplate.keywords) ? editingTemplate.keywords.join(', ') : ''}
-                        onChange={(e) => setEditingTemplate(prev => prev ? { 
-                          ...prev, 
-                          keywords: e.target.value.split(',').map(k => k.trim()) 
-                        } : null)}
-                        placeholder="hyra, lokaler, kontor"
-                      />
+                      <Input id="edit-keywords" value={Array.isArray(editingTemplate.keywords) ? editingTemplate.keywords.join(', ') : ''} onChange={e => setEditingTemplate(prev => prev ? {
+                      ...prev,
+                      keywords: e.target.value.split(',').map(k => k.trim())
+                    } : null)} placeholder="hyra, lokaler, kontor" />
                     </div>
 
                     <div>
                       <Label>Bokföringsposter</Label>
                       <div className="space-y-3 mt-2">
-                        {editingTemplate.template_entries.map((entry: any, index: number) => (
-                           <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
-                             <AccountSelector
-                               value={entry.account_code}
-                               onValueChange={(accountCode, accountName) => {
-                                 const newEntries = [...editingTemplate.template_entries];
-                                 newEntries[index].account_code = accountCode;
-                                 newEntries[index].account_name = accountName;
-                                 setEditingTemplate(prev => prev ? { ...prev, template_entries: newEntries } : null);
-                               }}
-                               placeholder="Välj konto"
-                               showAccountNumbers={isDeveloper}
-                             />
-                             <Input
-                               placeholder="Kontonamn"
-                               value={entry.account_name}
-                               disabled
-                               className="bg-gray-100"
-                             />
-                            <Select
-                              value={entry.type}
-                              onValueChange={(value) => {
-                                const newEntries = [...editingTemplate.template_entries];
-                                newEntries[index].type = value;
-                                setEditingTemplate(prev => prev ? { ...prev, template_entries: newEntries } : null);
-                              }}
-                            >
+                        {editingTemplate.template_entries.map((entry: any, index: number) => <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
+                             <AccountSelector value={entry.account_code} onValueChange={(accountCode, accountName) => {
+                          const newEntries = [...editingTemplate.template_entries];
+                          newEntries[index].account_code = accountCode;
+                          newEntries[index].account_name = accountName;
+                          setEditingTemplate(prev => prev ? {
+                            ...prev,
+                            template_entries: newEntries
+                          } : null);
+                        }} placeholder="Välj konto" showAccountNumbers={isDeveloper} />
+                             <Input placeholder="Kontonamn" value={entry.account_name} disabled className="bg-gray-100" />
+                            <Select value={entry.type} onValueChange={value => {
+                          const newEntries = [...editingTemplate.template_entries];
+                          newEntries[index].type = value;
+                          setEditingTemplate(prev => prev ? {
+                            ...prev,
+                            template_entries: newEntries
+                          } : null);
+                        }}>
                               <SelectTrigger>
                                 <SelectValue />
                               </SelectTrigger>
@@ -833,30 +713,26 @@ const TemplateManager = () => {
                                 <SelectItem value="credit">Kredit</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Input
-                              placeholder="Beskrivning"
-                              value={entry.description}
-                              onChange={(e) => {
-                                const newEntries = [...editingTemplate.template_entries];
-                                newEntries[index].description = e.target.value;
-                                setEditingTemplate(prev => prev ? { ...prev, template_entries: newEntries } : null);
-                              }}
-                            />
-                          </div>
-                        ))}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setEditingTemplate(prev => prev ? {
-                              ...prev,
-                              template_entries: [
-                                ...prev.template_entries,
-                                { account_code: '', account_name: '', type: 'debit', description: '' }
-                              ]
-                            } : null);
-                          }}
-                        >
+                            <Input placeholder="Beskrivning" value={entry.description} onChange={e => {
+                          const newEntries = [...editingTemplate.template_entries];
+                          newEntries[index].description = e.target.value;
+                          setEditingTemplate(prev => prev ? {
+                            ...prev,
+                            template_entries: newEntries
+                          } : null);
+                        }} />
+                          </div>)}
+                        <Button type="button" variant="outline" onClick={() => {
+                        setEditingTemplate(prev => prev ? {
+                          ...prev,
+                          template_entries: [...prev.template_entries, {
+                            account_code: '',
+                            account_name: '',
+                            type: 'debit',
+                            description: ''
+                          }]
+                        } : null);
+                      }}>
                           <Plus className="h-4 w-4 mr-2" />
                           Lägg till post
                         </Button>
@@ -871,8 +747,7 @@ const TemplateManager = () => {
                         Uppdatera mall
                       </Button>
                     </div>
-                  </div>
-                )}
+                  </div>}
               </DialogContent>
             </Dialog>
               </div>
@@ -881,7 +756,7 @@ const TemplateManager = () => {
         </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto py-8 px-0">
         <Tabs defaultValue="templates" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="templates" className="flex items-center gap-2">
@@ -898,28 +773,18 @@ const TemplateManager = () => {
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Sök mallar..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+              <Input placeholder="Sök mallar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-10" />
             </div>
             <div className="w-full sm:w-48">
-              <Select
-                value={selectedCategory}
-                onValueChange={setSelectedCategory}
-              >
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger>
                   <SelectValue placeholder="Alla kategorier" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Alla kategorier</SelectItem>
-                  {uniqueCategories.map((category) => (
-                    <SelectItem key={category} value={category}>
+                  {uniqueCategories.map(category => <SelectItem key={category} value={category}>
                       {category}
-                    </SelectItem>
-                  ))}
+                    </SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -927,10 +792,8 @@ const TemplateManager = () => {
 
           {/* Templates Tab */}
           <TabsContent value="templates" className="space-y-6">
-            {filteredTemplates.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredTemplates.map((template) => (
-                  <Card key={template.id} className="bg-white border border-gray-200">
+            {filteredTemplates.length > 0 ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredTemplates.map(template => <Card key={template.id} className="bg-white border border-gray-200">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div>
@@ -939,12 +802,10 @@ const TemplateManager = () => {
                           </CardTitle>
                           <p className="text-sm text-gray-600 mt-1">{template.description}</p>
                         </div>
-                        {template.is_system_template && (
-                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                        {template.is_system_template && <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
                             <Shield className="h-3 w-3 mr-1" />
                             System
-                          </Badge>
-                        )}
+                          </Badge>}
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -961,63 +822,43 @@ const TemplateManager = () => {
                         </div>
                       </div>
 
-                      {template.last_used_at && (
-                        <div className="flex items-center justify-between text-sm">
+                      {template.last_used_at && <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Senast använd:</span>
                           <span className="text-xs text-gray-500">
                             {formatDate(template.last_used_at)}
                           </span>
-                        </div>
-                      )}
+                        </div>}
 
-                      {template.keywords && template.keywords.length > 0 && (
-                        <div className="space-y-2">
+                      {template.keywords && template.keywords.length > 0 && <div className="space-y-2">
                           <span className="text-sm text-gray-600">Nyckelord:</span>
                           <div className="flex flex-wrap gap-1">
-                            {template.keywords.map((keyword, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
+                            {template.keywords.map((keyword, index) => <Badge key={index} variant="outline" className="text-xs">
                                 {keyword}
-                              </Badge>
-                            ))}
+                              </Badge>)}
                           </div>
-                        </div>
-                      )}
+                        </div>}
 
                       <div className="pt-2 border-t">
                         <span className="text-sm text-gray-600 block mb-2">Bokföringsposter:</span>
                         <div className="space-y-1 text-xs">
-                          {template.template_entries.map((entry: any, index: number) => (
-                            <div key={index} className="flex justify-between">
+                          {template.template_entries.map((entry: any, index: number) => <div key={index} className="flex justify-between">
                               <span>{entry.type === 'debit' ? 'D' : 'K'}: {entry.account_code}</span>
                               <span className="text-gray-500">{entry.account_name}</span>
-                            </div>
-                          ))}
+                            </div>)}
                         </div>
                       </div>
 
                       <div className="flex gap-2 pt-3 border-t">
                         {/* Show edit button for developers on system templates */}
-                        {isDeveloper && template.is_system_template && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => startEditTemplate(template)}
-                            className="flex-1"
-                          >
+                        {isDeveloper && template.is_system_template && <Button variant="outline" size="sm" onClick={() => startEditTemplate(template)} className="flex-1">
                             <Settings className="h-4 w-4 mr-2" />
                             Redigera
-                          </Button>
-                        )}
+                          </Button>}
                         
                         {/* Show delete button based on permissions */}
-                        {((!template.is_system_template) || (isDeveloper && template.is_system_template)) && (
-                          <AlertDialog>
+                        {(!template.is_system_template || isDeveloper && template.is_system_template) && <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className={`${isDeveloper && template.is_system_template ? 'flex-1' : 'w-full'} border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300`}
-                              >
+                              <Button variant="outline" size="sm" className={`${isDeveloper && template.is_system_template ? 'flex-1' : 'w-full'} border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300`}>
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Ta bort
                               </Button>
@@ -1033,33 +874,22 @@ const TemplateManager = () => {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteTemplate(template.id, template.template_name)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
+                                <AlertDialogAction onClick={() => deleteTemplate(template.id, template.template_name)} className="bg-red-600 hover:bg-red-700">
                                   Ta bort
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
-                          </AlertDialog>
-                        )}
+                          </AlertDialog>}
                       </div>
                     </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-gray-500">
+                  </Card>)}
+              </div> : <div className="text-center py-12 text-gray-500">
                 <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <p className="text-lg font-medium">Inga mallar hittades</p>
                 <p className="text-sm mt-1">
-                  {searchTerm || selectedCategory !== 'all' 
-                    ? 'Prova att ändra sökkriterier eller filter' 
-                    : 'Skapa din första mall för att komma igång'
-                  }
+                  {searchTerm || selectedCategory !== 'all' ? 'Prova att ändra sökkriterier eller filter' : 'Skapa din första mall för att komma igång'}
                 </p>
-              </div>
-            )}
+              </div>}
           </TabsContent>
 
           {/* Usage History Tab */}
@@ -1071,10 +901,8 @@ const TemplateManager = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {templateUsage.length > 0 ? (
-                  <div className="space-y-4">
-                    {templateUsage.map((usage) => (
-                      <div key={usage.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                {templateUsage.length > 0 ? <div className="space-y-4">
+                    {templateUsage.map(usage => <div key={usage.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                             <FileText className="h-5 w-5 text-blue-600" />
@@ -1089,16 +917,12 @@ const TemplateManager = () => {
                             {formatDate(usage.used_at)}
                           </p>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
+                      </div>)}
+                  </div> : <div className="text-center py-8 text-gray-500">
                     <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     <p>Inga mallar har använts än</p>
                     <p className="text-sm mt-1">Mallar kommer att visas här när de används i bokföringen</p>
-                  </div>
-                )}
+                  </div>}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1111,8 +935,7 @@ const TemplateManager = () => {
           <DialogHeader>
             <DialogTitle>Importera mallar</DialogTitle>
           </DialogHeader>
-          {importData && (
-            <div className="space-y-4">
+          {importData && <div className="space-y-4">
               <div className="bg-blue-50 p-4 rounded-lg">
                 <h3 className="font-medium text-blue-900">Import-information</h3>
                 <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
@@ -1130,14 +953,12 @@ const TemplateManager = () => {
                   Importera (skriv över konflikter)
                 </Button>
               </div>
-            </div>
-          )}
+            </div>}
         </DialogContent>
       </Dialog>
 
       {/* Validation Results Dialog */}
-      {validationResults && (
-        <Dialog open={!!validationResults} onOpenChange={() => setValidationResults(null)}>
+      {validationResults && <Dialog open={!!validationResults} onOpenChange={() => setValidationResults(null)}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Valideringsresultat</DialogTitle>
@@ -1163,10 +984,7 @@ const TemplateManager = () => {
               </div>
             </div>
           </DialogContent>
-        </Dialog>
-      )}
-    </div>
-  );
+        </Dialog>}
+    </div>;
 };
-
 export default TemplateManager;
