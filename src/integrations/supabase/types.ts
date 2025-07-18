@@ -675,7 +675,6 @@ export type Database = {
       profiles: {
         Row: {
           accounting_experience: string | null
-          accounting_method: string | null
           avatar_url: string | null
           bio: string | null
           created_at: string | null
@@ -702,7 +701,6 @@ export type Database = {
         }
         Insert: {
           accounting_experience?: string | null
-          accounting_method?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string | null
@@ -729,7 +727,6 @@ export type Database = {
         }
         Update: {
           accounting_experience?: string | null
-          accounting_method?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string | null
