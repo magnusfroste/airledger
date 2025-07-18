@@ -392,14 +392,11 @@ export type Database = {
       airledger_transactions: {
         Row: {
           analysis_data: Json | null
-          cash_flow_date: string | null
           created_at: string
           description: string
           id: string
           image_metadata: Json | null
           image_url: string | null
-          is_cash_transaction: boolean | null
-          payment_method: string | null
           reference_number: string | null
           total_amount: number
           transaction_date: string
@@ -409,14 +406,11 @@ export type Database = {
         }
         Insert: {
           analysis_data?: Json | null
-          cash_flow_date?: string | null
           created_at?: string
           description: string
           id?: string
           image_metadata?: Json | null
           image_url?: string | null
-          is_cash_transaction?: boolean | null
-          payment_method?: string | null
           reference_number?: string | null
           total_amount: number
           transaction_date: string
@@ -426,14 +420,11 @@ export type Database = {
         }
         Update: {
           analysis_data?: Json | null
-          cash_flow_date?: string | null
           created_at?: string
           description?: string
           id?: string
           image_metadata?: Json | null
           image_url?: string | null
-          is_cash_transaction?: boolean | null
-          payment_method?: string | null
           reference_number?: string | null
           total_amount?: number
           transaction_date?: string
