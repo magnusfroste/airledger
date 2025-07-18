@@ -149,11 +149,33 @@ serve(async (req) => {
     const quotaCheck = await checkAndUpdateQuota(userId, serviceSupabase, true);
     if (!quotaCheck.allowed) {
       console.log('Quota exceeded for user:', userId, 'tier:', quotaCheck.subscription_tier);
+      
+      const nextMonth = new Date();
+      nextMonth.setMonth(nextMonth.getMonth() + 1, 1);
+      const resetDate = nextMonth.toLocaleDateString('sv-SE', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+
+      const tierNames = {
+        free: 'Gratis',
+        premium: 'Premium', 
+        professional: 'Professional'
+      };
+
+      const tierName = tierNames[quotaCheck.subscription_tier as keyof typeof tierNames] || 'Gratis';
+      const usedCount = quotaCheck.usage?.ai_analyses_used || 0;
+      const limitCount = TIER_LIMITS[quotaCheck.subscription_tier]?.ai_analyses || 50;
+
       return new Response(
         JSON.stringify({ 
-          error: 'AI-analyskvoter överskridna för denna månad',
+          success: false,
+          error: `Du har använt alla dina AI-analyser för denna månad (${usedCount}/${limitCount}). Din ${tierName}-kvot återställs den ${resetDate}.`,
+          quota_exceeded: true,
           subscription_tier: quotaCheck.subscription_tier,
-          usage: quotaCheck.usage
+          usage: quotaCheck.usage,
+          reset_date: resetDate
         }),
         {
           status: 429,
@@ -233,7 +255,11 @@ ${bookkeepingContext}`
       JSON.stringify({
         success: true,
         response: aiResponse,
-        context_used: bookkeepingContext.length > 0
+        context_used: bookkeepingContext.length > 0,
+        quota_info: {
+          subscription_tier: quotaCheck.subscription_tier,
+          usage: quotaCheck.usage
+        }
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -244,7 +270,7 @@ ${bookkeepingContext}`
     console.error('Error in chat-assistant function:', error)
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'An unexpected error occurred',
+        error: error.message || 'Ett oväntat fel uppstod när jag försökte behandla din förfrågan',
         success: false 
       }),
       {

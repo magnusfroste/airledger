@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import TransactionConfirmDialog from "@/components/TransactionConfirmDialog";
+import QuotaExceeded from "@/components/QuotaExceeded";
 import MessageList from "./chat/MessageList";
 import InputArea from "./chat/InputArea";
 import CameraModal from "./chat/CameraModal";
@@ -11,16 +12,25 @@ import { useImageHandling } from "@/hooks/useImageHandling";
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 import { useCamera } from "@/hooks/useCamera";
 import { useReceiptAnalysis } from "@/hooks/useReceiptAnalysis";
+import { useSubscription } from "@/hooks/useSubscription";
 
 const ChatInterface = () => {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  const [quotaError, setQuotaError] = useState<{
+    show: boolean;
+    subscriptionTier: string;
+    usage?: any;
+  }>({ show: false, subscriptionTier: 'free' });
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Custom hooks
   const { conversationId, limitMessagesInConversation, handleNewChat } = useConversation();
+  const { subscription, usage } = useSubscription();
+  
   const { 
     messages, 
     hasMoreMessages, 
@@ -114,13 +124,38 @@ const ChatInterface = () => {
       resetMessages();
       setInputValue("");
       clearPendingImages();
+      setQuotaError({ show: false, subscriptionTier: 'free' });
     }
+  };
+
+  // Helper function to handle quota errors
+  const handleQuotaError = (error: any, subscriptionTier: string, usage: any) => {
+    console.log('Quota error detected:', error);
+    setQuotaError({
+      show: true,
+      subscriptionTier,
+      usage
+    });
+
+    const quotaErrorMessage = {
+      id: (Date.now() + Math.random()).toString(),
+      content: `🚫 **AI-analyskvoter överskridna**\n\nDu har använt alla dina AI-analyser för denna månad. Kvoten återställs den 1:a nästa månad.\n\n**Vad kan du göra?**\n• Uppgradera ditt abonnemang för fler analyser\n• Använd mallfunktionen för vanliga transaktioner\n• Bokför manuellt via Dashboard`,
+      sender: 'ai' as const,
+      timestamp: new Date(),
+      type: 'text' as const
+    };
+
+    addMessage(quotaErrorMessage);
+    saveMessageToDatabase(quotaErrorMessage, limitMessagesInConversation);
   };
 
   // Send message handler
   const handleSendMessage = async () => {
     if (!inputValue.trim() && pendingImages.length === 0) return;
     if (isLoading) return; // Prevent duplicate calls while loading
+    
+    // Reset quota error when sending new message
+    setQuotaError({ show: false, subscriptionTier: 'free' });
     
     // Upload images to permanent storage if any
     let uploadedImages: any[] = [];
@@ -182,6 +217,13 @@ const ChatInterface = () => {
 
           if (error) {
             console.error('Error calling chat assistant:', error);
+            
+            // Check if this is a quota error (429 status)
+            if (error.message?.includes('429') || error.message?.includes('AI-analyskvoter överskridna')) {
+              handleQuotaError(error, subscription?.subscription_tier || 'free', usage);
+              return;
+            }
+            
             throw new Error(error.message || 'Failed to get AI response');
           }
 
@@ -196,11 +238,23 @@ const ChatInterface = () => {
 
             addMessage(aiResponse);
             await saveMessageToDatabase(aiResponse, limitMessagesInConversation);
+          } else if (data?.error?.includes('AI-analyskvoter överskridna')) {
+            // Handle quota error from response data
+            handleQuotaError(data, data.subscription_tier || 'free', data.usage);
+            return;
           } else {
             throw new Error('Invalid response from chat assistant');
           }
-        } catch (chatError) {
+        } catch (chatError: any) {
           console.error('Error in text chat:', chatError);
+          
+          // Check if this is a quota error
+          if (chatError.message?.includes('AI-analyskvoter överskridna') || 
+              chatError.message?.includes('429')) {
+            handleQuotaError(chatError, subscription?.subscription_tier || 'free', usage);
+            return;
+          }
+          
           const errorResponse = {
             id: (Date.now() + 1).toString(),
             content: `Ursäkta, jag har tekniska problem just nu. Försök igen om en stund eller ladda upp ett kvitto så kan jag analysera det åt dig!\n\nFel: ${chatError.message}`,
@@ -213,8 +267,16 @@ const ChatInterface = () => {
           await saveMessageToDatabase(errorResponse, limitMessagesInConversation);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in handleSendMessage:', error);
+      
+      // Check if this is a quota error
+      if (error.message?.includes('AI-analyskvoter överskridna') || 
+          error.message?.includes('429')) {
+        handleQuotaError(error, subscription?.subscription_tier || 'free', usage);
+        return;
+      }
+      
       const errorResponse = {
         id: (Date.now() + Math.random()).toString(),
         content: `❌ **Ett fel uppstod**\n\nJag kunde inte behandla din förfrågan just nu. Försök igen om en stund.\n\nFelmeddelande: ${error.message}`,
@@ -249,6 +311,17 @@ const ChatInterface = () => {
 
   return (
     <div className="h-screen bg-background flex flex-col">
+      {/* Quota Error Display */}
+      {quotaError.show && (
+        <div className="shrink-0 p-4 border-b border-border/20">
+          <QuotaExceeded
+            subscriptionTier={quotaError.subscriptionTier}
+            usage={quotaError.usage}
+            onDismiss={() => setQuotaError({ show: false, subscriptionTier: 'free' })}
+          />
+        </div>
+      )}
+
       {/* Messages Container - takes available space and allows scrolling */}
       <div 
         ref={messagesContainerRef}
