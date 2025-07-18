@@ -63,8 +63,10 @@ När användaren nämner vanliga transaktioner:
 - "Fakturerat [kund]" → save_invoice
 
 **BETALNINGAR:**
-- "Fått betalning från [kund]" → save_payment
-- "[Kund] har betalat" → save_payment
+- "Fått betalning från [kund]" → använd mall "Kundbetalning"
+- "[Kund] har betalat" → använd mall "Kundbetalning"  
+- "Kontant betalning från kund" → använd mall "Kontantbetalning från kund"
+- Observera: Kundbetalningar ska INTE innehålla moms - det är enbart överföring från kundfordran till bank/kassa
 
 **VANLIGA TRANSAKTIONER (PRIORITERA MALLAR):**
 - Hyra, el, telefon, försäkringar, löner, etc. → use_transaction_template

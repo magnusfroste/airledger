@@ -434,24 +434,6 @@ export type Database = {
         }
         Relationships: []
       }
-      bas: {
-        Row: {
-          account_code: string | null
-          account_name: string | null
-          id: number
-        }
-        Insert: {
-          account_code?: string | null
-          account_name?: string | null
-          id?: never
-        }
-        Update: {
-          account_code?: string | null
-          account_name?: string | null
-          id?: never
-        }
-        Relationships: []
-      }
       content_clicks: {
         Row: {
           advertisement_id: string | null
