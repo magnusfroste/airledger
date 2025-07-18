@@ -6,6 +6,7 @@ export interface ConversationMessage {
 export interface UserData {
   userId: string;
   userName: string;
+  accountingMethod: 'cash' | 'accrual';
   transactions: any[];
   openingBalances: any[];
   chartOfAccounts: any[];

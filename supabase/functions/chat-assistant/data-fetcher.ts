@@ -44,6 +44,7 @@ export async function fetchUserData(userId: string, supabase: any): Promise<User
     .single();
 
   const userName = profile?.full_name || profile?.name || 'användare';
+  const accountingMethod = profile?.accounting_method || 'accrual';
 
   console.log('Fetching transaction templates');
   const { data: templates, error: templatesError } = await supabase
@@ -62,6 +63,7 @@ export async function fetchUserData(userId: string, supabase: any): Promise<User
   return {
     userId,
     userName,
+    accountingMethod: accountingMethod as 'cash' | 'accrual',
     transactions: transactions || [],
     openingBalances: openingBalances || [],
     chartOfAccounts: chartOfAccounts || [],

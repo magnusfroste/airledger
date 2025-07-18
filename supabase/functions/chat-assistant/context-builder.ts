@@ -1,7 +1,15 @@
 import { UserData } from './types.ts';
 
 export function buildBookkeepingContext(userData: UserData): string {
-  const { userName, transactions, openingBalances, chartOfAccounts, templates } = userData;
+  const { userName, accountingMethod, transactions, openingBalances, chartOfAccounts, templates } = userData;
+
+  // Add accounting method context
+  const accountingMethodContext = `
+BOKFÖRINGSMETOD: ${accountingMethod === 'cash' ? 'KASSAMÄSSIG' : 'PERIODMÄSSIG'}
+${accountingMethod === 'cash' 
+  ? '- Intäkter och kostnader bokförs när betalning sker (kassaflöde)\n- Fokusera på betalningsdatum\n- Använd kassaflödesanalys för rapporter' 
+  : '- Intäkter och kostnader bokförs när de uppstår (fakturadatum)\n- Använd kundfordringar och leverantörsskulder\n- Periodisera för korrekt resultat'}
+`;
 
   // Add chart of accounts context with detailed information
   let chartContext = '';
@@ -117,6 +125,8 @@ TRANSAKTIONSMALLAR:
     return `
 BOKFÖRINGSDATA FÖR ${userName.toUpperCase()}:
 
+${accountingMethodContext}
+
 ${chartContext}
 
 ${openingBalancesContext}
@@ -134,6 +144,8 @@ ${recentTransactions.map(t => `
   } else {
     return `
 BOKFÖRINGSDATA FÖR ${userName.toUpperCase()}:
+
+${accountingMethodContext}
 
 ${chartContext}
 

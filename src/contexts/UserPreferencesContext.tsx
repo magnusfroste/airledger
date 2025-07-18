@@ -6,6 +6,7 @@ interface UserPreferences {
   showAccountNumbers: boolean;
   accountingExperience: 'beginner' | 'intermediate' | 'advanced';
   industry: string | null;
+  accountingMethod: 'cash' | 'accrual';
 }
 
 interface UserPreferencesContextType {
@@ -18,6 +19,7 @@ const defaultPreferences: UserPreferences = {
   showAccountNumbers: false, // Default to false for beginner-friendly experience
   accountingExperience: 'beginner',
   industry: null,
+  accountingMethod: 'accrual', // Default to accrual accounting
 };
 
 const UserPreferencesContext = createContext<UserPreferencesContextType | undefined>(undefined);
@@ -53,6 +55,9 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
             ? profile.accounting_experience as 'beginner' | 'intermediate' | 'advanced'
             : defaultPreferences.accountingExperience,
           industry: profile.industry ?? defaultPreferences.industry,
+          accountingMethod: (['cash', 'accrual'].includes(profile.accounting_method))
+            ? profile.accounting_method as 'cash' | 'accrual'
+            : defaultPreferences.accountingMethod,
         };
         setPreferences(userPrefs);
       }
@@ -76,6 +81,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
           show_account_numbers: updatedPreferences.showAccountNumbers,
           accounting_experience: updatedPreferences.accountingExperience,
           industry: updatedPreferences.industry,
+          accounting_method: updatedPreferences.accountingMethod,
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id);
