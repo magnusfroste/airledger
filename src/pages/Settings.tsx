@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Settings as SettingsIcon, User, Shield, Save, Crown } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Settings as SettingsIcon, User, Shield, Save, Crown, Calculator } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 
 interface Profile {
   id: string;
@@ -21,6 +23,7 @@ interface Profile {
 const Settings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { preferences, updatePreferences, loading: preferencesLoading } = useUserPreferences();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -130,7 +133,27 @@ const Settings = () => {
     }
   };
 
-  if (loading) {
+  const handleAccountingMethodChange = async (method: 'cash' | 'accrual') => {
+    try {
+      setSaving(true);
+      await updatePreferences({ accountingMethod: method });
+      toast({
+        title: "Sparat!",
+        description: `Bokföringsmetoden har ändrats till ${method === 'cash' ? 'kontantmetoden' : 'fakturametoden'}.`,
+      });
+    } catch (error) {
+      console.error('Error updating accounting method:', error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte uppdatera bokföringsmetod. Försök igen.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading || preferencesLoading) {
     return (
       <div className="container px-6 py-6 max-w-4xl mx-auto">
         <div className="animate-fade-in space-y-6">
@@ -208,6 +231,78 @@ const Settings = () => {
                 <Save className="h-4 w-4" />
                 {saving ? 'Sparar...' : 'Spara ändringar'}
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Accounting Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Bokföringsinställningar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="accounting-method">Bokföringsmetod</Label>
+                <Select
+                  value={preferences.accountingMethod}
+                  onValueChange={(value: 'cash' | 'accrual') => handleAccountingMethodChange(value)}
+                  disabled={saving}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="accrual">
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Fakturametoden (Periodmässig)</span>
+                        <span className="text-xs text-muted-foreground">Standard för de flesta företag</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="cash">
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Kontantmetoden (Kassamässig)</span>
+                        <span className="text-xs text-muted-foreground">För små företag och enskilda firmor</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">
+                    {preferences.accountingMethod === 'cash' ? 'Kontantmetoden' : 'Fakturametoden'}
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    {preferences.accountingMethod === 'cash' 
+                      ? 'Intäkter och kostnader bokförs när betalning sker. Fokus på kassaflöde och faktiska in- och utbetalningar.'
+                      : 'Intäkter och kostnader bokförs när de uppstår. Används av företag med omsättning över 40 miljoner kr/år.'
+                    }
+                  </p>
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Passar för:</p>
+                    <ul className="text-xs text-muted-foreground space-y-0.5">
+                      {preferences.accountingMethod === 'cash' ? (
+                        <>
+                          <li>• Enskilda firmor och små företag</li>
+                          <li>• Omsättning under 40 miljoner kr/år</li>
+                          <li>• Enklare kassaflödesredovisning</li>
+                        </>
+                      ) : (
+                        <>
+                          <li>• Aktiebolag och handelsbolag</li>
+                          <li>• Företag med större omsättning</li>
+                          <li>• Krav på periodisering enligt BFN</li>
+                        </>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
