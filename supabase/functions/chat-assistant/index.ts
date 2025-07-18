@@ -8,7 +8,10 @@ import { authenticateUser } from './auth.ts';
 import { fetchUserData } from './data-fetcher.ts';
 import { buildBookkeepingContext } from './context-builder.ts';
 import { handleFunctionCall } from './function-handlers.ts';
-import { SYSTEM_PROMPT, FUNCTION_DEFINITIONS } from './openai-config.ts';
+import { handleEnhancedFunctionCall, shouldUseEnhancedAnalysis } from './enhanced-function-handlers.ts';
+import { ENHANCED_SYSTEM_PROMPT } from './enhanced-system-prompt.ts';
+import { FUNCTION_DEFINITIONS } from './function-definitions.ts';
+
 // Quota helper functions inlined
 const TIER_LIMITS: Record<string, { ai_analyses: number; storage_mb: number }> = {
   free: { ai_analyses: 50, storage_mb: 500 },
@@ -22,11 +25,9 @@ async function checkAndUpdateQuota(
   incrementAiAnalyses: boolean = false
 ): Promise<{ allowed: boolean; subscription_tier: string; usage: any }> {
   try {
-    // Get current month-year
     const now = new Date();
     const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    // Get user subscription
     const { data: subscriber } = await supabase
       .from('subscribers')
       .select('subscription_tier')
@@ -36,7 +37,6 @@ async function checkAndUpdateQuota(
     const subscriptionTier = subscriber?.subscription_tier || 'free';
     const limits = TIER_LIMITS[subscriptionTier];
 
-    // Get or create usage record
     const { data: usage, error: usageError } = await supabase
       .from('usage_tracking')
       .select('*')
@@ -46,7 +46,6 @@ async function checkAndUpdateQuota(
 
     let currentUsage = usage;
     if (!currentUsage) {
-      // Create new usage record
       const { data: newUsage, error: createError } = await supabase
         .from('usage_tracking')
         .insert({
@@ -65,7 +64,6 @@ async function checkAndUpdateQuota(
       currentUsage = newUsage;
     }
 
-    // Check if AI analyses are within quota
     const currentAiAnalyses = currentUsage.ai_analyses_used || 0;
     const aiAnalysesAllowed = limits.ai_analyses === -1 || currentAiAnalyses < limits.ai_analyses;
 
@@ -73,7 +71,6 @@ async function checkAndUpdateQuota(
       return { allowed: false, subscription_tier: subscriptionTier, usage: currentUsage };
     }
 
-    // If incrementing, update the usage
     if (incrementAiAnalyses && aiAnalysesAllowed) {
       const { error: updateError } = await supabase
         .from('usage_tracking')
@@ -88,7 +85,6 @@ async function checkAndUpdateQuota(
         return { allowed: false, subscription_tier: subscriptionTier, usage: currentUsage };
       }
       
-      // Update current usage for return
       currentUsage.ai_analyses_used = currentAiAnalyses + 1;
     }
 
@@ -110,13 +106,12 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    console.log('Chat assistant function called')
+    console.log('Chat assistant function called with enhanced analysis')
     const { message, conversationHistory } = await req.json()
 
     if (!message) {
@@ -125,18 +120,15 @@ serve(async (req) => {
 
     console.log('Message received:', message)
 
-    // Check if OpenAI API key is available
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
     if (!openaiApiKey) {
       console.error('OPENAI_API_KEY not found in environment')
       throw new Error('OpenAI API key not configured')
     }
 
-    // Get the Authorization header
     const authHeader = req.headers.get('Authorization')
     console.log('Auth header received')
 
-    // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
     
@@ -148,10 +140,8 @@ serve(async (req) => {
       },
     })
 
-    // Authenticate user
     const userId = await authenticateUser(authHeader || '', supabase);
 
-    // Check quota and increment usage - use service role for database operations
     const serviceSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
       auth: { persistSession: false }
     });
@@ -171,32 +161,27 @@ serve(async (req) => {
       );
     }
 
-    // Fetch user data
     const userData = await fetchUserData(userId, supabase);
-
-    // Build context
     const bookkeepingContext = buildBookkeepingContext(userData);
 
-    // Initialize OpenAI
-    console.log('Initializing OpenAI client')
+    console.log('Initializing OpenAI client with enhanced analysis')
     const openai = new OpenAI({
       apiKey: openaiApiKey,
     })
 
-    console.log('Processing chat message with OpenAI...')
+    console.log('Processing chat message with enhanced OpenAI analysis...')
 
-    // Prepare conversation messages
+    // Använd förbättrad systemprompt
     const messages = [
       {
         role: "system",
-        content: `${SYSTEM_PROMPT}
+        content: `${ENHANCED_SYSTEM_PROMPT}
 
 BOKFÖRINGSKONTEXTEN:
 ${bookkeepingContext}`
       }
     ]
 
-    // Add conversation history if provided
     if (conversationHistory && conversationHistory.length > 0) {
       console.log('Adding conversation history:', conversationHistory.length, 'messages')
       conversationHistory.forEach((msg: ConversationMessage) => {
@@ -207,18 +192,17 @@ ${bookkeepingContext}`
       })
     }
 
-    // Add current message
     messages.push({
       role: 'user',
       content: message
     })
 
-    console.log('Calling OpenAI API')
+    console.log('Calling OpenAI API with enhanced prompt')
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: messages,
-      max_tokens: 800,
-      temperature: 0.3,
+      max_tokens: 1000,
+      temperature: 0.2,
       tools: FUNCTION_DEFINITIONS,
       tool_choice: "auto"
     })
@@ -229,26 +213,41 @@ ${bookkeepingContext}`
     let aiResponse = response.choices[0].message.content || ""
     const toolCalls = response.choices[0].message.tool_calls
 
-    // Handle function calls
+    // Använd förbättrad funktionshanterare för transaktioner
     if (toolCalls && toolCalls.length > 0) {
       for (const toolCall of toolCalls) {
         const args = JSON.parse(toolCall.function.arguments);
-        const functionResponse = await handleFunctionCall(
-          toolCall.function.name, 
-          args, 
-          supabase
-        );
-        aiResponse += functionResponse;
+        
+        // Kontrollera om vi ska använda förbättrad analys
+        if (shouldUseEnhancedAnalysis(message)) {
+          console.log('Using enhanced transaction analysis');
+          const functionResponse = await handleEnhancedFunctionCall(
+            toolCall.function.name, 
+            args, 
+            supabase,
+            message
+          );
+          aiResponse += functionResponse;
+        } else {
+          // Använd ursprunglig hanterare för icke-transaktioner
+          const functionResponse = await handleFunctionCall(
+            toolCall.function.name, 
+            args, 
+            supabase
+          );
+          aiResponse += functionResponse;
+        }
       }
     }
 
-    console.log('AI response generated successfully')
+    console.log('Enhanced AI response generated successfully')
 
     return new Response(
       JSON.stringify({
         success: true,
         response: aiResponse,
-        context_used: bookkeepingContext.length > 0
+        context_used: bookkeepingContext.length > 0,
+        enhanced_analysis_used: shouldUseEnhancedAnalysis(message)
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -256,7 +255,7 @@ ${bookkeepingContext}`
     )
 
   } catch (error) {
-    console.error('Error in chat-assistant function:', error)
+    console.error('Error in enhanced chat-assistant function:', error)
     return new Response(
       JSON.stringify({ 
         error: error.message || 'An unexpected error occurred',
