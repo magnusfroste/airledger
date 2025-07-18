@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
@@ -8,8 +9,7 @@ import { authenticateUser } from './auth.ts';
 import { fetchUserData } from './data-fetcher.ts';
 import { buildBookkeepingContext } from './context-builder.ts';
 import { handleFunctionCall } from './function-handlers.ts';
-import { handleEnhancedFunctionCall, shouldUseEnhancedAnalysis } from './enhanced-function-handlers.ts';
-import { ENHANCED_SYSTEM_PROMPT } from './enhanced-system-prompt.ts';
+import { SYSTEM_PROMPT } from './system-prompt.ts';
 import { FUNCTION_DEFINITIONS } from './function-definitions.ts';
 
 // Quota helper functions inlined
@@ -111,7 +111,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Chat assistant function called with enhanced analysis')
+    console.log('Chat assistant function called')
     const { message, conversationHistory } = await req.json()
 
     if (!message) {
@@ -145,6 +145,7 @@ serve(async (req) => {
     const serviceSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
       auth: { persistSession: false }
     });
+    
     const quotaCheck = await checkAndUpdateQuota(userId, serviceSupabase, true);
     if (!quotaCheck.allowed) {
       console.log('Quota exceeded for user:', userId, 'tier:', quotaCheck.subscription_tier);
@@ -164,18 +165,17 @@ serve(async (req) => {
     const userData = await fetchUserData(userId, supabase);
     const bookkeepingContext = buildBookkeepingContext(userData);
 
-    console.log('Initializing OpenAI client with enhanced analysis')
+    console.log('Initializing OpenAI client')
     const openai = new OpenAI({
       apiKey: openaiApiKey,
     })
 
-    console.log('Processing chat message with enhanced OpenAI analysis...')
+    console.log('Processing chat message with OpenAI...')
 
-    // Använd förbättrad systemprompt
     const messages = [
       {
         role: "system",
-        content: `${ENHANCED_SYSTEM_PROMPT}
+        content: `${SYSTEM_PROMPT}
 
 BOKFÖRINGSKONTEXTEN:
 ${bookkeepingContext}`
@@ -197,7 +197,7 @@ ${bookkeepingContext}`
       content: message
     })
 
-    console.log('Calling OpenAI API with enhanced prompt')
+    console.log('Calling OpenAI API')
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: messages,
@@ -213,41 +213,27 @@ ${bookkeepingContext}`
     let aiResponse = response.choices[0].message.content || ""
     const toolCalls = response.choices[0].message.tool_calls
 
-    // Använd förbättrad funktionshanterare för transaktioner
     if (toolCalls && toolCalls.length > 0) {
       for (const toolCall of toolCalls) {
         const args = JSON.parse(toolCall.function.arguments);
         
-        // Kontrollera om vi ska använda förbättrad analys
-        if (shouldUseEnhancedAnalysis(message)) {
-          console.log('Using enhanced transaction analysis');
-          const functionResponse = await handleEnhancedFunctionCall(
-            toolCall.function.name, 
-            args, 
-            supabase,
-            message
-          );
-          aiResponse += functionResponse;
-        } else {
-          // Använd ursprunglig hanterare för icke-transaktioner
-          const functionResponse = await handleFunctionCall(
-            toolCall.function.name, 
-            args, 
-            supabase
-          );
-          aiResponse += functionResponse;
-        }
+        console.log('Calling function:', toolCall.function.name);
+        const functionResponse = await handleFunctionCall(
+          toolCall.function.name, 
+          args, 
+          supabase
+        );
+        aiResponse += functionResponse;
       }
     }
 
-    console.log('Enhanced AI response generated successfully')
+    console.log('AI response generated successfully')
 
     return new Response(
       JSON.stringify({
         success: true,
         response: aiResponse,
-        context_used: bookkeepingContext.length > 0,
-        enhanced_analysis_used: shouldUseEnhancedAnalysis(message)
+        context_used: bookkeepingContext.length > 0
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -255,7 +241,7 @@ ${bookkeepingContext}`
     )
 
   } catch (error) {
-    console.error('Error in enhanced chat-assistant function:', error)
+    console.error('Error in chat-assistant function:', error)
     return new Response(
       JSON.stringify({ 
         error: error.message || 'An unexpected error occurred',
