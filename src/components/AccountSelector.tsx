@@ -111,7 +111,7 @@ export function AccountSelector({
         >
           {selectedAccount
             ? showAccountNumbers 
-              ? `${selectedAccount.account_name} (${selectedAccount.account_code})`
+              ? `${selectedAccount.account_code} - ${selectedAccount.account_name}`
               : selectedAccount.account_name
             : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -141,7 +141,7 @@ export function AccountSelector({
                   <div className="flex flex-col">
                     <span className="font-medium">
                       {showAccountNumbers 
-                        ? `${account.account_name} (${account.account_code})`
+                        ? `${account.account_code} - ${account.account_name}`
                         : account.account_name}
                     </span>
                     <span className="text-xs text-muted-foreground capitalize">

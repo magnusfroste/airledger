@@ -666,6 +666,7 @@ const TemplateManager = () => {
                                 setNewTemplate(prev => ({ ...prev, template_entries: newEntries }));
                               }}
                               placeholder="Välj konto"
+                              showAccountNumbers={isDeveloper}
                             />
                             <Input
                               placeholder="Kontonamn"
@@ -808,6 +809,7 @@ const TemplateManager = () => {
                                  setEditingTemplate(prev => prev ? { ...prev, template_entries: newEntries } : null);
                                }}
                                placeholder="Välj konto"
+                               showAccountNumbers={isDeveloper}
                              />
                              <Input
                                placeholder="Kontonamn"
