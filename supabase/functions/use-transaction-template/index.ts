@@ -86,57 +86,104 @@ serve(async (req) => {
     
     console.log('Template entries before processing:', templateEntries)
     
-    // Calculate amounts
-    const inputAmount = parseFloat(amount.toString())
-    const vatRate = 0.25 // 25% Swedish VAT
-    
-    // For sales templates, input is typically excluding VAT
-    const amountExcludingVat = inputAmount
-    const vatAmount = amountExcludingVat * vatRate
-    const totalAmount = amountExcludingVat + vatAmount
-    
-    console.log('Amount calculations:', {
-      inputAmount,
-      amountExcludingVat,
-      vatAmount,
-      totalAmount,
-      vatRate
+    // Analyze template to determine if it uses VAT placeholders
+    const hasVatPlaceholders = templateEntries.some(entry => {
+      const debitAmount = entry.debit_amount?.toString() || ''
+      const creditAmount = entry.credit_amount?.toString() || ''
+      
+      return debitAmount.includes('{vat_amount}') || 
+             debitAmount.includes('{amount_excluding_vat}') || 
+             debitAmount.includes('{total_amount}') ||
+             creditAmount.includes('{vat_amount}') || 
+             creditAmount.includes('{amount_excluding_vat}') || 
+             creditAmount.includes('{total_amount}')
     })
+
+    console.log('Template uses VAT placeholders:', hasVatPlaceholders)
+
+    // Calculate amounts based on whether template uses VAT
+    const inputAmount = parseFloat(amount.toString())
+    let amountExcludingVat: number
+    let vatAmount: number
+    let totalAmount: number
+
+    if (hasVatPlaceholders) {
+      // Template uses VAT placeholders - calculate VAT
+      const vatRate = template.vat_rate || 0.25 // Default to 25% Swedish VAT
+      
+      // For sales templates, input is typically excluding VAT
+      amountExcludingVat = inputAmount
+      vatAmount = amountExcludingVat * vatRate
+      totalAmount = amountExcludingVat + vatAmount
+      
+      console.log('VAT calculations applied:', {
+        inputAmount,
+        amountExcludingVat,
+        vatAmount,
+        totalAmount,
+        vatRate
+      })
+    } else {
+      // Template doesn't use VAT placeholders - use exact amount
+      amountExcludingVat = inputAmount
+      vatAmount = 0
+      totalAmount = inputAmount
+      
+      console.log('No VAT calculations - using exact amount:', {
+        inputAmount,
+        exactAmount: totalAmount
+      })
+    }
 
     // Replace placeholders in template entries
     const entries = templateEntries.map((entry: any) => {
       let debitAmount = 0
       let creditAmount = 0
       
-      // Handle different amount types based on placeholders or fixed amounts
-      let entryAmount = 0
+      // Handle debit amounts
+      if (entry.debit_amount !== null && entry.debit_amount !== undefined) {
+        if (typeof entry.debit_amount === 'string') {
+          if (entry.debit_amount === '{amount_excluding_vat}') {
+            debitAmount = amountExcludingVat
+          } else if (entry.debit_amount === '{vat_amount}') {
+            debitAmount = vatAmount
+          } else if (entry.debit_amount === '{total_amount}') {
+            debitAmount = totalAmount
+          } else if (entry.debit_amount === '{amount}') {
+            // Generic placeholder - use input amount
+            debitAmount = inputAmount
+          } else {
+            debitAmount = parseFloat(entry.debit_amount) || 0
+          }
+        } else {
+          debitAmount = parseFloat(entry.debit_amount) || 0
+        }
+      }
       
-      if (typeof entry.debit_amount === 'string') {
-        if (entry.debit_amount === '{amount_excluding_vat}') {
-          entryAmount = amountExcludingVat
-        } else if (entry.debit_amount === '{vat_amount}') {
-          entryAmount = vatAmount
-        } else if (entry.debit_amount === '{total_amount}') {
-          entryAmount = totalAmount
+      // Handle credit amounts
+      if (entry.credit_amount !== null && entry.credit_amount !== undefined) {
+        if (typeof entry.credit_amount === 'string') {
+          if (entry.credit_amount === '{amount_excluding_vat}') {
+            creditAmount = amountExcludingVat
+          } else if (entry.credit_amount === '{vat_amount}') {
+            creditAmount = vatAmount
+          } else if (entry.credit_amount === '{total_amount}') {
+            creditAmount = totalAmount
+          } else if (entry.credit_amount === '{amount}') {
+            // Generic placeholder - use input amount
+            creditAmount = inputAmount
+          } else {
+            creditAmount = parseFloat(entry.credit_amount) || 0
+          }
         } else {
-          entryAmount = parseFloat(entry.debit_amount) || 0
+          creditAmount = parseFloat(entry.credit_amount) || 0
         }
-        debitAmount = entryAmount
-      } else if (typeof entry.credit_amount === 'string') {
-        if (entry.credit_amount === '{amount_excluding_vat}') {
-          entryAmount = amountExcludingVat
-        } else if (entry.credit_amount === '{vat_amount}') {
-          entryAmount = vatAmount
-        } else if (entry.credit_amount === '{total_amount}') {
-          entryAmount = totalAmount
-        } else {
-          entryAmount = parseFloat(entry.credit_amount) || 0
-        }
-        creditAmount = entryAmount
-      } else {
-        // Fallback to type-based logic for older templates
+      }
+      
+      // Fallback for older templates that use 'type' field
+      if (debitAmount === 0 && creditAmount === 0) {
         if (entry.type === 'debit') {
-          debitAmount = totalAmount
+          debitAmount = inputAmount
         } else if (entry.type === 'credit') {
           creditAmount = inputAmount
         }
@@ -160,7 +207,10 @@ serve(async (req) => {
     console.log('Balance check:', { totalDebit, totalCredit })
     
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
-      throw new Error(`Transaction entries are not balanced. Total debits: ${totalDebit}, Total credits: ${totalCredit}`)
+      console.error('Unbalanced transaction detected')
+      console.error('Template entries:', templateEntries)
+      console.error('Generated entries:', entries)
+      throw new Error(`Transaction entries are not balanced. Total debits: ${totalDebit.toFixed(2)}, Total credits: ${totalCredit.toFixed(2)}. This indicates an issue with the template "${templateName}".`)
     }
 
     // Create the transaction using save-general-transaction
@@ -210,7 +260,15 @@ serve(async (req) => {
         transaction: transactionData.transaction,
         template_used: template.template_name,
         template_id: template.id,
-        message: `Transaktion skapad från mall "${template.template_name}"`
+        message: `Transaktion skapad från mall "${template.template_name}"`,
+        vat_applied: hasVatPlaceholders,
+        amounts: hasVatPlaceholders ? {
+          excluding_vat: amountExcludingVat,
+          vat_amount: vatAmount,
+          total_amount: totalAmount
+        } : {
+          exact_amount: inputAmount
+        }
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
