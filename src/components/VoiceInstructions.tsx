@@ -1,4 +1,3 @@
-
 import { Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,12 +40,6 @@ const VoiceInstructions = () => {
       description: "Bokför löneutbetalningar och arbetsgivaravgifter",
       example: "Jag betalade ut lön 35 000 kr och sociala avgifter 11 000 kr",
       details: "AI:n använder lönemall med alla rätta konton: bruttolön, skatt, sociala avgifter"
-    },
-    {
-      title: "🎯 Egna Mallar & Specialfall",
-      description: "Skapa anpassade mallar för dina specifika behov",
-      example: "Skapa mall för denna transaktion eller använd mallen för hyra",
-      details: "Om AI:n inte känner igen din transaktion kan du skapa egna mallar via Mallar-sidan. Systemmallar delas av alla användare, egna mallar är bara för dig."
     }
   ];
 
