@@ -400,6 +400,12 @@ const TransactionsList = () => {
     setImportLoading(true);
 
     try {
+      // Get current user once
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('Du måste vara inloggad för att importera transaktioner');
+      }
+
       // Group rows by transaction (same date, description, type, etc.)
       const transactionGroups = new Map();
 
@@ -441,12 +447,15 @@ const TransactionsList = () => {
             .insert({
               ...group.transaction,
               total_amount: totalAmount,
-              user_id: (await supabase.auth.getUser()).data.user?.id,
+              user_id: user.id,
             })
             .select()
             .single();
 
-          if (transactionError) throw transactionError;
+          if (transactionError) {
+            console.error(`Transaction error for ${key}:`, transactionError);
+            throw transactionError;
+          }
 
           // Create entries
           const entriesWithTransactionId = group.entries.map((entry: any) => ({
@@ -458,8 +467,12 @@ const TransactionsList = () => {
             .from('airledger_entries')
             .insert(entriesWithTransactionId);
 
-          if (entriesError) throw entriesError;
+          if (entriesError) {
+            console.error(`Entries error for ${key}:`, entriesError);
+            throw entriesError;
+          }
 
+          console.log(`Successfully imported transaction: ${key}`);
           successCount++;
         } catch (error) {
           console.error(`Error importing transaction group ${key}:`, error);
