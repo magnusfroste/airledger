@@ -80,7 +80,7 @@ serve(async (req) => {
 
     console.log('Found template:', template.template_name)
 
-    // Create transaction entries based on template with VAT calculation
+    // Create transaction entries based on template with proper VAT calculation
     const templateEntries = template.template_entries as any[]
     
     // Check if template has VAT calculation entries
@@ -89,13 +89,35 @@ serve(async (req) => {
     let entries: any[]
     
     if (hasVatCalculation) {
-      // Calculate VAT amounts for templates with VAT
-      const vatRate = 0.25 // 25% Swedish VAT
-      const totalAmount = parseFloat(amount.toString())
-      const excludingVat = totalAmount / (1 + vatRate) // Amount excluding VAT
-      const vatAmount = totalAmount - excludingVat // VAT amount only
+      // For VAT templates, the input amount is typically EXCLUDING VAT
+      // We need to calculate VAT and total amounts properly
+      const inputAmount = parseFloat(amount.toString())
       
-      console.log('VAT Calculation:', { totalAmount, excludingVat, vatAmount })
+      console.log('VAT Template detected. Input amount (excluding VAT):', inputAmount)
+      
+      // Determine VAT rate from template entries
+      let vatRate = 0.25 // Default 25% Swedish VAT
+      
+      // Try to determine VAT rate from template structure
+      const vatEntry = templateEntries.find((entry: any) => 
+        entry.account_code === '2610' || entry.account_name?.toLowerCase().includes('moms')
+      )
+      
+      if (vatEntry && vatEntry.vat_calculation === 'vat_only') {
+        // Keep default 25% VAT rate
+        vatRate = 0.25
+      }
+      
+      const amountExcludingVat = inputAmount
+      const vatAmount = amountExcludingVat * vatRate
+      const totalAmountIncludingVat = amountExcludingVat + vatAmount
+      
+      console.log('VAT Calculation:', { 
+        amountExcludingVat, 
+        vatAmount, 
+        totalAmountIncludingVat,
+        vatRate 
+      })
       
       entries = templateEntries.map((entry: any) => {
         let debitAmount = 0
@@ -103,23 +125,25 @@ serve(async (req) => {
         
         if (entry.type === 'debit') {
           if (entry.vat_calculation === 'exclude_vat') {
-            debitAmount = excludingVat
+            debitAmount = amountExcludingVat
           } else if (entry.vat_calculation === 'vat_only') {
             debitAmount = vatAmount
           } else if (entry.vat_calculation === 'total_amount') {
-            debitAmount = totalAmount
+            debitAmount = totalAmountIncludingVat
           } else {
-            debitAmount = totalAmount // fallback
+            // For entries without specific VAT calculation, use total amount
+            debitAmount = totalAmountIncludingVat
           }
         } else if (entry.type === 'credit') {
           if (entry.vat_calculation === 'exclude_vat') {
-            creditAmount = excludingVat
+            creditAmount = amountExcludingVat
           } else if (entry.vat_calculation === 'vat_only') {
             creditAmount = vatAmount
           } else if (entry.vat_calculation === 'total_amount') {
-            creditAmount = totalAmount
+            creditAmount = totalAmountIncludingVat
           } else {
-            creditAmount = totalAmount // fallback
+            // For entries without specific VAT calculation, use total amount
+            creditAmount = totalAmountIncludingVat
           }
         }
         
@@ -143,6 +167,16 @@ serve(async (req) => {
     }
 
     console.log('Generated entries from template:', entries)
+
+    // Validate that entries balance
+    const totalDebit = entries.reduce((sum, entry) => sum + (entry.debitAmount || 0), 0)
+    const totalCredit = entries.reduce((sum, entry) => sum + (entry.creditAmount || 0), 0)
+    
+    console.log('Balance check:', { totalDebit, totalCredit })
+    
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      throw new Error(`Transaction entries are not balanced. Total debits: ${totalDebit}, Total credits: ${totalCredit}`)
+    }
 
     // Create the transaction using save-general-transaction
     const { data: transactionData, error: transactionError } = await supabase.functions.invoke('save-general-transaction', {
@@ -190,7 +224,7 @@ serve(async (req) => {
         success: true,
         transaction: transactionData.transaction,
         template_used: template.template_name,
-        template_id: template.id, // Add template ID for usage tracking
+        template_id: template.id,
         message: `Transaktion skapad från mall "${template.template_name}"`
       }),
       {
