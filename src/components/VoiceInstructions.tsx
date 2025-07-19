@@ -135,9 +135,10 @@ const VoiceInstructions = () => {
               </Badge>
             </div>
             <div className="text-sm space-y-1 text-amber-800 dark:text-amber-200">
-              <div>• AI:n föreslår att skapa en ny mall</div>
-              <div>• Gå till <strong>Mallar-sidan</strong> för att skapa anpassade mallar</div>
-              <div>• Dina mallar blir tillgängliga för framtida liknande transaktioner</div>
+              <div>• AI:n bokför transaktionen manuellt baserat på BAS-kontoplanen</div>
+              <div>• AI:n kan föreslå att du skapar en egen mall för framtida liknande transaktioner</div>
+              <div>• Gå till <strong>Mallar-sidan</strong> för att skapa anpassade mallar själv</div>
+              <div>• Dina mallar blir tillgängliga för framtida användning</div>
               <div>• Systemmallar används för vanliga transaktioner (skatt, lön, etc.)</div>
             </div>
           </div>
