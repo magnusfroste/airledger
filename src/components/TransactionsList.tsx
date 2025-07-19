@@ -441,6 +441,7 @@ const TransactionsList = () => {
             .insert({
               ...group.transaction,
               total_amount: totalAmount,
+              user_id: (await supabase.auth.getUser()).data.user?.id,
             })
             .select()
             .single();
