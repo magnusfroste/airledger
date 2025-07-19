@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
@@ -96,10 +97,43 @@ serve(async (req) => {
       throw new Error('Authentication failed')
     }
 
+    const finalTransactionDate = transactionDate || new Date().toISOString().split('T')[0];
+
+    // Check for potential duplicate transactions
+    console.log('Checking for duplicate transactions...')
+    const { data: existingTransactions, error: duplicateCheckError } = await supabase
+      .from('airledger_transactions')
+      .select('id, description, total_amount, transaction_date')
+      .eq('user_id', userId)
+      .eq('description', description)
+      .eq('total_amount', totalDebit)
+      .eq('transaction_date', finalTransactionDate)
+      .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
+
+    if (duplicateCheckError) {
+      console.error('Error checking for duplicates:', duplicateCheckError)
+      // Continue with transaction creation even if duplicate check fails
+    } else if (existingTransactions && existingTransactions.length > 0) {
+      console.log('Potential duplicate transaction found:', existingTransactions[0])
+      
+      // Return the existing transaction instead of creating a new one
+      return new Response(
+        JSON.stringify({
+          success: true,
+          transaction: existingTransactions[0],
+          message: 'Transaction already exists (duplicate prevented)',
+          duplicate_prevented: true
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
     // Create transaction
     const transactionData = {
       user_id: userId,
-      transaction_date: transactionDate || new Date().toISOString().split('T')[0],
+      transaction_date: finalTransactionDate,
       description: description,
       total_amount: totalDebit, // Use total debit as transaction amount
       transaction_type: 'expense', // Default to expense, could be made configurable

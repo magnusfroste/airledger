@@ -236,6 +236,9 @@ ${bookkeepingContext}`
     const toolCalls = response.choices[0].message.tool_calls
 
     if (toolCalls && toolCalls.length > 0) {
+      // Skapa en unik session-identifierare för denna konversation
+      const sessionId = `${userId}_${Date.now()}`;
+      
       for (const toolCall of toolCalls) {
         const args = JSON.parse(toolCall.function.arguments);
         
@@ -243,7 +246,8 @@ ${bookkeepingContext}`
         const functionResponse = await handleFunctionCall(
           toolCall.function.name, 
           args, 
-          supabase
+          supabase,
+          sessionId
         );
         aiResponse += functionResponse;
       }
