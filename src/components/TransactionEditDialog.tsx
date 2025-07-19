@@ -116,8 +116,10 @@ const TransactionEditDialog = ({ open, onOpenChange, transaction, onTransactionU
 
     const updatedEntries = editedTransaction.entries.filter(entry => entry.id !== entryId);
     
-    // Recalculate total amount
-    const newTotal = updatedEntries.reduce((sum, entry) => sum + Math.max(entry.debit_amount, entry.credit_amount), 0);
+    // Recalculate total amount correctly
+    const totalDebit = updatedEntries.reduce((sum, entry) => sum + entry.debit_amount, 0);
+    const totalCredit = updatedEntries.reduce((sum, entry) => sum + entry.credit_amount, 0);
+    const newTotal = Math.max(totalDebit, totalCredit);
     
     setEditedTransaction({
       ...editedTransaction,
@@ -160,13 +162,16 @@ const TransactionEditDialog = ({ open, onOpenChange, transaction, onTransactionU
 
     setIsLoading(true);
     try {
+      // Calculate correct total amount
+      const correctTotalAmount = Math.max(totalDebit, totalCredit);
+      
       // Update transaction
       const { error: transactionError } = await supabase
         .from('airledger_transactions')
         .update({
           transaction_date: editedTransaction.transaction_date,
           description: editedTransaction.description,
-          total_amount: editedTransaction.total_amount,
+          total_amount: correctTotalAmount,
           transaction_type: editedTransaction.transaction_type as "income" | "expense" | "transfer",
         })
         .eq('id', editedTransaction.id);
@@ -254,8 +259,10 @@ const TransactionEditDialog = ({ open, onOpenChange, transaction, onTransactionU
       }
     }
     
-    // Recalculate total amount
-    const newTotal = updatedEntries.reduce((sum, entry) => sum + Math.max(entry.debit_amount, entry.credit_amount), 0);
+    // Recalculate total amount correctly
+    const totalDebit = updatedEntries.reduce((sum, entry) => sum + entry.debit_amount, 0);
+    const totalCredit = updatedEntries.reduce((sum, entry) => sum + entry.credit_amount, 0);
+    const newTotal = Math.max(totalDebit, totalCredit);
     
     setEditedTransaction({
       ...editedTransaction,
