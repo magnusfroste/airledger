@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { AccountSelector } from "@/components/AccountSelector";
+import { TemplateGuide } from "@/components/TemplateGuide";
+
 interface TransactionTemplate {
   id: string;
   template_name: string;
@@ -458,14 +460,17 @@ const TemplateManager = () => {
         <div className="max-w-6xl mx-auto px-6 py-8">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
-                  <FileText className="h-6 w-6" />
-                  Transaktionsmallar
-                  {isDeveloper && <Badge variant="secondary" className="ml-2 gap-1">
-                      <Crown className="h-3 w-3" />
-                      Utvecklare
-                    </Badge>}
-                </h1>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+                    <FileText className="h-6 w-6" />
+                    Transaktionsmallar
+                    {isDeveloper && <Badge variant="secondary" className="ml-2 gap-1">
+                        <Crown className="h-3 w-3" />
+                        Utvecklare
+                      </Badge>}
+                  </h1>
+                  <TemplateGuide />
+                </div>
                 <p className="text-gray-600 mt-1">
                   Hantera och skapa mallar för återkommande transaktioner
                   {isDeveloper && " • Systemmallar tillgängliga"}
