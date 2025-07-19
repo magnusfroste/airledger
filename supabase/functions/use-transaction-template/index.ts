@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
@@ -80,91 +81,75 @@ serve(async (req) => {
 
     console.log('Found template:', template.template_name)
 
-    // Create transaction entries based on template with proper VAT calculation
+    // Create transaction entries based on template with placeholder replacement
     const templateEntries = template.template_entries as any[]
     
-    // Check if template has VAT calculation entries
-    const hasVatCalculation = templateEntries.some((entry: any) => entry.vat_calculation)
+    console.log('Template entries before processing:', templateEntries)
     
-    let entries: any[]
+    // Calculate amounts
+    const inputAmount = parseFloat(amount.toString())
+    const vatRate = 0.25 // 25% Swedish VAT
     
-    if (hasVatCalculation) {
-      // For VAT templates, the input amount is typically EXCLUDING VAT
-      // We need to calculate VAT and total amounts properly
-      const inputAmount = parseFloat(amount.toString())
+    // For sales templates, input is typically excluding VAT
+    const amountExcludingVat = inputAmount
+    const vatAmount = amountExcludingVat * vatRate
+    const totalAmount = amountExcludingVat + vatAmount
+    
+    console.log('Amount calculations:', {
+      inputAmount,
+      amountExcludingVat,
+      vatAmount,
+      totalAmount,
+      vatRate
+    })
+
+    // Replace placeholders in template entries
+    const entries = templateEntries.map((entry: any) => {
+      let debitAmount = 0
+      let creditAmount = 0
       
-      console.log('VAT Template detected. Input amount (excluding VAT):', inputAmount)
+      // Handle different amount types based on placeholders or fixed amounts
+      let entryAmount = 0
       
-      // Determine VAT rate from template entries
-      let vatRate = 0.25 // Default 25% Swedish VAT
-      
-      // Try to determine VAT rate from template structure
-      const vatEntry = templateEntries.find((entry: any) => 
-        entry.account_code === '2610' || entry.account_name?.toLowerCase().includes('moms')
-      )
-      
-      if (vatEntry && vatEntry.vat_calculation === 'vat_only') {
-        // Keep default 25% VAT rate
-        vatRate = 0.25
+      if (typeof entry.debit_amount === 'string') {
+        if (entry.debit_amount === '{amount_excluding_vat}') {
+          entryAmount = amountExcludingVat
+        } else if (entry.debit_amount === '{vat_amount}') {
+          entryAmount = vatAmount
+        } else if (entry.debit_amount === '{total_amount}') {
+          entryAmount = totalAmount
+        } else {
+          entryAmount = parseFloat(entry.debit_amount) || 0
+        }
+        debitAmount = entryAmount
+      } else if (typeof entry.credit_amount === 'string') {
+        if (entry.credit_amount === '{amount_excluding_vat}') {
+          entryAmount = amountExcludingVat
+        } else if (entry.credit_amount === '{vat_amount}') {
+          entryAmount = vatAmount
+        } else if (entry.credit_amount === '{total_amount}') {
+          entryAmount = totalAmount
+        } else {
+          entryAmount = parseFloat(entry.credit_amount) || 0
+        }
+        creditAmount = entryAmount
+      } else {
+        // Fallback to type-based logic for older templates
+        if (entry.type === 'debit') {
+          debitAmount = totalAmount
+        } else if (entry.type === 'credit') {
+          creditAmount = inputAmount
+        }
       }
       
-      const amountExcludingVat = inputAmount
-      const vatAmount = amountExcludingVat * vatRate
-      const totalAmountIncludingVat = amountExcludingVat + vatAmount
-      
-      console.log('VAT Calculation:', { 
-        amountExcludingVat, 
-        vatAmount, 
-        totalAmountIncludingVat,
-        vatRate 
-      })
-      
-      entries = templateEntries.map((entry: any) => {
-        let debitAmount = 0
-        let creditAmount = 0
-        
-        if (entry.type === 'debit') {
-          if (entry.vat_calculation === 'exclude_vat') {
-            debitAmount = amountExcludingVat
-          } else if (entry.vat_calculation === 'vat_only') {
-            debitAmount = vatAmount
-          } else if (entry.vat_calculation === 'total_amount') {
-            debitAmount = totalAmountIncludingVat
-          } else {
-            // For entries without specific VAT calculation, use total amount
-            debitAmount = totalAmountIncludingVat
-          }
-        } else if (entry.type === 'credit') {
-          if (entry.vat_calculation === 'exclude_vat') {
-            creditAmount = amountExcludingVat
-          } else if (entry.vat_calculation === 'vat_only') {
-            creditAmount = vatAmount
-          } else if (entry.vat_calculation === 'total_amount') {
-            creditAmount = totalAmountIncludingVat
-          } else {
-            // For entries without specific VAT calculation, use total amount
-            creditAmount = totalAmountIncludingVat
-          }
-        }
-        
-        return {
-          accountCode: entry.account_code,
-          accountName: entry.account_name,
-          debitAmount,
-          creditAmount,
-          description: entry.description || description || template.description
-        }
-      })
-    } else {
-      // For templates without VAT calculation, use original logic
-      entries = templateEntries.map((entry: any) => ({
+      return {
         accountCode: entry.account_code,
         accountName: entry.account_name,
-        debitAmount: entry.type === 'debit' ? amount : 0,
-        creditAmount: entry.type === 'credit' ? amount : 0,
+        debitAmount,
+        creditAmount,
         description: entry.description || description || template.description
-      }))
-    }
+      }
+    })
 
     console.log('Generated entries from template:', entries)
 
