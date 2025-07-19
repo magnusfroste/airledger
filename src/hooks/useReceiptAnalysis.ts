@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,9 +39,28 @@ export const useReceiptAnalysis = () => {
         setPendingAnalysis(analysis);
         setConfirmDialogOpen(true);
 
+        // Map payment method labels to match the updated options
+        let paymentMethodLabel = analysis.suggested_payment_method;
+        switch (analysis.suggested_payment_method) {
+          case 'expense':
+            paymentMethodLabel = 'Utlägg (2893)';
+            break;
+          case 'unpaid':
+            paymentMethodLabel = 'Ej betald (2440)';
+            break;
+          case 'bank':
+            paymentMethodLabel = 'Bankkonto (1930)';
+            break;
+          case 'cash':
+            paymentMethodLabel = 'Kassa (1910)';
+            break;
+          default:
+            paymentMethodLabel = analysis.suggested_payment_method;
+        }
+
         const aiResponse: Message = {
           id: (Date.now() + Math.random()).toString(),
-          content: `🎯 **Kvittoanalys klar!**\n\n**${analysis.vendor}** - ${analysis.date}\n**Belopp:** ${analysis.total_amount} kr\n**Dokumenttyp:** ${analysis.document_type === 'receipt' ? 'Kvitto' : 'Faktura'} (${analysis.document_type_confidence}% säkerhet)\n\n**Föreslaget betalningssätt:** ${analysis.suggested_payment_method}\n\n📋 Klicka "Bekräfta bokföring" för att granska och spara transaktionen.`,
+          content: `🎯 **Kvittoanalys klar!**\n\n**${analysis.vendor}** - ${analysis.date}\n**Belopp:** ${analysis.total_amount} kr\n**Dokumenttyp:** ${analysis.document_type === 'receipt' ? 'Kvitto' : 'Faktura'} (${analysis.document_type_confidence}% säkerhet)\n\n**Föreslaget betalningssätt:** ${paymentMethodLabel}\n\n📋 Klicka "Bekräfta bokföring" för att granska och spara transaktionen.`,
           sender: 'ai',
           timestamp: new Date(),
           type: 'text'

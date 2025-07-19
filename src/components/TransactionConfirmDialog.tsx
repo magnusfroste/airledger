@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -40,8 +41,8 @@ interface TransactionConfirmDialogProps {
 const paymentMethods = [
   { value: 'bank', label: 'Bankkonto (1930)', icon: Building2, account: '1930', description: 'Kort/bankbetalning' },
   { value: 'cash', label: 'Kassa (1910)', icon: Banknote, account: '1910', description: 'Kontant betalning' },
-  { value: 'expense', label: 'Utlägg (2640)', icon: Wallet, account: '2640', description: 'Privat utlägg att ersätta' },
-  { value: 'unpaid', label: 'Ej betald (2640)', icon: FileText, account: '2640', description: 'Faktura att betala' },
+  { value: 'expense', label: 'Utlägg (2893)', icon: Wallet, account: '2893', description: 'Privat utlägg från närstående' },
+  { value: 'unpaid', label: 'Ej betald (2440)', icon: FileText, account: '2440', description: 'Leverantörsskuld att betala' },
 ];
 
 const TransactionConfirmDialog = ({ open, onOpenChange, analysis, onConfirm }: TransactionConfirmDialogProps) => {
