@@ -1,7 +1,6 @@
 
 import Dashboard from "@/components/Dashboard";
 import LandingPage from "@/components/LandingPage";
-import Navigation from "@/components/Navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
@@ -18,15 +17,12 @@ const Index = () => {
     );
   }
 
+  // If user is authenticated, show Dashboard
   if (user) {
-    return (
-      <>
-        <Navigation />
-        <Dashboard />
-      </>
-    );
+    return <Dashboard />;
   }
 
+  // If not authenticated, show LandingPage
   return <LandingPage />;
 };
 

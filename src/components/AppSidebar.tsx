@@ -16,7 +16,6 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarSeparator,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 
@@ -117,7 +116,7 @@ const AppSidebar = ({ transactionCount, isDeveloper }: AppSidebarProps) => {
   const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar className="border-r border-border/20">
+    <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm">
@@ -125,7 +124,6 @@ const AppSidebar = ({ transactionCount, isDeveloper }: AppSidebarProps) => {
           </div>
           {!isCollapsed && <h1 className="text-lg font-semibold text-foreground">AirLedger</h1>}
         </div>
-        <SidebarTrigger className="mt-2" />
       </SidebarHeader>
 
       <SidebarContent>
