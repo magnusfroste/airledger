@@ -1,10 +1,13 @@
+
 import Dashboard from "@/components/Dashboard";
 import LandingPage from "@/components/LandingPage";
 import Navigation from "@/components/Navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
   const { user, loading } = useAuth();
+  const isMobile = useIsMobile();
 
   if (loading) {
     return (
@@ -21,7 +24,7 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
-        <main className="min-h-[calc(100vh-112px)]"> {/* Full height minus header and bottom nav */}
+        <main className={`${isMobile ? 'min-h-[calc(100vh-112px)]' : 'min-h-[calc(100vh-48px)]'}`}>
           <Dashboard />
         </main>
       </div>
@@ -32,3 +35,4 @@ const Index = () => {
 };
 
 export default Index;
+
