@@ -3,11 +3,9 @@ import Dashboard from "@/components/Dashboard";
 import LandingPage from "@/components/LandingPage";
 import Navigation from "@/components/Navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
   const { user, loading } = useAuth();
-  const isMobile = useIsMobile();
 
   if (loading) {
     return (
@@ -21,26 +19,11 @@ const Index = () => {
   }
 
   if (user) {
-    // Desktop/tablet layout with sidebar
-    if (!isMobile) {
-      return (
-        <div className="min-h-screen bg-background">
-          <Navigation />
-          <main className="ml-64 min-h-screen">
-            <Dashboard />
-          </main>
-        </div>
-      );
-    }
-
-    // Mobile layout
     return (
-      <div className="min-h-screen bg-background">
+      <>
         <Navigation />
-        <main className="min-h-[calc(100vh-112px)]">
-          <Dashboard />
-        </main>
-      </div>
+        <Dashboard />
+      </>
     );
   }
 

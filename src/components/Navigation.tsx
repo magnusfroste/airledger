@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,10 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Bot, FileText, MoreHorizontal, Settings, LogOut, User, BarChart3, Calculator, BookOpen, Menu } from "lucide-react";
+import { Home, Bot, FileText, MoreHorizontal, Settings, LogOut, User, BarChart3, Calculator, BookOpen } from "lucide-react";
 import VoiceInstructions from "@/components/VoiceInstructions";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
 
 const Navigation = () => {
@@ -195,25 +196,24 @@ const Navigation = () => {
     );
   };
 
-  // For desktop/tablet, wrap with SidebarProvider
+  // For desktop/tablet, use sidebar layout
   if (!isMobile) {
     return (
       <SidebarProvider>
         <div className="flex min-h-screen w-full">
           <AppSidebar transactionCount={transactionCount} isDeveloper={isDeveloper} />
-          
-          {/* Desktop Header */}
-          <div className="flex-1">
+          <SidebarInset>
             <header className="sticky top-0 z-40 w-full border-b border-border/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-              <div className="flex h-12 items-center justify-between px-4">
-                <SidebarTrigger />
-                
+              <div className="flex h-12 items-center justify-end px-4">
                 <div className="flex items-center gap-2">
                   {location.pathname === '/chat' && <VoiceInstructions />}
                 </div>
               </div>
             </header>
-          </div>
+            <main className="flex-1">
+              {/* Content will be rendered here by the router */}
+            </main>
+          </SidebarInset>
         </div>
       </SidebarProvider>
     );
