@@ -1,6 +1,6 @@
-
 import Dashboard from "@/components/Dashboard";
 import LandingPage from "@/components/LandingPage";
+import Navigation from "@/components/Navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
@@ -17,12 +17,17 @@ const Index = () => {
     );
   }
 
-  // If user is authenticated, show Dashboard
   if (user) {
-    return <Dashboard />;
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <main className="min-h-[calc(100vh-112px)]"> {/* Full height minus header and bottom nav */}
+          <Dashboard />
+        </main>
+      </div>
+    );
   }
 
-  // If not authenticated, show LandingPage
   return <LandingPage />;
 };
 

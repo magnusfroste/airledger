@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, TrendingUp } from "lucide-react";
@@ -11,7 +12,6 @@ import ChartsSection from "./dashboard/ChartsSection";
 import RecentTransactions from "./dashboard/RecentTransactions";
 import QuotaWarning from "./QuotaWarning";
 import { useSubscription } from "@/hooks/useSubscription";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DashboardStats {
   revenue: number;
@@ -45,7 +45,6 @@ const Dashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { subscription, usage } = useSubscription();
-  const isMobile = useIsMobile();
 
   const [stats, setStats] = useState<DashboardStats>({
     revenue: 0,
@@ -250,7 +249,7 @@ const Dashboard = () => {
       <DashboardHeader greeting={greeting} userName={userName} />
 
       {/* Main Content with Tabs */}
-      <div className={`max-w-6xl mx-auto px-[10px] py-[10px] ${isMobile ? 'pb-20' : 'pb-6'} sm:pb-6`}>
+      <div className="max-w-6xl mx-auto pb-20 sm:pb-6 px-[10px] py-[10px]">
         {/* Quota Warning */}
         {subscription && (
           <div className="mb-6">
