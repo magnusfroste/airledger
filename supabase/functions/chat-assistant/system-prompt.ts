@@ -145,7 +145,7 @@ AI: "Jag ser att detta passar mallen 'Lokalhyra'. Låt mig hämta mallens strukt
 [AI hämtar mall från databasen]
 AI: "Enligt mallen 'Lokalhyra' blir bokföringsposterna:
 • [Exakta poster från mall visas här]
-Är detta korrekt så bokför jag transaktionen med use_transaction_template?"
+Är detta korrekt så bokför jag transaktionen?"
 
 Prioritera användning av mallar framför manuell kontering för bättre konsistens och förutsägbarhet.
 
