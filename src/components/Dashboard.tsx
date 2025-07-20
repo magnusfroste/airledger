@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, TrendingUp } from "lucide-react";
@@ -11,12 +12,14 @@ import ChartsSection from "./dashboard/ChartsSection";
 import RecentTransactions from "./dashboard/RecentTransactions";
 import QuotaWarning from "./QuotaWarning";
 import { useSubscription } from "@/hooks/useSubscription";
+
 interface DashboardStats {
   revenue: number;
   expenses: number;
   checkingBalance: number;
   unpaidInvoices: number;
 }
+
 interface YearlyStats {
   revenue: number;
   expenses: number;
@@ -28,6 +31,7 @@ interface YearlyStats {
     netResult: number;
   }>;
 }
+
 interface RecentTransaction {
   id: string;
   description: string;
@@ -36,51 +40,60 @@ interface RecentTransaction {
   transaction_type: string;
   vendor?: string;
 }
+
 const Dashboard = () => {
-  const {
-    user
-  } = useAuth();
-  const {
-    toast
-  } = useToast();
-  const {
-    subscription,
-    usage
-  } = useSubscription();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { subscription, usage } = useSubscription();
+
   const [stats, setStats] = useState<DashboardStats>({
     revenue: 0,
     expenses: 0,
     checkingBalance: 0,
     unpaidInvoices: 0
   });
+
   const [yearlyStats, setYearlyStats] = useState<YearlyStats>({
     revenue: 0,
     expenses: 0,
     netResult: 0,
     monthlyBreakdown: []
   });
+
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [greeting] = useState(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "God morgon";
     if (hour < 17) return "God middag";
     return "God kväll";
   });
+
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Användare';
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
 
       // Fetch all transactions and entries in parallel
-      const [transactionsResult, entriesResult] = await Promise.all([supabase.from('airledger_transactions').select('*').order('transaction_date', {
-        ascending: false
-      }), supabase.from('airledger_entries').select('*')]);
+      const [transactionsResult, entriesResult] = await Promise.all([
+        supabase
+          .from('airledger_transactions')
+          .select('*')
+          .order('transaction_date', { ascending: false }),
+        supabase
+          .from('airledger_entries')
+          .select('*')
+      ]);
+
       if (transactionsResult.error) throw transactionsResult.error;
       if (entriesResult.error) throw entriesResult.error;
+
       const transactions = transactionsResult.data || [];
       const entries = entriesResult.data || [];
 
@@ -89,65 +102,94 @@ const Dashboard = () => {
       const currentYear = new Date().getFullYear();
 
       // MONTHLY DATA
-      // Revenue - only from sales (3000 account), not payments
+      // Revenue - all revenue accounts (3000-3999), not just 3000
       const monthlyRevenue = entries.filter(e => {
         const entryDate = new Date(e.created_at);
-        return e.account_code === '3000' && entryDate.getMonth() === currentMonth && entryDate.getFullYear() === currentYear;
+        const accountNum = parseInt(e.account_code);
+        return accountNum >= 3000 && accountNum <= 3999 && 
+               entryDate.getMonth() === currentMonth && 
+               entryDate.getFullYear() === currentYear;
       }).reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
-      // Expenses - posted expense transactions this month
-      const monthlyExpenses = transactions.filter(t => {
-        const transactionDate = new Date(t.transaction_date);
-        return t.transaction_type === 'expense' && transactionDate.getMonth() === currentMonth && transactionDate.getFullYear() === currentYear;
-      }).reduce((sum, t) => sum + t.total_amount, 0);
+      // Expenses - use entries for expense accounts (4000-4999, 6000-6999) like Reports
+      const monthlyExpenses = entries.filter(e => {
+        const entryDate = new Date(e.created_at);
+        const accountNum = parseInt(e.account_code);
+        return ((accountNum >= 4000 && accountNum <= 4999) || (accountNum >= 6000 && accountNum <= 6999)) &&
+               entryDate.getMonth() === currentMonth && 
+               entryDate.getFullYear() === currentYear;
+      }).reduce((sum, e) => sum + (e.debit_amount || 0), 0);
 
       // Checking account balance (1930) - include opening balance + transactions
-      const checkingOpeningBalance = await supabase.from('airledger_opening').select('opening_balance').eq('account_code', '1930').single();
-      const checkingTransactions = entries.filter(e => e.account_code === '1930').reduce((sum, e) => sum + (e.debit_amount || 0) - (e.credit_amount || 0), 0);
+      const checkingOpeningBalance = await supabase
+        .from('airledger_opening')
+        .select('opening_balance')
+        .eq('account_code', '1930')
+        .single();
+
+      const checkingTransactions = entries.filter(e => e.account_code === '1930')
+        .reduce((sum, e) => sum + (e.debit_amount || 0) - (e.credit_amount || 0), 0);
+
       const checkingBalance = (checkingOpeningBalance.data?.opening_balance || 0) + checkingTransactions;
 
       // Unpaid invoices - customer receivables (1510) minus any advance payments
-      const customerReceivables = entries.filter(e => e.account_code === '1510').reduce((sum, e) => sum + (e.debit_amount || 0) - (e.credit_amount || 0), 0);
+      const customerReceivables = entries.filter(e => e.account_code === '1510')
+        .reduce((sum, e) => sum + (e.debit_amount || 0) - (e.credit_amount || 0), 0);
+
       setStats({
         revenue: monthlyRevenue,
-        expenses: Math.abs(monthlyExpenses),
+        expenses: monthlyExpenses,
         checkingBalance,
         unpaidInvoices: Math.max(customerReceivables, 0)
       });
 
       // YEARLY DATA
-      // Calculate yearly totals and monthly breakdown
+      // Calculate yearly totals using same logic as Reports
       const yearlyRevenue = entries.filter(e => {
         const entryDate = new Date(e.created_at);
-        return e.account_code === '3000' && entryDate.getFullYear() === currentYear;
+        const accountNum = parseInt(e.account_code);
+        return accountNum >= 3000 && accountNum <= 3999 && 
+               entryDate.getFullYear() === currentYear;
       }).reduce((sum, e) => sum + (e.credit_amount || 0), 0);
-      const yearlyExpenses = transactions.filter(t => {
-        const transactionDate = new Date(t.transaction_date);
-        return t.transaction_type === 'expense' && transactionDate.getFullYear() === currentYear;
-      }).reduce((sum, t) => sum + t.total_amount, 0);
 
-      // Create monthly breakdown for charts
+      const yearlyExpenses = entries.filter(e => {
+        const entryDate = new Date(e.created_at);
+        const accountNum = parseInt(e.account_code);
+        return ((accountNum >= 4000 && accountNum <= 4999) || (accountNum >= 6000 && accountNum <= 6999)) &&
+               entryDate.getFullYear() === currentYear;
+      }).reduce((sum, e) => sum + (e.debit_amount || 0), 0);
+
+      // Create monthly breakdown for charts using entries logic
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
       const monthlyBreakdown = monthNames.map((month, index) => {
         const monthRevenue = entries.filter(e => {
           const entryDate = new Date(e.created_at);
-          return e.account_code === '3000' && entryDate.getMonth() === index && entryDate.getFullYear() === currentYear;
+          const accountNum = parseInt(e.account_code);
+          return accountNum >= 3000 && accountNum <= 3999 && 
+                 entryDate.getMonth() === index && 
+                 entryDate.getFullYear() === currentYear;
         }).reduce((sum, e) => sum + (e.credit_amount || 0), 0);
-        const monthExpenses = transactions.filter(t => {
-          const transactionDate = new Date(t.transaction_date);
-          return t.transaction_type === 'expense' && transactionDate.getMonth() === index && transactionDate.getFullYear() === currentYear;
-        }).reduce((sum, t) => sum + t.total_amount, 0);
+
+        const monthExpenses = entries.filter(e => {
+          const entryDate = new Date(e.created_at);
+          const accountNum = parseInt(e.account_code);
+          return ((accountNum >= 4000 && accountNum <= 4999) || (accountNum >= 6000 && accountNum <= 6999)) &&
+                 entryDate.getMonth() === index && 
+                 entryDate.getFullYear() === currentYear;
+        }).reduce((sum, e) => sum + (e.debit_amount || 0), 0);
+
         return {
           month,
           revenue: monthRevenue,
-          expenses: Math.abs(monthExpenses),
-          netResult: monthRevenue - Math.abs(monthExpenses)
+          expenses: monthExpenses,
+          netResult: monthRevenue - monthExpenses
         };
       });
+
       setYearlyStats({
         revenue: yearlyRevenue,
-        expenses: Math.abs(yearlyExpenses),
-        netResult: yearlyRevenue - Math.abs(yearlyExpenses),
+        expenses: yearlyExpenses,
+        netResult: yearlyRevenue - yearlyExpenses,
         monthlyBreakdown
       });
 
@@ -160,7 +202,9 @@ const Dashboard = () => {
         transaction_type: t.transaction_type,
         vendor: typeof t.analysis_data === 'object' && t.analysis_data !== null && 'vendor' in t.analysis_data ? String(t.analysis_data.vendor) : undefined
       }));
+
       setRecentTransactions(recent);
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast({
@@ -172,6 +216,7 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', {
       style: 'currency',
@@ -180,29 +225,38 @@ const Dashboard = () => {
       maximumFractionDigits: 0
     }).format(amount);
   };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('sv-SE', {
       day: 'numeric',
       month: 'short'
     });
   };
+
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-gray-600">Laddar dashboard...</p>
         </div>
-      </div>;
+      </div>
+    );
   }
-  return <div className="min-h-screen bg-gray-50">
+
+  return (
+    <div className="min-h-screen bg-gray-50">
       <DashboardHeader greeting={greeting} userName={userName} />
 
       {/* Main Content with Tabs */}
       <div className="max-w-6xl mx-auto pb-20 sm:pb-6 px-[10px] py-[10px]">
         {/* Quota Warning */}
-        {subscription && <div className="mb-6">
+        {subscription && (
+          <div className="mb-6">
             <QuotaWarning subscriptionTier={subscription.subscription_tier} usage={usage || undefined} />
-          </div>}
+          </div>
+        )}
+
         <Tabs defaultValue="month" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="month" className="flex items-center gap-2">
@@ -229,6 +283,8 @@ const Dashboard = () => {
 
         <RecentTransactions recentTransactions={recentTransactions} formatCurrency={formatCurrency} formatDate={formatDate} />
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Dashboard;
