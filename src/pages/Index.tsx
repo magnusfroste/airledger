@@ -21,10 +21,23 @@ const Index = () => {
   }
 
   if (user) {
+    // Desktop/tablet layout with sidebar
+    if (!isMobile) {
+      return (
+        <div className="min-h-screen bg-background">
+          <Navigation />
+          <main className="ml-64 min-h-screen">
+            <Dashboard />
+          </main>
+        </div>
+      );
+    }
+
+    // Mobile layout
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
-        <main className={`${isMobile ? 'min-h-[calc(100vh-112px)]' : 'min-h-[calc(100vh-48px)]'}`}>
+        <main className="min-h-[calc(100vh-112px)]">
           <Dashboard />
         </main>
       </div>
@@ -35,4 +48,3 @@ const Index = () => {
 };
 
 export default Index;
-
