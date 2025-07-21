@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Bot, Check, Receipt, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import heroImage from "@/assets/hero-image.jpg";
 import DemoChat from "@/components/DemoChat";
 
 const LandingPage = () => {
@@ -148,7 +147,7 @@ const LandingPage = () => {
 
             <div className="relative">
               <img 
-                src={heroImage} 
+                src="/hero-image.jpg" 
                 alt="AirLedger Dashboard" 
                 className="rounded-2xl shadow-2xl"
               />
