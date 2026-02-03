@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -553,33 +553,18 @@ export type Database = {
         }
         Relationships: []
       }
-      meeting_invites: {
+      keep_alive: {
         Row: {
-          available_slots: Json
           created_at: string
-          description: string | null
-          expires_at: string | null
-          id: string
-          inviter_name: string
-          title: string
+          id: number
         }
         Insert: {
-          available_slots: Json
           created_at?: string
-          description?: string | null
-          expires_at?: string | null
-          id?: string
-          inviter_name: string
-          title: string
+          id?: number
         }
         Update: {
-          available_slots?: Json
           created_at?: string
-          description?: string | null
-          expires_at?: string | null
-          id?: string
-          inviter_name?: string
-          title?: string
+          id?: number
         }
         Relationships: []
       }
@@ -615,44 +600,6 @@ export type Database = {
           where?: string
         }
         Relationships: []
-      }
-      participant_responses: {
-        Row: {
-          created_at: string
-          id: string
-          invite_id: string
-          participant_initials: string
-          participant_name: string
-          selected_slots: Json
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          invite_id: string
-          participant_initials: string
-          participant_name: string
-          selected_slots: Json
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          invite_id?: string
-          participant_initials?: string
-          participant_name?: string
-          selected_slots?: Json
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "participant_responses_invite_id_fkey"
-            columns: ["invite_id"]
-            isOneToOne: false
-            referencedRelation: "meeting_invites"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       profiles: {
         Row: {
@@ -734,241 +681,6 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
-      }
-      sense_profiles: {
-        Row: {
-          auto_backup: boolean | null
-          auto_tracking: boolean | null
-          avatar_url: string | null
-          bio: string | null
-          company: string | null
-          created_at: string
-          currency: string | null
-          data_retention_months: number | null
-          data_sharing_level: string | null
-          date_format: string | null
-          default_polling_frequency: number | null
-          default_trip_type: Database["public"]["Enums"]["trip_type"] | null
-          default_vehicle_id: string | null
-          department: string | null
-          distance_unit: string | null
-          email: string | null
-          export_format: string | null
-          fuel_consumption_l_per_100km: number | null
-          full_name: string | null
-          id: string
-          language: string | null
-          notifications_email: boolean | null
-          notifications_sync_status: boolean | null
-          notifications_trip_end: boolean | null
-          notifications_trip_start: boolean | null
-          notifications_weekly_report: boolean | null
-          privacy_level: string | null
-          theme: string | null
-          timezone: string | null
-          tracking_mode: string | null
-          trip_max_duration_hours: number | null
-          trip_minimum_distance_meters: number | null
-          trip_movement_threshold_meters: number | null
-          trip_sensitivity_level: string | null
-          trip_stationary_timeout_minutes: number | null
-          updated_at: string
-          username: string | null
-        }
-        Insert: {
-          auto_backup?: boolean | null
-          auto_tracking?: boolean | null
-          avatar_url?: string | null
-          bio?: string | null
-          company?: string | null
-          created_at?: string
-          currency?: string | null
-          data_retention_months?: number | null
-          data_sharing_level?: string | null
-          date_format?: string | null
-          default_polling_frequency?: number | null
-          default_trip_type?: Database["public"]["Enums"]["trip_type"] | null
-          default_vehicle_id?: string | null
-          department?: string | null
-          distance_unit?: string | null
-          email?: string | null
-          export_format?: string | null
-          fuel_consumption_l_per_100km?: number | null
-          full_name?: string | null
-          id: string
-          language?: string | null
-          notifications_email?: boolean | null
-          notifications_sync_status?: boolean | null
-          notifications_trip_end?: boolean | null
-          notifications_trip_start?: boolean | null
-          notifications_weekly_report?: boolean | null
-          privacy_level?: string | null
-          theme?: string | null
-          timezone?: string | null
-          tracking_mode?: string | null
-          trip_max_duration_hours?: number | null
-          trip_minimum_distance_meters?: number | null
-          trip_movement_threshold_meters?: number | null
-          trip_sensitivity_level?: string | null
-          trip_stationary_timeout_minutes?: number | null
-          updated_at?: string
-          username?: string | null
-        }
-        Update: {
-          auto_backup?: boolean | null
-          auto_tracking?: boolean | null
-          avatar_url?: string | null
-          bio?: string | null
-          company?: string | null
-          created_at?: string
-          currency?: string | null
-          data_retention_months?: number | null
-          data_sharing_level?: string | null
-          date_format?: string | null
-          default_polling_frequency?: number | null
-          default_trip_type?: Database["public"]["Enums"]["trip_type"] | null
-          default_vehicle_id?: string | null
-          department?: string | null
-          distance_unit?: string | null
-          email?: string | null
-          export_format?: string | null
-          fuel_consumption_l_per_100km?: number | null
-          full_name?: string | null
-          id?: string
-          language?: string | null
-          notifications_email?: boolean | null
-          notifications_sync_status?: boolean | null
-          notifications_trip_end?: boolean | null
-          notifications_trip_start?: boolean | null
-          notifications_weekly_report?: boolean | null
-          privacy_level?: string | null
-          theme?: string | null
-          timezone?: string | null
-          tracking_mode?: string | null
-          trip_max_duration_hours?: number | null
-          trip_minimum_distance_meters?: number | null
-          trip_movement_threshold_meters?: number | null
-          trip_sensitivity_level?: string | null
-          trip_stationary_timeout_minutes?: number | null
-          updated_at?: string
-          username?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sense_profiles_default_vehicle_id_fkey"
-            columns: ["default_vehicle_id"]
-            isOneToOne: false
-            referencedRelation: "vehicle_connections"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sense_trip_exports: {
-        Row: {
-          created_at: string
-          date_from: string
-          date_to: string
-          export_type: string
-          file_url: string | null
-          id: string
-          trip_type: Database["public"]["Enums"]["trip_type"] | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          date_from: string
-          date_to: string
-          export_type: string
-          file_url?: string | null
-          id?: string
-          trip_type?: Database["public"]["Enums"]["trip_type"] | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          date_from?: string
-          date_to?: string
-          export_type?: string
-          file_url?: string | null
-          id?: string
-          trip_type?: Database["public"]["Enums"]["trip_type"] | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      sense_trips: {
-        Row: {
-          created_at: string
-          distance_km: number | null
-          duration_minutes: number | null
-          end_location: Json | null
-          end_time: string | null
-          fuel_consumed_liters: number | null
-          id: string
-          is_automatic: boolean | null
-          notes: string | null
-          odometer_km: number | null
-          route_data: Json | null
-          smartcar_trip_id: string | null
-          start_location: Json
-          start_time: string
-          trip_status: Database["public"]["Enums"]["trip_status"] | null
-          trip_type: Database["public"]["Enums"]["trip_type"] | null
-          updated_at: string
-          user_id: string
-          vehicle_connection_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          distance_km?: number | null
-          duration_minutes?: number | null
-          end_location?: Json | null
-          end_time?: string | null
-          fuel_consumed_liters?: number | null
-          id?: string
-          is_automatic?: boolean | null
-          notes?: string | null
-          odometer_km?: number | null
-          route_data?: Json | null
-          smartcar_trip_id?: string | null
-          start_location: Json
-          start_time?: string
-          trip_status?: Database["public"]["Enums"]["trip_status"] | null
-          trip_type?: Database["public"]["Enums"]["trip_type"] | null
-          updated_at?: string
-          user_id: string
-          vehicle_connection_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          distance_km?: number | null
-          duration_minutes?: number | null
-          end_location?: Json | null
-          end_time?: string | null
-          fuel_consumed_liters?: number | null
-          id?: string
-          is_automatic?: boolean | null
-          notes?: string | null
-          odometer_km?: number | null
-          route_data?: Json | null
-          smartcar_trip_id?: string | null
-          start_location?: Json
-          start_time?: string
-          trip_status?: Database["public"]["Enums"]["trip_status"] | null
-          trip_type?: Database["public"]["Enums"]["trip_type"] | null
-          updated_at?: string
-          user_id?: string
-          vehicle_connection_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sense_trips_vehicle_connection_id_fkey"
-            columns: ["vehicle_connection_id"]
-            isOneToOne: false
-            referencedRelation: "vehicle_connections"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       signed_diplomas: {
         Row: {
@@ -1057,213 +769,6 @@ export type Database = {
         }
         Relationships: []
       }
-      track_challenges: {
-        Row: {
-          challenger_id: string
-          completion_time_seconds: number | null
-          created_at: string
-          end_time: string | null
-          gps_data: Json | null
-          id: string
-          start_time: string | null
-          status: Database["public"]["Enums"]["challenge_status"]
-          target_time_seconds: number | null
-          track_id: string
-          updated_at: string
-        }
-        Insert: {
-          challenger_id: string
-          completion_time_seconds?: number | null
-          created_at?: string
-          end_time?: string | null
-          gps_data?: Json | null
-          id?: string
-          start_time?: string | null
-          status?: Database["public"]["Enums"]["challenge_status"]
-          target_time_seconds?: number | null
-          track_id: string
-          updated_at?: string
-        }
-        Update: {
-          challenger_id?: string
-          completion_time_seconds?: number | null
-          created_at?: string
-          end_time?: string | null
-          gps_data?: Json | null
-          id?: string
-          start_time?: string | null
-          status?: Database["public"]["Enums"]["challenge_status"]
-          target_time_seconds?: number | null
-          track_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "track_challenges_track_id_fkey"
-            columns: ["track_id"]
-            isOneToOne: false
-            referencedRelation: "track_tracks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      track_leaderboards: {
-        Row: {
-          achieved_at: string
-          challenge_id: string | null
-          completion_time_seconds: number
-          created_at: string
-          id: string
-          track_id: string
-          user_id: string
-          verified_gps_data: Json
-        }
-        Insert: {
-          achieved_at?: string
-          challenge_id?: string | null
-          completion_time_seconds: number
-          created_at?: string
-          id?: string
-          track_id: string
-          user_id: string
-          verified_gps_data: Json
-        }
-        Update: {
-          achieved_at?: string
-          challenge_id?: string | null
-          completion_time_seconds?: number
-          created_at?: string
-          id?: string
-          track_id?: string
-          user_id?: string
-          verified_gps_data?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "track_leaderboards_challenge_id_fkey"
-            columns: ["challenge_id"]
-            isOneToOne: false
-            referencedRelation: "track_challenges"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "track_leaderboards_track_id_fkey"
-            columns: ["track_id"]
-            isOneToOne: false
-            referencedRelation: "track_tracks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "track_leaderboards_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      track_ratings: {
-        Row: {
-          created_at: string
-          id: string
-          rating: number | null
-          review: string | null
-          track_id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          rating?: number | null
-          review?: string | null
-          track_id: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          rating?: number | null
-          review?: string | null
-          track_id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      track_tracks: {
-        Row: {
-          activity_type: Database["public"]["Enums"]["activity_type"]
-          average_rating: number | null
-          created_at: string
-          creator_id: string
-          description: string | null
-          difficulty: Database["public"]["Enums"]["track_difficulty"]
-          distance_meters: number
-          elevation_gain_meters: number | null
-          id: string
-          is_deleted: boolean
-          is_public: boolean
-          is_verified: boolean
-          last_completed_at: string | null
-          max_lat: number
-          max_lng: number
-          min_lat: number
-          min_lng: number
-          name: string
-          route_data: Json
-          times_completed: number | null
-          updated_at: string
-        }
-        Insert: {
-          activity_type?: Database["public"]["Enums"]["activity_type"]
-          average_rating?: number | null
-          created_at?: string
-          creator_id: string
-          description?: string | null
-          difficulty?: Database["public"]["Enums"]["track_difficulty"]
-          distance_meters: number
-          elevation_gain_meters?: number | null
-          id?: string
-          is_deleted?: boolean
-          is_public?: boolean
-          is_verified?: boolean
-          last_completed_at?: string | null
-          max_lat: number
-          max_lng: number
-          min_lat: number
-          min_lng: number
-          name: string
-          route_data: Json
-          times_completed?: number | null
-          updated_at?: string
-        }
-        Update: {
-          activity_type?: Database["public"]["Enums"]["activity_type"]
-          average_rating?: number | null
-          created_at?: string
-          creator_id?: string
-          description?: string | null
-          difficulty?: Database["public"]["Enums"]["track_difficulty"]
-          distance_meters?: number
-          elevation_gain_meters?: number | null
-          id?: string
-          is_deleted?: boolean
-          is_public?: boolean
-          is_verified?: boolean
-          last_completed_at?: string | null
-          max_lat?: number
-          max_lng?: number
-          min_lat?: number
-          min_lng?: number
-          name?: string
-          route_data?: Json
-          times_completed?: number | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       usage_tracking: {
         Row: {
           ai_analyses_used: number
@@ -1294,143 +799,6 @@ export type Database = {
         }
         Relationships: []
       }
-      vehicle_connections: {
-        Row: {
-          access_token: string
-          connected_at: string
-          created_at: string
-          id: string
-          last_sync_at: string | null
-          make: string | null
-          model: string | null
-          refresh_token: string
-          smartcar_vehicle_id: string
-          updated_at: string
-          user_id: string
-          vehicle_id: string
-          vin: string | null
-          year: number | null
-        }
-        Insert: {
-          access_token: string
-          connected_at?: string
-          created_at?: string
-          id?: string
-          last_sync_at?: string | null
-          make?: string | null
-          model?: string | null
-          refresh_token: string
-          smartcar_vehicle_id: string
-          updated_at?: string
-          user_id: string
-          vehicle_id: string
-          vin?: string | null
-          year?: number | null
-        }
-        Update: {
-          access_token?: string
-          connected_at?: string
-          created_at?: string
-          id?: string
-          last_sync_at?: string | null
-          make?: string | null
-          model?: string | null
-          refresh_token?: string
-          smartcar_vehicle_id?: string
-          updated_at?: string
-          user_id?: string
-          vehicle_id?: string
-          vin?: string | null
-          year?: number | null
-        }
-        Relationships: []
-      }
-      vehicle_data_history: {
-        Row: {
-          connection_id: string
-          created_at: string
-          id: string
-          location: Json | null
-          odometer_km: number | null
-          poll_time: string
-        }
-        Insert: {
-          connection_id: string
-          created_at?: string
-          id?: string
-          location?: Json | null
-          odometer_km?: number | null
-          poll_time?: string
-        }
-        Update: {
-          connection_id?: string
-          created_at?: string
-          id?: string
-          location?: Json | null
-          odometer_km?: number | null
-          poll_time?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vehicle_data_history_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: false
-            referencedRelation: "vehicle_connections"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      vehicle_states: {
-        Row: {
-          connection_id: string
-          created_at: string
-          current_trip_id: string | null
-          id: string
-          last_location: Json | null
-          last_odometer: number | null
-          last_poll_time: string | null
-          polling_frequency: number | null
-          updated_at: string
-        }
-        Insert: {
-          connection_id: string
-          created_at?: string
-          current_trip_id?: string | null
-          id?: string
-          last_location?: Json | null
-          last_odometer?: number | null
-          last_poll_time?: string | null
-          polling_frequency?: number | null
-          updated_at?: string
-        }
-        Update: {
-          connection_id?: string
-          created_at?: string
-          current_trip_id?: string | null
-          id?: string
-          last_location?: Json | null
-          last_odometer?: number | null
-          last_poll_time?: string | null
-          polling_frequency?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vehicle_states_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: true
-            referencedRelation: "vehicle_connections"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vehicle_states_current_trip_id_fkey"
-            columns: ["current_trip_id"]
-            isOneToOne: false
-            referencedRelation: "sense_trips"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -1440,12 +808,9 @@ export type Database = {
         Args: { invite_token_param: string }
         Returns: Json
       }
-      generate_short_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_short_code: { Args: never; Returns: string }
       get_random_advertisement: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           ad_type: Database["public"]["Enums"]["ad_type"]
           advertiser_id: string
@@ -1460,19 +825,25 @@ export type Database = {
           updated_at: string | null
           views_count: number | null
         }
+        SetofOptions: {
+          from: "*"
+          to: "advertisements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       user_can_access_conversation: {
         Args: { conversation_uuid: string }
         Returns: boolean
       }
       verify_counter_consistency: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
-          table_name: string
-          record_id: string
-          stored_count: number
           actual_count: number
           discrepancy: number
+          record_id: string
+          stored_count: number
+          table_name: string
         }[]
       }
     }
@@ -1483,8 +854,6 @@ export type Database = {
       challenge_status: "pending" | "active" | "completed" | "failed"
       track_difficulty: "easy" | "medium" | "hard" | "expert"
       transaction_type: "income" | "expense" | "transfer"
-      trip_status: "active" | "completed" | "paused"
-      trip_type: "work" | "personal" | "unknown"
       user_type: "content_provider" | "advertiser"
     }
     CompositeTypes: {
@@ -1619,8 +988,6 @@ export const Constants = {
       challenge_status: ["pending", "active", "completed", "failed"],
       track_difficulty: ["easy", "medium", "hard", "expert"],
       transaction_type: ["income", "expense", "transfer"],
-      trip_status: ["active", "completed", "paused"],
-      trip_type: ["work", "personal", "unknown"],
       user_type: ["content_provider", "advertiser"],
     },
   },
