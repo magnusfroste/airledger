@@ -165,9 +165,44 @@ serve(async (req) => {
       }
 
       case 'confirm_booking': {
-        // Delegate to existing function handlers for execution
-        // The confirmation flow is handled by the frontend TransactionConfirmDialog
-        aiResponse = '✅ Jag bokför transaktionen nu...';
+        // User confirmed a previous proposal — re-classify the conversation context
+        // to find the original booking intent and execute it
+        if (conversationHistory?.length) {
+          // Find the last booking proposal from conversation
+          const lastProposal = [...(conversationHistory || [])].reverse().find(
+            (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('Bokföringsförslag')
+          );
+          
+          const lastUserBooking = [...(conversationHistory || [])].reverse().find(
+            (msg: ConversationMessage) => msg.sender === 'user' && msg.content !== message
+          );
+
+          if (lastUserBooking) {
+            // Re-classify the original message to get template info
+            const originalIntent = await classifyIntent(lastUserBooking.content, templateNames, lovableApiKey);
+            
+            if (originalIntent.matched_template_hint && originalIntent.extracted_data.amount) {
+              const sessionId = `${userId}_${Date.now()}`;
+              const args = {
+                templateName: originalIntent.matched_template_hint,
+                amount: originalIntent.extracted_data.amount,
+                description: originalIntent.extracted_data.description || originalIntent.extracted_data.vendor || '',
+                transactionDate: originalIntent.extracted_data.date || new Date().toISOString().split('T')[0],
+                referenceNumber: originalIntent.extracted_data.reference || undefined,
+              };
+              aiResponse = await handleFunctionCall('use_transaction_template', args, supabase, sessionId);
+              if (!aiResponse) {
+                aiResponse = '✅ Transaktionen är bokförd!';
+              }
+            } else {
+              aiResponse = 'Jag kunde inte hitta den tidigare transaktionen. Kan du upprepa vad du vill bokföra?';
+            }
+          } else {
+            aiResponse = 'Jag hittar ingen tidigare transaktion att bekräfta. Vad vill du bokföra?';
+          }
+        } else {
+          aiResponse = 'Det finns ingen pågående bokning att bekräfta. Beskriv vad du vill bokföra.';
+        }
         break;
       }
 
