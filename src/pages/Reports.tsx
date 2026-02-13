@@ -61,7 +61,7 @@ const Reports = () => {
           break;
       }
 
-      // Fetch all entries for the period - using created_at like Dashboard
+      // Fetch all entries for the period with transaction date
       const { data: entries, error } = await supabase
         .from('airledger_entries')
         .select(`
@@ -69,18 +69,29 @@ const Reports = () => {
           account_name,
           debit_amount,
           credit_amount,
-          created_at,
           airledger_transactions!inner(
-            user_id
+            user_id,
+            transaction_date
           )
         `)
         .eq('airledger_transactions.user_id', user.id)
-        .gte('created_at', startDate.toISOString().split('T')[0])
-        .lte('created_at', endDate.toISOString().split('T')[0]);
+        .gte('airledger_transactions.transaction_date', startDate.toISOString().split('T')[0])
+        .lte('airledger_transactions.transaction_date', endDate.toISOString().split('T')[0]);
 
       if (error) {
         throw error;
       }
+
+      // Fetch chart of accounts to get account_type
+      const { data: chartAccounts, error: chartError } = await supabase
+        .from('airledger_chart_of_accounts')
+        .select('account_code, account_type')
+        .eq('is_active', true);
+
+      if (chartError) throw chartError;
+
+      const accountTypeMap = new Map<string, string>();
+      chartAccounts?.forEach(a => accountTypeMap.set(a.account_code, a.account_type || ''));
 
       // Group entries by account and calculate totals
       const accountTotals = new Map<string, {
@@ -104,16 +115,22 @@ const Reports = () => {
         accountTotals.set(key, existing);
       });
 
-      // Separate revenue and expenses based on BAS account codes
+      // Classify using account_type from chart of accounts
+      // Fallback: 3xxx = income, 4xxx-8xxx = expense (for accounts not in chart)
       const revenue: Array<{ account_code: string; account_name: string; total: number }> = [];
       const expenses: Array<{ account_code: string; account_name: string; total: number }> = [];
 
       accountTotals.forEach(account => {
         const accountNum = parseInt(account.account_code);
-        const netAmount = account.credit_total - account.debit_total;
+        const type = accountTypeMap.get(account.account_code);
 
-        if (accountNum >= 3000 && accountNum <= 3999) {
-          // Revenue accounts (3000-3999) - normal balance is credit
+        // Skip balance sheet accounts (class 1-2)
+        if (accountNum < 3000) return;
+
+        const isIncome = type === 'income' || (!type && accountNum >= 3000 && accountNum < 4000);
+
+        if (isIncome) {
+          const netAmount = account.credit_total - account.debit_total;
           if (netAmount !== 0) {
             revenue.push({
               account_code: account.account_code,
@@ -121,8 +138,8 @@ const Reports = () => {
               total: netAmount
             });
           }
-        } else if ((accountNum >= 4000 && accountNum <= 4999) || (accountNum >= 6000 && accountNum <= 6999)) {
-          // Expense accounts (4000-4999, 6000-6999) - normal balance is debit
+        } else {
+          // expense (4xxx-8xxx)
           const expenseAmount = account.debit_total - account.credit_total;
           if (expenseAmount !== 0) {
             expenses.push({
