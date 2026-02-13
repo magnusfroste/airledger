@@ -1,60 +1,39 @@
 
+# Ta bort hårdkodade konton och lägga till kontovalidering
 
-# Action Buttons: Bokfor och Avbryt
+## Bakgrund
+Idag filtrerar `context-builder.ts` kontoplanen till bara 11 hårdkodade konton. Det begränsar AI:ns förmåga att bokföra korrekt utanför mallarna. Vi har redan 812 BAS 2024-konton i databasen som täcker 98% av BAS 2026.
 
-Minimal implementation -- tva knappar under bokforingsforslag som skickar text till chatten, precis som om anvandaren skrivit det.
+## Ändringar
 
----
+### 1. context-builder.ts — Ta bort hårdkodade konton
+Ersätt det hårdkodade filtret (rad 47-53) med en smart gruppering som skickar kontoplanen organiserad per kontoklass (1xxx-8xxx). Detta ger AI:n tillgång till hela kontoplanen utan att spränga token-budgeten.
 
-## Approach
-
-Knapparna ar inte "riktiga" knappar med egen logik. De triggar exakt samma flode som att skriva "Ja, bokfor" eller "Avbryt" i chatten. Detta bevarar Intent Router-arkitekturen och gor knapparna till ren UX-socker.
-
-### Detektering
-
-Ett AI-meddelande ar ett bokforingsforslag om det innehaller bade "Bokforingsforslag" och "Ska jag bokfora detta?". Enkel string-match -- ingen ny metadata behovs.
-
----
-
-## Filandringar
-
-### 1. `src/components/chat/ActionButtons.tsx` (ny fil)
-
-Liten komponent som renderar tva knappar:
-- **Bokfor** (primar, gron) -- skickar "Ja, bokfor detta"
-- **Avbryt** (ghost, diskret) -- skickar "Nej, avbryt"
-
-Props: `onAction: (message: string) => void`
-
-Styling: subtila, rundade knappar med liten storlek. Placerade under meddelandebubblan, vansterjusterade (som AI-meddelandet).
-
-### 2. `src/components/chat/Message.tsx`
-
-- Importera `ActionButtons`
-- Lagg till ny prop: `onAction?: (message: string) => void`
-- Efter meddelandebubblan, om `sender === 'ai'` och innehallet matchar bokforingsforslag-monster, rendera `ActionButtons`
-- Knapparna visas bara pa det SISTA AI-meddelandet (styrs av ny prop `isLastAiMessage`)
-
-### 3. `src/components/chat/MessageList.tsx`
-
-- Skicka `onAction` callback och `isLastAiMessage` till `Message`
-- `onAction` bubblar upp till `ChatInterface`
-
-### 4. `src/components/ChatInterface.tsx`
-
-- Ny funktion `handleActionButton(message: string)` som satter `inputValue` och triggar `handleSendMessage`
-- Skickas ner till `MessageList` som prop
-
----
-
-## Teknisk detalj
-
-Detekteringslogik i `Message.tsx`:
+Strategi: Skicka kontoklasser som rubriker med underliggande konton, t.ex.:
 ```
-const isBookingProposal = sender === 'ai' 
-  && content.includes('Bokföringsförslag') 
-  && content.includes('Ska jag bokföra detta?');
+KONTOKLASS 1 - Tillgångar:
+1010 Balanserade utgifter
+1930 Checkkonto
+...
 ```
 
-Knapparna forsvinner efter klick (genom att de bara visas pa sista AI-meddelandet -- nar anvandaren svarar och ett nytt meddelande laggs till ar det inte langre sista).
+### 2. save-general-transaction — Kontovalidering
+Lägg till en databasvalidering som kontrollerar att varje `accountCode` i inkommande entries faktiskt existerar i `airledger_chart_of_accounts` innan transaktionen sparas. Om ett konto inte finns returneras ett tydligt felmeddelande.
 
+### 3. function-definitions.ts — Uppdatera beskrivning
+Ändra "BAS 2024" till "BAS-kontoplanen" i function definitions så att det inte refererar till ett specifikt år.
+
+## Tekniska detaljer
+
+### context-builder.ts
+- Ta bort `filter`-logiken på rad 49-51
+- Gruppera konton per kontoklass (första siffran) för läsbarhet
+- Begränsa till ~200 vanligaste konton baserat på `account_type` för att hålla token-användningen rimlig
+
+### save-general-transaction/index.ts
+- Efter entry-validering (rad 35-57), lägg till en lookup mot `airledger_chart_of_accounts`
+- Hämta alla unika `accountCode` från entries i en enda query
+- Jämför mot resultatet — om något konto saknas, returnera fel med kontonummer och förslag
+
+### function-definitions.ts
+- Rad 81, 98: Ändra "BAS 2024" till "BAS-kontoplanen"
