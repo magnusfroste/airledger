@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import ChatActionButtons from "./ChatActionButtons";
 
 interface MessageImage {
   id: string;
@@ -22,9 +23,14 @@ interface MessageProps {
   timestamp: Date;
   type?: 'text' | 'voice' | 'image';
   images?: MessageImage[];
+  isLastAiMessage?: boolean;
+  onAction?: (message: string) => void;
 }
 
-const Message = ({ content, sender, type, images }: MessageProps) => {
+const Message = ({ content, sender, type, images, isLastAiMessage, onAction }: MessageProps) => {
+  const isBookingProposal = sender === 'ai'
+    && content.includes('Bokföringsförslag')
+    && content.includes('Ska jag bokföra detta?');
   return (
     <div className={`flex gap-3 ${sender === 'user' ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[85%] ${sender === 'user' ? 'order-1' : 'order-2'}`}>
@@ -80,6 +86,9 @@ const Message = ({ content, sender, type, images }: MessageProps) => {
             </ReactMarkdown>
           </div>
         </div>
+        {isBookingProposal && isLastAiMessage && onAction && (
+          <ChatActionButtons onAction={onAction} />
+        )}
       </div>
     </div>
   );

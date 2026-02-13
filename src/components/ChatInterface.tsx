@@ -292,6 +292,57 @@ const ChatInterface = () => {
     }
   };
 
+  const handleActionButton = (message: string) => {
+    if (isLoading) return;
+    setInputValue("");
+    const userMessage = {
+      id: Date.now().toString(),
+      content: message,
+      sender: 'user' as const,
+      timestamp: new Date(),
+      type: 'text' as const,
+    };
+    addMessage(userMessage);
+    saveMessageToDatabase(userMessage, limitMessagesInConversation);
+    setIsLoading(true);
+    
+    supabase.functions.invoke('chat-assistant', {
+      body: {
+        message,
+        conversationHistory: messages.slice(-10).map(msg => ({
+          sender: msg.sender,
+          content: msg.content
+        }))
+      }
+    }).then(({ data, error }) => {
+      if (error) throw error;
+      if (data?.success && data?.response) {
+        const aiResponse = {
+          id: (Date.now() + 1).toString(),
+          content: data.response,
+          sender: 'ai' as const,
+          timestamp: new Date(),
+          type: 'text' as const
+        };
+        addMessage(aiResponse);
+        saveMessageToDatabase(aiResponse, limitMessagesInConversation);
+      }
+    }).catch((err) => {
+      console.error('Action button error:', err);
+      const errorResponse = {
+        id: (Date.now() + 1).toString(),
+        content: `❌ Ett fel uppstod. Försök igen.`,
+        sender: 'ai' as const,
+        timestamp: new Date(),
+        type: 'text' as const
+      };
+      addMessage(errorResponse);
+      saveMessageToDatabase(errorResponse, limitMessagesInConversation);
+    }).finally(() => {
+      setIsLoading(false);
+    });
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -336,6 +387,7 @@ const ChatInterface = () => {
           hasMoreMessages={hasMoreMessages}
           loadingOlderMessages={loadingOlderMessages}
           onLoadOlderMessages={loadOlderMessages}
+          onAction={handleActionButton}
         />
       </div>
 
