@@ -33,6 +33,7 @@ interface MessageListProps {
   hasMoreMessages?: boolean;
   loadingOlderMessages?: boolean;
   onLoadOlderMessages?: () => void;
+  onAction?: (message: string) => void;
 }
 
 const MessageList = ({ 
@@ -42,8 +43,14 @@ const MessageList = ({
   messagesEndRef, 
   hasMoreMessages, 
   loadingOlderMessages, 
-  onLoadOlderMessages 
+  onLoadOlderMessages,
+  onAction
 }: MessageListProps) => {
+  // Find last AI message index
+  const messagesWithoutSystem = messages.slice(1);
+  const lastAiIndex = messagesWithoutSystem.reduce((last, msg, i) => 
+    msg.sender === 'ai' ? i : last, -1
+  );
   return (
     <div className="h-full overflow-y-auto px-4 py-4">
       {/* Load Older Messages Button */}
@@ -77,7 +84,7 @@ const MessageList = ({
 
       {/* Messages */}
       <div className="space-y-6">
-        {messages.slice(1).map(message => (
+        {messagesWithoutSystem.map((message, index) => (
           <Message
             key={message.id}
             id={message.id}
@@ -86,6 +93,8 @@ const MessageList = ({
             timestamp={message.timestamp}
             type={message.type}
             images={message.images}
+            isLastAiMessage={index === lastAiIndex}
+            onAction={onAction}
           />
         ))}
         
