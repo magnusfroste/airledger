@@ -135,6 +135,12 @@ serve(async (req) => {
       })
     }
 
+    // Detect if template has VAT account entries (2640, 2641) using old type format
+    const vatAccountCodes = ['2640', '2641', '2610'];
+    const hasVatAccountInOldFormat = !hasVatPlaceholders && templateEntries.some(
+      (e: any) => vatAccountCodes.includes(e.account_code) && (e.type === 'debit' || e.type === 'credit')
+    );
+
     // Replace placeholders in template entries
     const entries = templateEntries.map((entry: any) => {
       let debitAmount = 0
@@ -150,7 +156,6 @@ serve(async (req) => {
           } else if (entry.debit_amount === '{total_amount}') {
             debitAmount = totalAmount
           } else if (entry.debit_amount === '{amount}') {
-            // Generic placeholder - use input amount
             debitAmount = inputAmount
           } else {
             debitAmount = parseFloat(entry.debit_amount) || 0
@@ -170,7 +175,6 @@ serve(async (req) => {
           } else if (entry.credit_amount === '{total_amount}') {
             creditAmount = totalAmount
           } else if (entry.credit_amount === '{amount}') {
-            // Generic placeholder - use input amount
             creditAmount = inputAmount
           } else {
             creditAmount = parseFloat(entry.credit_amount) || 0
@@ -182,10 +186,31 @@ serve(async (req) => {
       
       // Fallback for older templates that use 'type' field
       if (debitAmount === 0 && creditAmount === 0) {
-        if (entry.type === 'debit') {
-          debitAmount = inputAmount
-        } else if (entry.type === 'credit') {
-          creditAmount = inputAmount
+        if (hasVatAccountInOldFormat) {
+          // Smart VAT handling: detect VAT account and split accordingly
+          // Input amount is assumed to be inclusive of VAT (25%)
+          const vatRate = 0.25;
+          const netAmount = Math.round(inputAmount / (1 + vatRate) * 100) / 100;
+          const vatCalc = Math.round((inputAmount - netAmount) * 100) / 100;
+
+          if (vatAccountCodes.includes(entry.account_code)) {
+            // This is the VAT entry
+            if (entry.type === 'debit') debitAmount = vatCalc;
+            else creditAmount = vatCalc;
+          } else if (entry.type === 'credit') {
+            // Credit entry (usually payment account) = total amount
+            creditAmount = inputAmount;
+          } else {
+            // Debit entry (expense account) = net amount
+            debitAmount = netAmount;
+          }
+        } else {
+          // Simple 1:1 template without VAT
+          if (entry.type === 'debit') {
+            debitAmount = inputAmount
+          } else if (entry.type === 'credit') {
+            creditAmount = inputAmount
+          }
         }
       }
       
