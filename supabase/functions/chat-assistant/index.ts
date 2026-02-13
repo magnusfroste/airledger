@@ -1,28 +1,27 @@
-
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import OpenAI from 'https://esm.sh/openai@4.20.1'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 import { ConversationMessage } from './types.ts';
 import { authenticateUser } from './auth.ts';
 import { fetchUserData } from './data-fetcher.ts';
-import { buildBookkeepingContext } from './context-builder.ts';
+import { buildLightContext, buildBookkeepingContext } from './context-builder.ts';
+import { classifyIntent } from './intent-classifier.ts';
+import { matchTemplate, getTopTemplateCandidates } from './template-matcher.ts';
+import { formatBookingProposal, formatClarificationRequest, formatTemplateChoices, formatConfirmation } from './response-formatter.ts';
 import { handleFunctionCall } from './function-handlers.ts';
 import { SYSTEM_PROMPT } from './system-prompt.ts';
-import { FUNCTION_DEFINITIONS } from './function-definitions.ts';
 
-// Quota helper functions inlined
-const TIER_LIMITS: Record<string, { ai_analyses: number; storage_mb: number }> = {
-  free: { ai_analyses: 50, storage_mb: 500 },
-  premium: { ai_analyses: 500, storage_mb: 5000 },
-  professional: { ai_analyses: -1, storage_mb: 50000 } // -1 means unlimited
+// Quota helper
+const TIER_LIMITS: Record<string, { ai_analyses: number }> = {
+  free: { ai_analyses: 50 },
+  premium: { ai_analyses: 500 },
+  professional: { ai_analyses: -1 },
 };
 
 async function checkAndUpdateQuota(
-  userId: string, 
+  userId: string,
   supabase: any,
-  incrementAiAnalyses: boolean = false
+  increment: boolean = false
 ): Promise<{ allowed: boolean; subscription_tier: string; usage: any }> {
   try {
     const now = new Date();
@@ -34,68 +33,42 @@ async function checkAndUpdateQuota(
       .eq('user_id', userId)
       .single();
 
-    const subscriptionTier = subscriber?.subscription_tier || 'free';
-    const limits = TIER_LIMITS[subscriptionTier];
+    const tier = subscriber?.subscription_tier || 'free';
+    const limits = TIER_LIMITS[tier];
 
-    const { data: usage, error: usageError } = await supabase
+    let { data: usage } = await supabase
       .from('usage_tracking')
       .select('*')
       .eq('user_id', userId)
       .eq('month_year', monthYear)
       .single();
 
-    let currentUsage = usage;
-    if (!currentUsage) {
-      const { data: newUsage, error: createError } = await supabase
+    if (!usage) {
+      const { data: newUsage, error } = await supabase
         .from('usage_tracking')
-        .insert({
-          user_id: userId,
-          month_year: monthYear,
-          ai_analyses_used: 0,
-          storage_used_mb: 0
-        })
+        .insert({ user_id: userId, month_year: monthYear, ai_analyses_used: 0, storage_used_mb: 0 })
         .select()
         .single();
-      
-      if (createError) {
-        console.error('Error creating usage record:', createError);
-        return { allowed: false, subscription_tier: subscriptionTier, usage: null };
-      }
-      currentUsage = newUsage;
+      if (error) return { allowed: false, subscription_tier: tier, usage: null };
+      usage = newUsage;
     }
 
-    const currentAiAnalyses = currentUsage.ai_analyses_used || 0;
-    const aiAnalysesAllowed = limits.ai_analyses === -1 || currentAiAnalyses < limits.ai_analyses;
+    const current = usage.ai_analyses_used || 0;
+    const allowed = limits.ai_analyses === -1 || current < limits.ai_analyses;
 
-    if (!aiAnalysesAllowed && incrementAiAnalyses) {
-      return { allowed: false, subscription_tier: subscriptionTier, usage: currentUsage };
-    }
+    if (!allowed && increment) return { allowed: false, subscription_tier: tier, usage };
 
-    if (incrementAiAnalyses && aiAnalysesAllowed) {
-      const { error: updateError } = await supabase
+    if (increment && allowed) {
+      await supabase
         .from('usage_tracking')
-        .update({ 
-          ai_analyses_used: currentAiAnalyses + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentUsage.id);
-
-      if (updateError) {
-        console.error('Error updating usage:', updateError);
-        return { allowed: false, subscription_tier: subscriptionTier, usage: currentUsage };
-      }
-      
-      currentUsage.ai_analyses_used = currentAiAnalyses + 1;
+        .update({ ai_analyses_used: current + 1, updated_at: new Date().toISOString() })
+        .eq('id', usage.id);
+      usage.ai_analyses_used = current + 1;
     }
 
-    return { 
-      allowed: aiAnalysesAllowed, 
-      subscription_tier: subscriptionTier, 
-      usage: currentUsage 
-    };
-
+    return { allowed, subscription_tier: tier, usage };
   } catch (error) {
-    console.error('Error in quota check:', error);
+    console.error('Quota check error:', error);
     return { allowed: false, subscription_tier: 'free', usage: null };
   }
 }
@@ -103,184 +76,216 @@ async function checkAndUpdateQuota(
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Chat assistant function called')
-    const { message, conversationHistory } = await req.json()
+    const { message, conversationHistory } = await req.json();
+    if (!message) throw new Error('Message is required');
 
-    if (!message) {
-      throw new Error('Message is required')
-    }
+    console.log('Intent Router: message received');
 
-    console.log('Message received:', message)
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    if (!lovableApiKey) throw new Error('LOVABLE_API_KEY not configured');
 
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!openaiApiKey) {
-      console.error('OPENAI_API_KEY not found in environment')
-      throw new Error('OpenAI API key not configured')
-    }
+    const authHeader = req.headers.get('Authorization');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    const authHeader = req.headers.get('Authorization')
-    console.log('Auth header received')
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
-    
     const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: authHeader,
-        },
-      },
-    })
+      global: { headers: { Authorization: authHeader! } },
+    });
 
     const userId = await authenticateUser(authHeader || '', supabase);
 
     const serviceSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-      auth: { persistSession: false }
+      auth: { persistSession: false },
     });
-    
+
+    // Quota check
     const quotaCheck = await checkAndUpdateQuota(userId, serviceSupabase, true);
     if (!quotaCheck.allowed) {
-      console.log('Quota exceeded for user:', userId, 'tier:', quotaCheck.subscription_tier);
-      
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1, 1);
-      const resetDate = nextMonth.toLocaleDateString('sv-SE', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-
-      const tierNames = {
-        free: 'Gratis',
-        premium: 'Premium', 
-        professional: 'Professional'
-      };
-
-      const tierName = tierNames[quotaCheck.subscription_tier as keyof typeof tierNames] || 'Gratis';
-      const usedCount = quotaCheck.usage?.ai_analyses_used || 0;
+      const resetDate = nextMonth.toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' });
       const limitCount = TIER_LIMITS[quotaCheck.subscription_tier]?.ai_analyses || 50;
 
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           success: false,
-          error: `Du har använt alla dina AI-analyser för denna månad (${usedCount}/${limitCount}). Din ${tierName}-kvot återställs den ${resetDate}.`,
+          error: `Du har använt alla dina AI-analyser (${quotaCheck.usage?.ai_analyses_used}/${limitCount}). Kvoten återställs ${resetDate}.`,
           quota_exceeded: true,
           subscription_tier: quotaCheck.subscription_tier,
           usage: quotaCheck.usage,
-          reset_date: resetDate
         }),
-        {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // Fetch user data
     const userData = await fetchUserData(userId, supabase);
-    const bookkeepingContext = buildBookkeepingContext(userData);
+    const templateNames = buildLightContext(userData);
 
-    console.log('Initializing OpenAI client')
-    const openai = new OpenAI({
-      apiKey: openaiApiKey,
-    })
+    // === INTENT CLASSIFICATION (lightweight AI call) ===
+    console.log('Classifying intent...');
+    const intent = await classifyIntent(message, templateNames, lovableApiKey);
+    console.log('Intent:', intent.intent, 'confidence:', intent.confidence);
 
-    console.log('Processing chat message with OpenAI...')
+    let aiResponse = '';
 
-    const messages = [
-      {
-        role: "system",
-        content: `${SYSTEM_PROMPT}
+    // === ROUTING ===
+    switch (intent.intent) {
+      case 'book_expense':
+      case 'book_sale':
+      case 'book_payment': {
+        // Deterministic template matching
+        const match = await matchTemplate(intent, supabase, userId);
 
-BOKFÖRINGSKONTEXTEN:
-${bookkeepingContext}`
+        if (intent.clarification_needed && !intent.extracted_data.amount) {
+          aiResponse = formatClarificationRequest(intent.clarification_needed);
+        } else if (match) {
+          const amount = intent.extracted_data.amount || 0;
+          const date = intent.extracted_data.date || new Date().toISOString().split('T')[0];
+          const desc = intent.extracted_data.description || intent.extracted_data.vendor || match.template.template_name;
+          aiResponse = formatBookingProposal(match, amount, date, desc);
+        } else {
+          // No match — show top candidates
+          const candidates = getTopTemplateCandidates(userData.templates || [], intent);
+          if (candidates.length > 0) {
+            aiResponse = formatTemplateChoices(candidates);
+          } else {
+            aiResponse = formatClarificationRequest('Jag kunde inte hitta en passande mall. Kan du beskriva transaktionen mer detaljerat?');
+          }
+        }
+        break;
       }
-    ]
 
-    if (conversationHistory && conversationHistory.length > 0) {
-      console.log('Adding conversation history:', conversationHistory.length, 'messages')
-      conversationHistory.forEach((msg: ConversationMessage) => {
-        messages.push({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.content
-        })
-      })
-    }
+      case 'confirm_booking': {
+        // Delegate to existing function handlers for execution
+        // The confirmation flow is handled by the frontend TransactionConfirmDialog
+        aiResponse = '✅ Jag bokför transaktionen nu...';
+        break;
+      }
 
-    messages.push({
-      role: 'user',
-      content: message
-    })
+      case 'opening_balance': {
+        // Extract and present opening balance info
+        if (intent.extracted_data.amount) {
+          const sessionId = `${userId}_${Date.now()}`;
+          const args = {
+            accountCode: intent.extracted_data.reference || '1930',
+            accountName: intent.extracted_data.description || 'Checkkonto/Bankkonto',
+            amount: intent.extracted_data.amount,
+          };
+          aiResponse = await handleFunctionCall('save_opening_balance', args, supabase, sessionId);
+        } else {
+          aiResponse = formatClarificationRequest('Vilket konto och belopp vill du registrera som ingående balans?');
+        }
+        break;
+      }
 
-    console.log('Calling OpenAI API')
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: messages,
-      max_tokens: 1000,
-      temperature: 0.2,
-      tools: FUNCTION_DEFINITIONS,
-      tool_choice: "auto"
-    })
+      case 'ask_question':
+      case 'view_report':
+      case 'unknown': {
+        // Full AI call with complete context (fallback to rich conversation)
+        const fullContext = buildBookkeepingContext(userData);
+        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey);
+        break;
+      }
 
-    console.log('OpenAI response received')
-    console.log('Tool calls:', response.choices[0].message.tool_calls?.length || 0)
+      case 'analyze_image': {
+        aiResponse = '📸 Skicka bilden så analyserar jag den åt dig!';
+        break;
+      }
 
-    let aiResponse = response.choices[0].message.content || ""
-    const toolCalls = response.choices[0].message.tool_calls
-
-    if (toolCalls && toolCalls.length > 0) {
-      // Skapa en unik session-identifierare för denna konversation
-      const sessionId = `${userId}_${Date.now()}`;
-      
-      for (const toolCall of toolCalls) {
-        const args = JSON.parse(toolCall.function.arguments);
-        
-        console.log('Calling function:', toolCall.function.name);
-        const functionResponse = await handleFunctionCall(
-          toolCall.function.name, 
-          args, 
-          supabase,
-          sessionId
-        );
-        aiResponse += functionResponse;
+      default: {
+        const fullContext = buildBookkeepingContext(userData);
+        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey);
       }
     }
-
-    console.log('AI response generated successfully')
 
     return new Response(
       JSON.stringify({
         success: true,
         response: aiResponse,
-        context_used: bookkeepingContext.length > 0,
+        intent: intent.intent,
+        confidence: intent.confidence,
+        context_used: true,
         quota_info: {
           subscription_tier: quotaCheck.subscription_tier,
-          usage: quotaCheck.usage
-        }
+          usage: quotaCheck.usage,
+        },
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
-
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
-    console.error('Error in chat-assistant function:', error)
+    console.error('Intent Router error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'Ett oväntat fel uppstod när jag försökte behandla din förfrågan',
-        success: false 
-      }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
+      JSON.stringify({ error: error.message || 'Ett oväntat fel uppstod', success: false }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
-})
+});
+
+/**
+ * Full AI call for questions, reports, and unknown intents.
+ * Uses Lovable AI Gateway with streaming disabled (non-streaming for now).
+ */
+async function handleFullAICall(
+  message: string,
+  conversationHistory: ConversationMessage[] | undefined,
+  context: string,
+  apiKey: string
+): Promise<string> {
+  const messages: Array<{ role: string; content: string }> = [
+    { role: 'system', content: `${SYSTEM_PROMPT}\n\nBOKFÖRINGSKONTEXT:\n${context}` },
+  ];
+
+  if (conversationHistory?.length) {
+    for (const msg of conversationHistory) {
+      messages.push({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.content,
+      });
+    }
+  }
+
+  messages.push({ role: 'user', content: message });
+
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-3-flash-preview',
+        messages,
+        max_tokens: 1000,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        return '⚠️ AI-tjänsten är tillfälligt överbelastad. Försök igen om en stund.';
+      }
+      if (response.status === 402) {
+        return '⚠️ AI-krediter slut. Kontakta support.';
+      }
+      const errText = await response.text();
+      console.error('Full AI call error:', response.status, errText);
+      return 'Jag kunde tyvärr inte svara just nu. Försök igen.';
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || 'Jag förstod inte riktigt. Kan du omformulera?';
+  } catch (error) {
+    console.error('Full AI call failed:', error);
+    return 'Ett fel uppstod. Försök igen.';
+  }
+}

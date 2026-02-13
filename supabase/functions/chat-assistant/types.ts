@@ -11,22 +11,59 @@ export interface UserData {
   openingBalances: any[];
   chartOfAccounts: any[];
   templates: any[];
+  recentTransactions?: any[];
+  profile?: any;
 }
 
 export interface FunctionCallArgs {
   [key: string]: any;
 }
 
-export interface OpenAIResponse {
-  choices: Array<{
-    message: {
-      content: string;
-      tool_calls?: Array<{
-        function: {
-          name: string;
-          arguments: string;
-        };
-      }>;
-    };
+// Intent Router types
+export type IntentType =
+  | 'book_expense'
+  | 'book_sale'
+  | 'book_payment'
+  | 'opening_balance'
+  | 'confirm_booking'
+  | 'ask_question'
+  | 'view_report'
+  | 'analyze_image'
+  | 'unknown';
+
+export interface ExtractedData {
+  amount?: number;
+  date?: string;
+  description?: string;
+  vendor?: string;
+  vat_rate?: number;
+  reference?: string;
+  payment_method?: string;
+}
+
+export interface IntentClassification {
+  intent: IntentType;
+  extracted_data: ExtractedData;
+  matched_template_hint?: string;
+  confidence: number;
+  clarification_needed?: string | null;
+}
+
+export interface TemplateMatch {
+  template: any;
+  match_type: 'exact' | 'category' | 'keyword' | 'fallback';
+  confidence: number;
+}
+
+export interface BookingProposal {
+  template: any;
+  entries: Array<{
+    account_code: string;
+    account_name: string;
+    debit_amount: number;
+    credit_amount: number;
   }>;
+  total_amount: number;
+  date: string;
+  description: string;
 }
