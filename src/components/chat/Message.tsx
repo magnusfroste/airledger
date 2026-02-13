@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface MessageImage {
   id: string;
@@ -53,6 +54,7 @@ const Message = ({ content, sender, type, images }: MessageProps) => {
           
           <div className="prose prose-sm max-w-none dark:prose-invert">
             <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
               components={{
                 table: ({ children }) => (
                   <div className="overflow-x-auto my-2 rounded-lg border border-border">
