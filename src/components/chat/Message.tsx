@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import ReactMarkdown from "react-markdown";
 
 interface MessageImage {
   id: string;
@@ -50,16 +51,31 @@ const Message = ({ content, sender, type, images }: MessageProps) => {
             </div>
           )}
           
-          <div className="prose prose-sm max-w-none">
-            {content.split('\n').map((line, index) => {
-              if (line.startsWith('**') && line.endsWith('**')) {
-                return <p key={index} className="font-bold mb-2">{line.slice(2, -2)}</p>;
-              }
-              if (line.startsWith('•')) {
-                return <p key={index} className="ml-2 mb-1">{line}</p>;
-              }
-              return line ? <p key={index} className="mb-2">{line}</p> : <br key={index} />;
-            })}
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            <ReactMarkdown
+              components={{
+                table: ({ children }) => (
+                  <div className="overflow-x-auto my-2 rounded-lg border border-border">
+                    <table className="w-full text-sm">{children}</table>
+                  </div>
+                ),
+                thead: ({ children }) => (
+                  <thead className="bg-muted/50">{children}</thead>
+                ),
+                th: ({ children }) => (
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground text-xs">{children}</th>
+                ),
+                td: ({ children }) => (
+                  <td className="px-3 py-2 border-t border-border">{children}</td>
+                ),
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                ul: ({ children }) => <ul className="ml-2 space-y-1">{children}</ul>,
+                li: ({ children }) => <li className="flex gap-1"><span>•</span><span>{children}</span></li>,
+              }}
+            >
+              {content}
+            </ReactMarkdown>
           </div>
         </div>
       </div>
