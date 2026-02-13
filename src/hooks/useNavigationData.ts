@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,6 +8,18 @@ export const useNavigationData = () => {
   const [isDeveloper, setIsDeveloper] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
 
+  const fetchTransactionCount = useCallback(async () => {
+    if (!user) return;
+    const { count, error } = await supabase
+      .from('airledger_transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+    
+    if (!error && count !== null) {
+      setTransactionCount(count);
+    }
+  }, [user]);
+
   useEffect(() => {
     const fetchNavigationData = async () => {
       if (!user) {
@@ -16,17 +28,8 @@ export const useNavigationData = () => {
       }
       
       try {
-        // Fetch transaction count
-        const { data: transactions, error: transError } = await supabase
-          .from('airledger_transactions')
-          .select('id', { count: 'exact' })
-          .eq('user_id', user.id);
-        
-        if (!transError && transactions) {
-          setTransactionCount(transactions.length);
-        }
+        await fetchTransactionCount();
 
-        // Check if user is developer
         const { data: profile } = await supabase
           .from('profiles')
           .select('is_developer')
@@ -44,7 +47,30 @@ export const useNavigationData = () => {
     };
 
     fetchNavigationData();
-  }, [user]);
+
+    // Subscribe to transaction changes to keep count updated
+    if (user) {
+      const channel = supabase
+        .channel('nav-transaction-count')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'airledger_transactions',
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            fetchTransactionCount();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user, fetchTransactionCount]);
 
   return { transactionCount, isDeveloper, loading };
 };
