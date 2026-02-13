@@ -61,6 +61,32 @@ serve(async (req) => {
       throw new Error(`Transaction is not balanced. Total debits: ${totalDebit}, Total credits: ${totalCredit}`)
     }
 
+    // Validate account codes against chart of accounts
+    const accountCodes = [...new Set(entries.map((e: any) => e.accountCode))]
+    console.log('Validating account codes:', accountCodes)
+    
+    const supabaseUrlForValidation = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const validationClient = createClient(supabaseUrlForValidation, supabaseServiceKey)
+    
+    const { data: validAccounts, error: validationError } = await validationClient
+      .from('airledger_chart_of_accounts')
+      .select('account_code')
+      .in('account_code', accountCodes)
+      .eq('is_active', true)
+
+    if (validationError) {
+      console.error('Account validation query failed:', validationError)
+      // Continue anyway - don't block transaction on validation failure
+    } else {
+      const validCodes = new Set(validAccounts.map((a: any) => a.account_code))
+      const invalidCodes = accountCodes.filter((c: string) => !validCodes.has(c))
+      
+      if (invalidCodes.length > 0) {
+        throw new Error(`Ogiltiga kontonummer: ${invalidCodes.join(', ')}. Kontrollera att kontona finns i BAS-kontoplanen.`)
+      }
+    }
+
     // Get the Authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {

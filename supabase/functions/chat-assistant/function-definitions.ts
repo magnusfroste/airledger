@@ -44,7 +44,7 @@ export const FUNCTION_DEFINITIONS = [
         properties: {
           accountCode: {
             type: "string",
-            description: "Kontonummer enligt BAS 2024 (ex: 1930, 2640)"
+            description: "Kontonummer enligt BAS-kontoplanen (ex: 1930, 2640)"
           },
           accountName: {
             type: "string", 
@@ -79,7 +79,7 @@ export const FUNCTION_DEFINITIONS = [
               properties: {
                 accountCode: {
                   type: "string",
-                  description: "Kontonummer enligt BAS 2024"
+                  description: "Kontonummer enligt BAS-kontoplanen"
                 },
                 accountName: {
                   type: "string",

@@ -45,11 +45,26 @@ export function buildBookkeepingContext(userData: UserData): string {
   }
 
   if (userData.chartOfAccounts && userData.chartOfAccounts.length > 0) {
-    context += `\nBAS-KONTOPLAN (urval):\n`;
-    const relevant = userData.chartOfAccounts.filter((a: any) =>
-      ['1930', '1510', '2640', '2610', '3000', '4000', '5010', '6410', '6110', '6212', '6970'].includes(a.account_code)
-    );
-    relevant.forEach((a: any) => context += `${a.account_code} ${a.account_name}\n`);
+    const classNames: Record<string, string> = {
+      '1': 'Tillgångar', '2': 'Eget kapital & Skulder', '3': 'Intäkter',
+      '4': 'Kostnader för varor', '5': 'Lokalkostnader & Förbrukningsinventarier',
+      '6': 'Övriga externa kostnader', '7': 'Personal', '8': 'Finansiella poster & Skatt'
+    };
+
+    // Group accounts by class (first digit)
+    const grouped: Record<string, any[]> = {};
+    for (const a of userData.chartOfAccounts) {
+      const cls = a.account_code?.charAt(0);
+      if (!cls || !classNames[cls]) continue;
+      if (!grouped[cls]) grouped[cls] = [];
+      grouped[cls].push(a);
+    }
+
+    context += `\nBAS-KONTOPLAN:\n`;
+    for (const cls of Object.keys(grouped).sort()) {
+      context += `\nKONTOKLASS ${cls} - ${classNames[cls]}:\n`;
+      grouped[cls].forEach((a: any) => context += `${a.account_code} ${a.account_name}\n`);
+    }
   }
 
   if (userData.openingBalances && userData.openingBalances.length > 0) {
