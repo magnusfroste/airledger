@@ -1,4 +1,4 @@
-import { BookOpen, Calculator, BarChart3, Settings, User } from "lucide-react";
+import { BookOpen, Calculator, BarChart3, Settings, User, Shield } from "lucide-react";
 
 export interface NavigationItem {
   href: string;
@@ -36,6 +36,12 @@ export const getMoreMenuItems = (): NavigationItem[] => [
     href: "/subscription", 
     label: "Prenumeration", 
     icon: User,
+    badge: null
+  },
+  { 
+    href: "/admin", 
+    label: "Admin", 
+    icon: Shield,
     badge: null
   },
 ];

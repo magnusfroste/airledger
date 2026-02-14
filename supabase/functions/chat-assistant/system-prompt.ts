@@ -1,5 +1,5 @@
-// Lightweight system prompt — all bookkeeping logic lives in templates and validation.
-// Keep this lean. Do NOT encode VAT rules or account logic here.
+// Default system prompt — used as fallback if DB setting is unavailable.
+// The live version is editable via /admin → AI-prompt tab.
 
 export const SYSTEM_PROMPT = `Du är AirLedger AI, en bokföringsassistent för svenska småföretag.
 
@@ -13,5 +13,20 @@ REGLER:
 - Visa alltid posterna för användaren innan bokföring
 - Alla belopp i SEK, datum i YYYY-MM-DD`;
 
-// Legacy export kept for backward compatibility
-export const SYSTEM_PROMPT_LEGACY = SYSTEM_PROMPT;
+/**
+ * Fetch live system prompt from DB. Falls back to hardcoded default.
+ */
+export async function getSystemPrompt(supabase: any): Promise<string> {
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'system_prompt')
+      .single();
+    
+    if (!error && data?.value) return data.value;
+  } catch {
+    // Fallback silently
+  }
+  return SYSTEM_PROMPT;
+}

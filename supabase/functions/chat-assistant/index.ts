@@ -9,7 +9,7 @@ import { classifyIntent } from './intent-classifier.ts';
 import { matchTemplate } from './template-matcher.ts';
 import { formatBookingProposal, formatClarificationRequest, formatConfirmation } from './response-formatter.ts';
 import { handleFunctionCall } from './function-handlers.ts';
-import { SYSTEM_PROMPT } from './system-prompt.ts';
+import { SYSTEM_PROMPT, getSystemPrompt } from './system-prompt.ts';
 import { FUNCTION_DEFINITIONS } from './function-definitions.ts';
 
 // Quota helper
@@ -127,8 +127,11 @@ serve(async (req) => {
       );
     }
 
-    // Fetch user data
-    const userData = await fetchUserData(userId, supabase);
+    // Fetch user data and live system prompt in parallel
+    const [userData, livePrompt] = await Promise.all([
+      fetchUserData(userId, supabase),
+      getSystemPrompt(serviceSupabase),
+    ]);
     const templateNames = buildLightContext(userData);
 
     // === INTENT CLASSIFICATION (lightweight AI call) ===
@@ -158,7 +161,7 @@ serve(async (req) => {
           // so the AI can create a freeform transaction via save_general_transaction
           console.log('No template match — falling back to freeform AI booking');
           const fullContext = buildBookkeepingContext(userData);
-          aiResponse = await handleFreeformBooking(message, conversationHistory, fullContext, lovableApiKey, supabase, userId);
+          aiResponse = await handleFreeformBooking(message, conversationHistory, fullContext, lovableApiKey, supabase, userId, livePrompt);
         }
         break;
       }
@@ -181,7 +184,7 @@ serve(async (req) => {
             
             // Re-classify to get the transaction data, then execute
             const freeformResult = await executeFreeformBooking(
-              lastUserBooking.content, conversationHistory, fullContext, lovableApiKey, supabase, userId
+              lastUserBooking.content, conversationHistory, fullContext, lovableApiKey, supabase, userId, livePrompt
             );
             aiResponse = freeformResult || '✅ Transaktionen är bokförd!';
           } else {
@@ -238,7 +241,7 @@ serve(async (req) => {
       case 'unknown': {
         // Full AI call with complete context (fallback to rich conversation)
         const fullContext = buildBookkeepingContext(userData);
-        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey);
+        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
         break;
       }
 
@@ -249,7 +252,7 @@ serve(async (req) => {
 
       default: {
         const fullContext = buildBookkeepingContext(userData);
-        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey);
+        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
       }
     }
 
@@ -285,9 +288,10 @@ async function executeFreeformBooking(
   context: string,
   apiKey: string,
   supabase: any,
-  userId: string
+  userId: string,
+  systemPrompt: string = SYSTEM_PROMPT
 ): Promise<string> {
-  const freeformPrompt = `${SYSTEM_PROMPT}\n\nBOKFÖRINGSKONTEXT:\n${context}\n\nVIKTIGT: Användaren har BEKRÄFTAT att denna transaktion ska bokföras. Använd funktionen save_general_transaction med korrekta BAS-konton. Se till att debet = kredit.`;
+  const freeformPrompt = `${systemPrompt}\n\nBOKFÖRINGSKONTEXT:\n${context}\n\nVIKTIGT: Användaren har BEKRÄFTAT att denna transaktion ska bokföras. Använd funktionen save_general_transaction med korrekta BAS-konton. Se till att debet = kredit.`;
 
   const messages: Array<{ role: string; content: string }> = [
     { role: 'system', content: freeformPrompt },
@@ -341,9 +345,10 @@ async function handleFullAICall(
   message: string,
   conversationHistory: ConversationMessage[] | undefined,
   context: string,
-  apiKey: string
+  apiKey: string,
+  systemPrompt: string = SYSTEM_PROMPT
 ): Promise<string> {
-  const messages = buildMessages(message, conversationHistory, context);
+  const messages = buildMessages(message, conversationHistory, context, systemPrompt);
 
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -377,9 +382,10 @@ async function handleFreeformBooking(
   context: string,
   apiKey: string,
   supabase: any,
-  userId: string
+  userId: string,
+  systemPrompt: string = SYSTEM_PROMPT
 ): Promise<string> {
-  const freeformPrompt = `${SYSTEM_PROMPT}
+  const freeformPrompt = `${systemPrompt}
 
 BOKFÖRINGSKONTEXT:
 ${context}
@@ -469,9 +475,9 @@ Formatera förslaget tydligt med kontonummer, kontonamn och belopp.`;
   }
 }
 
-function buildMessages(message: string, conversationHistory: ConversationMessage[] | undefined, context: string) {
+function buildMessages(message: string, conversationHistory: ConversationMessage[] | undefined, context: string, systemPrompt: string = SYSTEM_PROMPT) {
   const messages: Array<{ role: string; content: string }> = [
-    { role: 'system', content: `${SYSTEM_PROMPT}\n\nBOKFÖRINGSKONTEXT:\n${context}` },
+    { role: 'system', content: `${systemPrompt}\n\nBOKFÖRINGSKONTEXT:\n${context}` },
   ];
   if (conversationHistory?.length) {
     for (const msg of conversationHistory) {

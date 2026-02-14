@@ -769,6 +769,33 @@ export type Database = {
         }
         Relationships: []
       }
+      system_settings: {
+        Row: {
+          description: string | null
+          id: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: string
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: string
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       usage_tracking: {
         Row: {
           ai_analyses_used: number
@@ -795,6 +822,27 @@ export type Database = {
           month_year?: string
           storage_used_mb?: number
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
         Relationships: []
@@ -832,6 +880,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       user_can_access_conversation: {
         Args: { conversation_uuid: string }
         Returns: boolean
@@ -851,6 +906,7 @@ export type Database = {
       activity_type: "running" | "cycling" | "walking" | "hiking"
       ad_status: "active" | "inactive" | "pending"
       ad_type: "image" | "html"
+      app_role: "admin" | "user"
       challenge_status: "pending" | "active" | "completed" | "failed"
       track_difficulty: "easy" | "medium" | "hard" | "expert"
       transaction_type: "income" | "expense" | "transfer"
@@ -985,6 +1041,7 @@ export const Constants = {
       activity_type: ["running", "cycling", "walking", "hiking"],
       ad_status: ["active", "inactive", "pending"],
       ad_type: ["image", "html"],
+      app_role: ["admin", "user"],
       challenge_status: ["pending", "active", "completed", "failed"],
       track_difficulty: ["easy", "medium", "hard", "expert"],
       transaction_type: ["income", "expense", "transfer"],

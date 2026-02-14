@@ -20,6 +20,7 @@ import OpeningBalances from "./pages/OpeningBalances";
 import GeneralLedger from "./pages/GeneralLedger";
 import Subscription from "./pages/Subscription";
 import Auth from "./pages/Auth";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
                         <Route path="/opening-balances" element={<PageLayout><OpeningBalances /></PageLayout>} />
                         <Route path="/general-ledger" element={<PageLayout><GeneralLedger /></PageLayout>} />
                         <Route path="/subscription" element={<PageLayout><Subscription /></PageLayout>} />
+                        <Route path="/admin" element={<PageLayout><Admin /></PageLayout>} />
                         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                         <Route path="*" element={<PageLayout><NotFound /></PageLayout>} />
                       </Routes>
