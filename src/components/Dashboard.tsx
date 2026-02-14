@@ -97,23 +97,33 @@ const Dashboard = () => {
       const transactions = transactionsResult.data || [];
       const entries = entriesResult.data || [];
 
+      // Build a map of transaction_id -> transaction_date for correct periodization
+      const txDateMap = new Map<string, string>();
+      transactions.forEach(t => txDateMap.set(t.id, t.transaction_date));
+
+      // Helper: get transaction_date for an entry
+      const getEntryDate = (e: typeof entries[0]) => {
+        const dateStr = txDateMap.get(e.transaction_id);
+        return dateStr ? new Date(dateStr) : null;
+      };
+
       // Calculate stats
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
 
       // MONTHLY DATA
-      // Revenue - all revenue accounts (3000-3999), not just 3000
       const monthlyRevenue = entries.filter(e => {
-        const entryDate = new Date(e.created_at);
+        const entryDate = getEntryDate(e);
+        if (!entryDate) return false;
         const accountNum = parseInt(e.account_code);
         return accountNum >= 3000 && accountNum <= 3999 && 
                entryDate.getMonth() === currentMonth && 
                entryDate.getFullYear() === currentYear;
       }).reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
-      // Expenses - use entries for expense accounts (4000-4999, 6000-6999) like Reports
       const monthlyExpenses = entries.filter(e => {
-        const entryDate = new Date(e.created_at);
+        const entryDate = getEntryDate(e);
+        if (!entryDate) return false;
         const accountNum = parseInt(e.account_code);
         return ((accountNum >= 4000 && accountNum <= 4999) || (accountNum >= 6000 && accountNum <= 6999)) &&
                entryDate.getMonth() === currentMonth && 
@@ -146,14 +156,16 @@ const Dashboard = () => {
       // YEARLY DATA
       // Calculate yearly totals using same logic as Reports
       const yearlyRevenue = entries.filter(e => {
-        const entryDate = new Date(e.created_at);
+        const entryDate = getEntryDate(e);
+        if (!entryDate) return false;
         const accountNum = parseInt(e.account_code);
         return accountNum >= 3000 && accountNum <= 3999 && 
                entryDate.getFullYear() === currentYear;
       }).reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
       const yearlyExpenses = entries.filter(e => {
-        const entryDate = new Date(e.created_at);
+        const entryDate = getEntryDate(e);
+        if (!entryDate) return false;
         const accountNum = parseInt(e.account_code);
         return ((accountNum >= 4000 && accountNum <= 4999) || (accountNum >= 6000 && accountNum <= 6999)) &&
                entryDate.getFullYear() === currentYear;
@@ -163,7 +175,8 @@ const Dashboard = () => {
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
       const monthlyBreakdown = monthNames.map((month, index) => {
         const monthRevenue = entries.filter(e => {
-          const entryDate = new Date(e.created_at);
+          const entryDate = getEntryDate(e);
+          if (!entryDate) return false;
           const accountNum = parseInt(e.account_code);
           return accountNum >= 3000 && accountNum <= 3999 && 
                  entryDate.getMonth() === index && 
@@ -171,7 +184,8 @@ const Dashboard = () => {
         }).reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
         const monthExpenses = entries.filter(e => {
-          const entryDate = new Date(e.created_at);
+          const entryDate = getEntryDate(e);
+          if (!entryDate) return false;
           const accountNum = parseInt(e.account_code);
           return ((accountNum >= 4000 && accountNum <= 4999) || (accountNum >= 6000 && accountNum <= 6999)) &&
                  entryDate.getMonth() === index && 
