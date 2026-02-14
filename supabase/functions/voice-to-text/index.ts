@@ -149,7 +149,18 @@ serve(async (req) => {
       );
     }
 
-    const { audio } = await req.json()
+    const body = await req.json()
+    
+    // Health check mode — verify function and API key are configured
+    if (body.healthCheck) {
+      const hasKey = !!Deno.env.get('OPENAI_API_KEY')
+      return new Response(
+        JSON.stringify({ success: hasKey, healthy: true, hasApiKey: hasKey }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const { audio } = body
     
     if (!audio) {
       throw new Error('No audio data provided')
