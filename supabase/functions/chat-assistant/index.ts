@@ -245,6 +245,61 @@ serve(async (req) => {
         break;
       }
 
+      case 'vat_report': {
+        // Determine quarter from extracted data or current quarter
+        const now = new Date();
+        const q = Math.floor(now.getMonth() / 3);
+        const year = now.getFullYear();
+        const periodStart = intent.extracted_data.date || `${year}-${String(q * 3 + 1).padStart(2, '0')}-01`;
+        const qEnd = new Date(year, q * 3 + 3, 0);
+        const periodEnd = qEnd.toISOString().split('T')[0];
+        
+        const sessionId = `${userId}_${Date.now()}`;
+        aiResponse = await handleFunctionCall('calculate_vat_report', { periodStart, periodEnd }, supabase, sessionId);
+        if (!aiResponse) {
+          const fullContext = buildBookkeepingContext(userData);
+          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+        }
+        break;
+      }
+
+      case 'account_balance': {
+        const accountCode = intent.extracted_data.reference || '';
+        if (accountCode) {
+          const sessionId = `${userId}_${Date.now()}`;
+          aiResponse = await handleFunctionCall('calculate_account_balance', { accountCode }, supabase, sessionId);
+        } else {
+          // Let AI ask which account
+          const fullContext = buildBookkeepingContext(userData);
+          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+        }
+        break;
+      }
+
+      case 'period_reconciliation': {
+        const accountCode = intent.extracted_data.reference || '';
+        if (accountCode) {
+          const sessionId = `${userId}_${Date.now()}`;
+          aiResponse = await handleFunctionCall('calculate_account_balance', { 
+            accountCode,
+            periodStart: intent.extracted_data.date || undefined,
+          }, supabase, sessionId);
+        } else {
+          const fullContext = buildBookkeepingContext(userData);
+          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+        }
+        break;
+      }
+
+      case 'year_end': {
+        const year = intent.extracted_data.date 
+          ? parseInt(intent.extracted_data.date.substring(0, 4))
+          : new Date().getFullYear() - (new Date().getMonth() < 3 ? 1 : 0);
+        const sessionId = `${userId}_${Date.now()}`;
+        aiResponse = await handleFunctionCall('get_year_end_checklist', { fiscalYear: year }, supabase, sessionId);
+        break;
+      }
+
       case 'analyze_image': {
         aiResponse = '📸 Skicka bilden så analyserar jag den åt dig!';
         break;
