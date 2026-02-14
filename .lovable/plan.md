@@ -37,3 +37,19 @@ Lägg till en databasvalidering som kontrollerar att varje `accountCode` i inkom
 
 ### function-definitions.ts
 - Rad 81, 98: Ändra "BAS 2024" till "BAS-kontoplanen"
+
+---
+
+# Nästa steg — Bokföringskvalitet & regelefterlevnad
+
+## 4. Räkenskapsårslåsning
+Skapa tabell `fiscal_year_locks` (year, locked_at, locked_by) med RLS. Lägg till validering i `save-transaction` och `save-general-transaction` som blockerar bokföring på låst år. Bygg UI under Rapporter/Inställningar med bekräftelsedialog som visar årssammanfattning innan låsning. Admin kan låsa upp igen vid behov.
+
+## 5. Mjuk varning vid gammal datering
+Lägg till en varning i chatten om `transaction_date` är >30 dagar äldre än dagens datum. Varningen blockerar inte — den informerar användaren och ber om bekräftelse.
+
+## 6. Rättelseverifikationer istället för radering
+På sikt: blockera radering av bokförda transaktioner. Ersätt med motbokningsfunktion som skapar en ny verifikation som reverserar den ursprungliga. Behåller verifikationskedjan intakt enligt BFL.
+
+## 7. Automatiska ingående balanser
+Vid stängning av räkenskapsår: generera ingående balanser för nästa år automatiskt från utgående balanser (balanskonton klass 1-2). Resultaträkningskonton (klass 3-8) nollställs och resultatet förs till eget kapital (konto 2099).
