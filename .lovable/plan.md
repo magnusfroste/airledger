@@ -51,5 +51,5 @@ Lägg till en varning i chatten om `transaction_date` är >30 dagar äldre än d
 ## 6. Rättelseverifikationer istället för radering
 På sikt: blockera radering av bokförda transaktioner. Ersätt med motbokningsfunktion som skapar en ny verifikation som reverserar den ursprungliga. Behåller verifikationskedjan intakt enligt BFL.
 
-## 7. Automatiska ingående balanser
-Vid stängning av räkenskapsår: generera ingående balanser för nästa år automatiskt från utgående balanser (balanskonton klass 1-2). Resultaträkningskonton (klass 3-8) nollställs och resultatet förs till eget kapital (konto 2099).
+## 7. Designbeslut: Ingående balanser — Modell B (beräknad IB)
+IB sätts *en gång* i `airledger_opening` (första året i systemet). För efterföljande år beräknas IB on-the-fly: IB(år X) = airledger_opening + ackumulerade entries på balanskonton (klass 1-2) t.o.m. 31/12 år X-1, plus årets resultat (klass 3-8) fört till konto 2099 (eget kapital). Ingen ny tabell eller duplicering behövs — en enda källa till sanning.
