@@ -31,6 +31,16 @@ export function formatBookingProposal(
   if (description) {
     response += `**Beskrivning:** ${description}\n`;
   }
+
+  // Show warnings if any
+  if (match.warnings?.length) {
+    response += `\n`;
+    for (const warning of match.warnings) {
+      response += `${warning}\n`;
+    }
+    response += `\n`;
+  }
+
   response += `\nSka jag bokföra detta?`;
 
   return response;

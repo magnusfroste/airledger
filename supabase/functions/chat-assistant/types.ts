@@ -53,6 +53,7 @@ export interface TemplateMatch {
   template: any;
   match_type: 'exact' | 'category' | 'keyword' | 'fallback';
   confidence: number;
+  warnings?: string[];
 }
 
 export interface BookingProposal {
