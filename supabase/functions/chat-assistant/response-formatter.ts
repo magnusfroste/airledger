@@ -97,6 +97,15 @@ export function formatBatchProposal(rows: any[]): string {
   return response;
 }
 
+export function formatMissingDataPrompt(transactionType: string): string {
+  const typeLabel = transactionType === 'book_sale' ? 'intäkt' : 
+                    transactionType === 'book_payment' ? 'betalning' : 'utgift';
+  return `Självklart! Jag hjälper dig bokföra en ${typeLabel}. Du kan:\n\n` +
+    `- **Beskriv transaktionen** — t.ex. "Köpt kontorsmaterial för 500 kr"\n` +
+    `- **Bifoga ett kvitto eller faktura** — så analyserar jag det automatiskt\n\n` +
+    `Vad vill du bokföra?`;
+}
+
 // Helpers
 
 function formatKr(amount: number): string {
