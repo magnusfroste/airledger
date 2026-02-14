@@ -10,6 +10,10 @@ const LIMITS = {
   FRISKVARD_MAX: 5_000,                   // Friskvårdsbidrag skattefritt max
   GAVA_PERSONAL_MAX: 500,                 // Julgåva/jubileumsgåva max per tillfälle
   FORBRUKNINGSINVENTARIE_MAX: HALVA_PRISBASBELOPP,
+  TRAKTAMENTE_INRIKES_HELDAG: 290,        // Heldagstraktamente inrikes 2026
+  TRAKTAMENTE_INRIKES_HALVDAG: 145,       // Halvdagstraktamente inrikes 2026
+  MILERSATTNING_SKATTEFRI: 27,            // Max skattefri milersättning kr/mil 2026
+  GAVA_KUND_MAX: 300,                     // Representationsgåva max exkl moms
 };
 
 // Warning rules: checked after template match
@@ -45,6 +49,41 @@ const WARNING_RULES: WarningRule[] = [
     check: (amount) =>
       amount > LIMITS.FORBRUKNINGSINVENTARIE_MAX
         ? `⚠️ Belopp över ${LIMITS.FORBRUKNINGSINVENTARIE_MAX.toLocaleString('sv-SE')} kr (halva prisbasbeloppet) ska normalt bokföras som anläggningstillgång, inte förbrukningsinventarie.`
+        : null,
+  },
+  // Gåvor till personal
+  {
+    templates: ['Intern representation'],
+    check: (amount) => {
+      // If it looks like a gift amount per person
+      if (amount > LIMITS.GAVA_PERSONAL_MAX && amount <= 2000) {
+        return `⚠️ Gåva till anställd över ${LIMITS.GAVA_PERSONAL_MAX} kr/tillfälle (jul, jubileum) är en skattepliktig förmån som ska förmånsbeskattas.`;
+      }
+      return null;
+    },
+  },
+  // Traktamente inrikes
+  {
+    templates: ['Traktamente inrikes'],
+    check: (amount) =>
+      amount > LIMITS.TRAKTAMENTE_INRIKES_HELDAG
+        ? `⚠️ Skattefritt heldagstraktamente inrikes är max ${LIMITS.TRAKTAMENTE_INRIKES_HELDAG} kr/dag (2026). Belopp över detta ska förmånsbeskattas. Halvdag: max ${LIMITS.TRAKTAMENTE_INRIKES_HALVDAG} kr.`
+        : null,
+  },
+  // Milersättning
+  {
+    templates: ['Milersättning anställd'],
+    check: (amount) =>
+      amount > 5000
+        ? `⚠️ Skattefri milersättning är max ${LIMITS.MILERSATTNING_SKATTEFRI} kr/mil (2026). Kontrollera att beloppet inte överstiger schablonen — överskjutande del ska förmånsbeskattas.`
+        : null,
+  },
+  // Konferens — påminnelse om programkrav
+  {
+    templates: ['Konferens med övernattning'],
+    check: (amount) =>
+      amount > 5000
+        ? `💡 Konferens kräver program på minst 6 timmar/dag och 30 timmar/vecka för att vara avdragsgill. Spara programmet som underlag.`
         : null,
   },
 ];
