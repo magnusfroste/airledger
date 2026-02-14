@@ -1,12 +1,15 @@
 import { UserData } from './types.ts';
 
 /**
- * Light mode: Only template names and categories (~100 tokens).
- * Used for intent classification.
+ * Light mode: Template name + category + description + keywords (~400 tokens).
+ * Used for intent classification — gives AI enough context to pick the right template.
  */
 export function buildLightContext(userData: UserData): string[] {
   if (!userData.templates || userData.templates.length === 0) return [];
-  return userData.templates.map((t: any) => t.template_name);
+  return userData.templates.map((t: any) => {
+    const keywords = (t.keywords || []).join(', ');
+    return `${t.template_name} [${t.category}] – ${t.description}${keywords ? ` (${keywords})` : ''}`;
+  });
 }
 
 /**
