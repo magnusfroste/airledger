@@ -13,6 +13,14 @@ export interface UserData {
   templates: any[];
   recentTransactions?: any[];
   profile?: any;
+  vatSummary?: VatSummary;
+}
+
+export interface VatSummary {
+  outputVat: number;
+  inputVat: number;
+  netVat: number;
+  quarterLabel: string;
 }
 
 export interface FunctionCallArgs {
@@ -29,6 +37,10 @@ export type IntentType =
   | 'ask_question'
   | 'view_report'
   | 'analyze_image'
+  | 'vat_report'
+  | 'period_reconciliation'
+  | 'year_end'
+  | 'account_balance'
   | 'unknown';
 
 export interface ExtractedData {

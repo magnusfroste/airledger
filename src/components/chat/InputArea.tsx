@@ -3,6 +3,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
 import ActionButtons from "./ActionButtons";
 import PendingImages from "./PendingImages";
+import ChatQuickActions from "./ChatQuickActions";
 
 interface PendingImage {
   id: string;
@@ -22,6 +23,9 @@ interface InputAreaProps {
   onRemovePendingImage: (imageId: string) => void;
   onVoiceRecording: () => void;
   onStartCamera: () => void;
+  onQuickAction?: (message: string) => void;
+  hasMessages?: boolean;
+  lastMessageIsBooking?: boolean;
 }
 
 const InputArea = ({
@@ -35,7 +39,10 @@ const InputArea = ({
   onImageUpload,
   onRemovePendingImage,
   onVoiceRecording,
-  onStartCamera
+  onStartCamera,
+  onQuickAction,
+  hasMessages = false,
+  lastMessageIsBooking = false,
 }: InputAreaProps) => {
   return (
     <div className="p-3 space-y-3">
@@ -44,6 +51,16 @@ const InputArea = ({
         pendingImages={pendingImages}
         onRemoveImage={onRemovePendingImage}
       />
+
+      {/* Quick Actions */}
+      {onQuickAction && (
+        <ChatQuickActions
+          onAction={onQuickAction}
+          isLoading={isLoading}
+          hasMessages={hasMessages}
+          lastMessageIsBooking={lastMessageIsBooking}
+        />
+      )}
 
       {/* Action buttons above textarea */}
       <div className="flex justify-center">

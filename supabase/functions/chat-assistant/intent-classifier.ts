@@ -4,7 +4,7 @@ const INTENT_SYSTEM_PROMPT = `Du är en svensk bokföringsassistent. Klassificer
 
 Returnera ALLTID JSON med följande struktur:
 {
-  "intent": "book_expense" | "book_sale" | "book_payment" | "opening_balance" | "confirm_booking" | "ask_question" | "view_report" | "analyze_image" | "unknown",
+  "intent": "book_expense" | "book_sale" | "book_payment" | "opening_balance" | "confirm_booking" | "ask_question" | "view_report" | "analyze_image" | "vat_report" | "period_reconciliation" | "year_end" | "account_balance" | "unknown",
   "extracted_data": {
     "amount": number | null,
     "date": "YYYY-MM-DD" | null,
@@ -28,6 +28,10 @@ REGLER:
 - "ask_question": Frågor om bokföring, regler, konton
 - "view_report": Rapport, resultat, balansräkning, översikt
 - "analyze_image": Nämner bild, kvitto, foto (men hanteras separat)
+- "vat_report": Momsrapport, moms kvartal, momsdeklaration, redovisa moms
+- "period_reconciliation": Avstämning, stämmer kontot, kontrollera, periodavstämning
+- "year_end": Årsbokslut, stäng året, bokslut, årsredovisning
+- "account_balance": Saldo på, vad står det på, hur mycket finns
 - "unknown": Oklart eller orelaterat
 
 Om beloppet anges utan moms-specifikation, sätt clarification_needed till "Är beloppet inkl eller exkl moms?"
@@ -70,7 +74,7 @@ Meddelande: "${message}"`;
                 properties: {
                   intent: {
                     type: 'string',
-                    enum: ['book_expense', 'book_sale', 'book_payment', 'opening_balance', 'confirm_booking', 'ask_question', 'view_report', 'analyze_image', 'unknown']
+                    enum: ['book_expense', 'book_sale', 'book_payment', 'opening_balance', 'confirm_booking', 'ask_question', 'view_report', 'analyze_image', 'vat_report', 'period_reconciliation', 'year_end', 'account_balance', 'unknown']
                   },
                   extracted_data: {
                     type: 'object',

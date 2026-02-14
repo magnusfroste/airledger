@@ -113,6 +113,69 @@ export const FUNCTION_DEFINITIONS = [
         required: ["description", "entries"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "calculate_vat_report",
+      description: "Beräkna momsrapport för en given period. Returnerar utgående moms, ingående moms och nettomoms att betala/få tillbaka. Använd när användaren frågar om moms, momsdeklaration eller momsrapport.",
+      parameters: {
+        type: "object",
+        properties: {
+          periodStart: {
+            type: "string",
+            description: "Periodens startdatum i format YYYY-MM-DD"
+          },
+          periodEnd: {
+            type: "string",
+            description: "Periodens slutdatum i format YYYY-MM-DD"
+          }
+        },
+        required: ["periodStart", "periodEnd"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "calculate_account_balance",
+      description: "Beräkna saldo för ett specifikt konto under en given period. Visar IB, rörelse (debet/kredit) och UB. Använd för avstämning, kontosaldo eller periodavstämning.",
+      parameters: {
+        type: "object",
+        properties: {
+          accountCode: {
+            type: "string",
+            description: "Kontonummer enligt BAS-kontoplanen (ex: 1930, 2640)"
+          },
+          periodStart: {
+            type: "string",
+            description: "Periodens startdatum i format YYYY-MM-DD (valfritt, standard är räkenskapsårets start)"
+          },
+          periodEnd: {
+            type: "string",
+            description: "Periodens slutdatum i format YYYY-MM-DD (valfritt, standard är dagens datum)"
+          }
+        },
+        required: ["accountCode"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_year_end_checklist",
+      description: "Hämta checklista och status för årsbokslut. Visar vilka steg som är gjorda och vad som återstår. Använd när användaren frågar om bokslut, årsbokslut eller vill stänga året.",
+      parameters: {
+        type: "object",
+        properties: {
+          fiscalYear: {
+            type: "number",
+            description: "Räkenskapsåret att göra bokslut för (ex: 2025)"
+          }
+        },
+        required: ["fiscalYear"]
+      }
+    }
   }
 ];
 

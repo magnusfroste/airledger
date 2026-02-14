@@ -1,4 +1,4 @@
-import { UserData } from './types.ts';
+import { UserData, VatSummary } from './types.ts';
 
 /**
  * Light mode: Template name + category + description + keywords (~400 tokens).
@@ -75,6 +75,15 @@ export function buildBookkeepingContext(userData: UserData): string {
     userData.openingBalances.forEach((b: any) => {
       context += `${b.account_code} ${b.account_name}: ${b.opening_balance} kr\n`;
     });
+  }
+
+  if (userData.vatSummary) {
+    const v = userData.vatSummary;
+    const direction = v.netVat >= 0 ? 'betala' : 'få tillbaka';
+    context += `\nMOMSSAMMANFATTNING (innevarande kvartal ${v.quarterLabel}):\n`;
+    context += `Utgående moms: ${v.outputVat.toLocaleString('sv-SE')} kr\n`;
+    context += `Ingående moms: ${v.inputVat.toLocaleString('sv-SE')} kr\n`;
+    context += `Netto att ${direction}: ${Math.abs(v.netVat).toLocaleString('sv-SE')} kr\n`;
   }
 
   return context;

@@ -465,6 +465,14 @@ const ChatInterface = () => {
           onRemovePendingImage={removePendingImage}
           onVoiceRecording={handleVoiceClick}
           onStartCamera={startCamera}
+          onQuickAction={handleActionButton}
+          hasMessages={messages.length > 0}
+          lastMessageIsBooking={
+            messages.length > 0 &&
+            messages[messages.length - 1]?.sender === 'ai' &&
+            (messages[messages.length - 1]?.content?.includes('✅') || 
+             messages[messages.length - 1]?.content?.includes('bokförd'))
+          }
         />
       </div>
 

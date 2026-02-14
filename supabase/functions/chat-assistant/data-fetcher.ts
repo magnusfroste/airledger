@@ -1,4 +1,50 @@
-import { UserData } from './types.ts';
+import { UserData, VatSummary } from './types.ts';
+
+function getCurrentQuarter(): { start: string; end: string; label: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-indexed
+  const q = Math.floor(month / 3);
+  const qStart = new Date(year, q * 3, 1);
+  const qEnd = new Date(year, q * 3 + 3, 0);
+  return {
+    start: qStart.toISOString().split('T')[0],
+    end: qEnd.toISOString().split('T')[0],
+    label: `Q${q + 1} ${year}`,
+  };
+}
+
+async function fetchVatSummary(userId: string, supabase: any): Promise<VatSummary | undefined> {
+  try {
+    const quarter = getCurrentQuarter();
+    const { data: vatEntries } = await supabase
+      .from('airledger_entries')
+      .select('account_code, debit_amount, credit_amount, airledger_transactions!inner(transaction_date, user_id)')
+      .eq('airledger_transactions.user_id', userId)
+      .gte('airledger_transactions.transaction_date', quarter.start)
+      .lte('airledger_transactions.transaction_date', quarter.end);
+
+    if (!vatEntries || vatEntries.length === 0) {
+      return { outputVat: 0, inputVat: 0, netVat: 0, quarterLabel: quarter.label };
+    }
+
+    let outputVat = 0;
+    let inputVat = 0;
+    for (const entry of vatEntries) {
+      const code = parseInt(entry.account_code);
+      if (code >= 2610 && code <= 2619) {
+        outputVat += (entry.credit_amount || 0) - (entry.debit_amount || 0);
+      } else if (code >= 2640 && code <= 2649) {
+        inputVat += (entry.debit_amount || 0) - (entry.credit_amount || 0);
+      }
+    }
+
+    return { outputVat, inputVat, netVat: outputVat - inputVat, quarterLabel: quarter.label };
+  } catch (err) {
+    console.error('fetchVatSummary error:', err);
+    return undefined;
+  }
+}
 
 export async function fetchUserData(userId: string, supabase: any): Promise<UserData> {
   console.log('Fetching user transactions for user:', userId);
@@ -60,6 +106,9 @@ export async function fetchUserData(userId: string, supabase: any): Promise<User
 
   console.log('Fetched templates:', templates?.length || 0);
 
+  // Fetch VAT summary for current quarter in parallel
+  const vatSummary = await fetchVatSummary(userId, supabase);
+
   return {
     userId,
     userName,
@@ -67,6 +116,7 @@ export async function fetchUserData(userId: string, supabase: any): Promise<User
     transactions: transactions || [],
     openingBalances: openingBalances || [],
     chartOfAccounts: chartOfAccounts || [],
-    templates: templates || []
+    templates: templates || [],
+    vatSummary,
   };
 }
