@@ -75,8 +75,6 @@ const AdminIntegrations = () => {
     setErrors(prev => ({ ...prev, [integration.id]: '' }));
 
     try {
-      // For integrations that need specific payloads, only test connectivity
-      // We use a minimal health-check approach
       if (integration.id === 'lovable-ai') {
         const { data, error } = await supabase.functions.invoke(integration.edgeFunction, {
           body: { message: 'ping' },
@@ -91,21 +89,12 @@ const AdminIntegrations = () => {
         setStatuses(prev => ({ ...prev, [integration.id]: 'success' }));
         toast.success(`${integration.name}: Anslutning OK`);
       } else if (integration.id === 'openai-whisper') {
-        // Can't send empty audio — just invoke to check auth/key config
-        const { error } = await supabase.functions.invoke(integration.edgeFunction, {
-          body: { audio: '' },
+        // Use health-check mode to verify function + API key without sending audio
+        const { data, error } = await supabase.functions.invoke(integration.edgeFunction, {
+          body: { healthCheck: true },
         });
-        // A "No audio data provided" error means the function runs fine, key is loaded
-        if (error) {
-          const msg = error.message || '';
-          if (msg.includes('not configured') || msg.includes('API key')) {
-            throw new Error('OPENAI_API_KEY är inte konfigurerad');
-          }
-          // Function responded = it's running
-          setStatuses(prev => ({ ...prev, [integration.id]: 'success' }));
-          toast.success(`${integration.name}: Funktion aktiv`);
-          return;
-        }
+        if (error) throw new Error(error.message);
+        if (!data?.hasApiKey) throw new Error('OPENAI_API_KEY är inte konfigurerad');
         setStatuses(prev => ({ ...prev, [integration.id]: 'success' }));
         toast.success(`${integration.name}: Funktion aktiv`);
       } else {
