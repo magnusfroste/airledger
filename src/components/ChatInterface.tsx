@@ -20,10 +20,6 @@ const ChatInterface = () => {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
-  const [pendingImageChoice, setPendingImageChoice] = useState<{
-    images: any[];
-    uploadedImages: any[];
-  } | null>(null);
   const [quotaError, setQuotaError] = useState<{
     show: boolean;
     subscriptionTier: string;
@@ -202,24 +198,49 @@ const ChatInterface = () => {
 
     try {
       if (currentPendingImages.length > 0) {
-        // Store pending images for type choice
-        setPendingImageChoice({
-          images: currentPendingImages,
-          uploadedImages,
-        });
+        // Auto-classify and process each image
+        for (const image of currentPendingImages) {
+          const imageBase64 = await convertFileToBase64(image.file);
+          const uploadedImage = uploadedImages.find(img => img.id === image.id);
 
-        // Ask user what type of document
-        const choiceMsg = {
-          id: (Date.now() + Math.random()).toString(),
-          content: `📄 **Vilken typ av dokument är detta?**\n\nVälj nedan så analyserar jag bilden åt dig.`,
-          sender: 'ai' as const,
-          timestamp: new Date(),
-          type: 'text' as const
-        };
-        addMessage(choiceMsg);
-        await saveMessageToDatabase(choiceMsg, limitMessagesInConversation);
-        setIsLoading(false);
-        return;
+          // Classify document type
+          const classifyMsg = {
+            id: (Date.now() + Math.random()).toString(),
+            content: `🔍 Analyserar dokumenttyp...`,
+            sender: 'ai' as const,
+            timestamp: new Date(),
+            type: 'text' as const
+          };
+          addMessage(classifyMsg);
+
+          let docType = 'receipt';
+          try {
+            const { data: classData } = await supabase.functions.invoke('classify-document', {
+              body: { imageBase64 }
+            });
+            if (classData?.success && classData?.type) {
+              docType = classData.type;
+            }
+          } catch (e) {
+            console.warn('Classification failed, defaulting to receipt:', e);
+          }
+
+          if (docType === 'bank_statement') {
+            await analyzeBankStatement(
+              imageBase64,
+              addMessage,
+              (msg) => saveMessageToDatabase(msg, limitMessagesInConversation)
+            );
+          } else {
+            // receipt, invoice, or unknown → treat as receipt
+            await analyzeReceipt(
+              imageBase64,
+              uploadedImage,
+              addMessage,
+              (msg) => saveMessageToDatabase(msg, limitMessagesInConversation)
+            );
+          }
+        }
       } else {
         // Handle text-only messages with AI assistant
         try {
@@ -313,71 +334,8 @@ const ChatInterface = () => {
     }
   };
 
-  // Process pending images as receipt or bank statement
-  const processImagesAs = async (type: 'receipt' | 'bank_statement') => {
-    if (!pendingImageChoice) return;
-    setIsLoading(true);
-
-    try {
-      for (const image of pendingImageChoice.images) {
-        const imageBase64 = await convertFileToBase64(image.file);
-        const uploadedImage = pendingImageChoice.uploadedImages.find((img: any) => img.id === image.id);
-
-        if (type === 'receipt') {
-          await analyzeReceipt(
-            imageBase64,
-            uploadedImage,
-            addMessage,
-            (msg) => saveMessageToDatabase(msg, limitMessagesInConversation)
-          );
-        } else {
-          await analyzeBankStatement(
-            imageBase64,
-            addMessage,
-            (msg) => saveMessageToDatabase(msg, limitMessagesInConversation)
-          );
-        }
-      }
-    } catch (error: any) {
-      const errorResponse = {
-        id: (Date.now() + Math.random()).toString(),
-        content: `❌ **Fel vid analys**\n\n${error.message}`,
-        sender: 'ai' as const,
-        timestamp: new Date(),
-        type: 'text' as const
-      };
-      addMessage(errorResponse);
-      await saveMessageToDatabase(errorResponse, limitMessagesInConversation);
-    } finally {
-      setPendingImageChoice(null);
-      setIsLoading(false);
-    }
-  };
-
   const handleActionButton = (message: string) => {
     if (isLoading) return;
-
-    // Handle document type choice
-    if (pendingImageChoice) {
-      const userMessage = {
-        id: Date.now().toString(),
-        content: message,
-        sender: 'user' as const,
-        timestamp: new Date(),
-        type: 'text' as const,
-      };
-      addMessage(userMessage);
-      saveMessageToDatabase(userMessage, limitMessagesInConversation);
-
-      if (message.includes('Kvitto') || message.includes('kvitto') || message.includes('Faktura') || message.includes('faktura')) {
-        processImagesAs('receipt');
-      } else if (message.includes('Bankutdrag') || message.includes('bankutdrag') || message.includes('Kontoutdrag')) {
-        processImagesAs('bank_statement');
-      }
-      return;
-    }
-
-    setInputValue("");
     const userMessage = {
       id: Date.now().toString(),
       content: message,
@@ -473,23 +431,8 @@ const ChatInterface = () => {
           onAction={handleActionButton}
         />
 
-        {/* Document type choice buttons */}
-        {pendingImageChoice && !isLoading && (
-          <div className="flex gap-2 justify-center py-3">
-            <button
-              className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-              onClick={() => handleActionButton("📄 Kvitto / Faktura")}
-            >
-              📄 Kvitto / Faktura
-            </button>
-            <button
-              className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 transition-colors"
-              onClick={() => handleActionButton("🏦 Bankutdrag / Kontoutdrag")}
-            >
-              🏦 Bankutdrag
-            </button>
-          </div>
-        )}
+
+
 
         {/* Bank statement batch review */}
         {isBankReviewVisible && bankAnalysis && (
