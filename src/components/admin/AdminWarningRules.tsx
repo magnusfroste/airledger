@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -168,7 +168,7 @@ const AdminWarningRules = () => {
               </p>
             </div>
             <div className="flex items-center gap-1 ml-2">
-              <Switch checked={r.is_active} onCheckedChange={() => handleToggle(r)} />
+              <Checkbox checked={r.is_active} onCheckedChange={() => handleToggle(r)} />
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r)}>
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
