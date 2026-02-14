@@ -26,8 +26,13 @@ serve(async (req) => {
   }
 
   try {
-    const { csvContent } = await req.json()
-    if (!csvContent) throw new Error('csvContent is required')
+    const { csvUrl } = await req.json()
+    if (!csvUrl) throw new Error('csvUrl is required')
+
+    // Fetch CSV from URL
+    const csvResponse = await fetch(csvUrl)
+    if (!csvResponse.ok) throw new Error(`Failed to fetch CSV: ${csvResponse.status}`)
+    const csvContent = await csvResponse.text()
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -39,10 +44,9 @@ serve(async (req) => {
 
     for (const line of lines) {
       const cols = line.split(';')
-      // 4-digit account codes are in column index 6, names in index 7
       if (cols.length >= 8) {
         const code = cols[6]?.trim()
-        const name = cols[7]?.trim()?.replace(/\|/g, '')
+        const name = cols[7]?.trim()?.replace(/\|/g, '').replace(/\*/g, '')
         
         if (code && name && /^\d{4}$/.test(code) && !seenCodes.has(code)) {
           seenCodes.add(code)
