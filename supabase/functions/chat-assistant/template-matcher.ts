@@ -4,6 +4,51 @@ import { IntentClassification, TemplateMatch } from './types.ts';
 const PRISBASBELOPP = 57_300;
 const HALVA_PRISBASBELOPP = PRISBASBELOPP / 2; // 28 650 kr
 
+// Beloppsgränser för varningar (Skatteverket 2026)
+const LIMITS = {
+  REPRESENTATION_MOMS_PER_PERSON: 300,   // Momsavdrag max 300 kr/person exkl moms
+  FRISKVARD_MAX: 5_000,                   // Friskvårdsbidrag skattefritt max
+  GAVA_PERSONAL_MAX: 500,                 // Julgåva/jubileumsgåva max per tillfälle
+  FORBRUKNINGSINVENTARIE_MAX: HALVA_PRISBASBELOPP,
+};
+
+// Warning rules: checked after template match
+type WarningRule = {
+  templates: string[];
+  check: (amount: number) => string | null;
+};
+
+const WARNING_RULES: WarningRule[] = [
+  {
+    templates: ['Extern representation mat'],
+    check: (amount) =>
+      amount > LIMITS.REPRESENTATION_MOMS_PER_PERSON
+        ? `⚠️ Momsavdrag för representation är max ${LIMITS.REPRESENTATION_MOMS_PER_PERSON} kr/person exkl moms. Om beloppet avser flera personer, kontrollera att det understiger gränsen per person. Överskjutande moms är ej avdragsgill.`
+        : null,
+  },
+  {
+    templates: ['Intern representation'],
+    check: (amount) =>
+      amount > LIMITS.REPRESENTATION_MOMS_PER_PERSON
+        ? `⚠️ Intern representation: momsavdrag max ${LIMITS.REPRESENTATION_MOMS_PER_PERSON} kr/person exkl moms. Ange antal deltagare för att beräkna korrekt avdrag.`
+        : null,
+  },
+  {
+    templates: ['Friskvårdsbidrag'],
+    check: (amount) =>
+      amount > LIMITS.FRISKVARD_MAX
+        ? `⚠️ Friskvårdsbidrag över ${LIMITS.FRISKVARD_MAX.toLocaleString('sv-SE')} kr/år är en skattepliktig förmån. Beloppet ${amount.toLocaleString('sv-SE')} kr överstiger gränsen.`
+        : null,
+  },
+  {
+    templates: ['Förbrukningsinventarie'],
+    check: (amount) =>
+      amount > LIMITS.FORBRUKNINGSINVENTARIE_MAX
+        ? `⚠️ Belopp över ${LIMITS.FORBRUKNINGSINVENTARIE_MAX.toLocaleString('sv-SE')} kr (halva prisbasbeloppet) ska normalt bokföras som anläggningstillgång, inte förbrukningsinventarie.`
+        : null,
+  },
+];
+
 // Templates that should be overridden based on amount thresholds
 const AMOUNT_OVERRIDES: Array<{
   fromTemplates: string[];       // template names that trigger the rule
@@ -135,7 +180,9 @@ export async function matchTemplate(
 
   // 4. Apply amount-based overrides (e.g. inventarie vs anläggningstillgång)
   if (match) {
-    return applyAmountOverride(match, intent.extracted_data.amount, templates);
+    match = applyAmountOverride(match, intent.extracted_data.amount, templates);
+    match = applyWarnings(match, intent.extracted_data.amount);
+    return match;
   }
 
   return null;
@@ -171,6 +218,30 @@ function applyAmountOverride(
     }
   }
 
+  return match;
+}
+
+/**
+ * Apply warning rules based on amount and matched template.
+ */
+function applyWarnings(
+  match: TemplateMatch,
+  amount: number | undefined | null
+): TemplateMatch {
+  if (!amount || amount <= 0) return match;
+
+  const warnings: string[] = [];
+  const matchedName = match.template.template_name;
+
+  for (const rule of WARNING_RULES) {
+    if (!rule.templates.includes(matchedName)) continue;
+    const warning = rule.check(amount);
+    if (warning) warnings.push(warning);
+  }
+
+  if (warnings.length > 0) {
+    return { ...match, warnings };
+  }
   return match;
 }
 
