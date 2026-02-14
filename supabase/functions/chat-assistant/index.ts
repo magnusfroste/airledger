@@ -7,7 +7,7 @@ import { fetchUserData } from './data-fetcher.ts';
 import { buildLightContext, buildBookkeepingContext } from './context-builder.ts';
 import { classifyIntent } from './intent-classifier.ts';
 import { matchTemplate } from './template-matcher.ts';
-import { formatBookingProposal, formatClarificationRequest, formatConfirmation } from './response-formatter.ts';
+import { formatBookingProposal, formatClarificationRequest, formatConfirmation, formatMissingDataPrompt } from './response-formatter.ts';
 import { handleFunctionCall } from './function-handlers.ts';
 import { SYSTEM_PROMPT, getSystemPrompt } from './system-prompt.ts';
 import { FUNCTION_DEFINITIONS } from './function-definitions.ts';
@@ -146,6 +146,15 @@ serve(async (req) => {
       case 'book_expense':
       case 'book_sale':
       case 'book_payment': {
+        // Early check: if no data at all, ask the user what to book
+        const d = intent.extracted_data;
+        const hasEnoughData = d.amount || d.vendor || d.description;
+
+        if (!hasEnoughData) {
+          aiResponse = formatMissingDataPrompt(intent.intent);
+          break;
+        }
+
         // Deterministic template matching
         const match = await matchTemplate(intent, supabase, userId);
 
