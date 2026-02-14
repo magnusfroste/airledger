@@ -32,7 +32,7 @@ REGLER:
 
 Om beloppet anges utan moms-specifikation, sätt clarification_needed till "Är beloppet inkl eller exkl moms?"
 Om datum saknas, sätt date till null (systemet använder dagens datum).
-matched_template_hint: gissa mallnamn baserat på beskrivning (t.ex. "Lokalhyra", "Telekommunikation").
+matched_template_hint: välj det EXAKTA mallnamnet (texten före []) från listan nedan som bäst matchar användarens beskrivning.
 Dagens datum: ${new Date().toISOString().split('T')[0]}`;
 
 export async function classifyIntent(
@@ -40,7 +40,8 @@ export async function classifyIntent(
   templateNames: string[],
   apiKey: string
 ): Promise<IntentClassification> {
-  const userPrompt = `Tillgängliga mallar: ${templateNames.join(', ')}
+  const userPrompt = `Tillgängliga mallar (format: Mallnamn [Kategori] – Beskrivning (nyckelord)):
+${templateNames.join('\n')}
 
 Meddelande: "${message}"`;
 
