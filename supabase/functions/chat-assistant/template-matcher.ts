@@ -16,77 +16,51 @@ const LIMITS = {
   GAVA_KUND_MAX: 300,                     // Representationsgåva max exkl moms
 };
 
-// Warning rules: checked after template match
-type WarningRule = {
-  templates: string[];
-  check: (amount: number) => string | null;
-};
+// DB-driven warning rules replace hardcoded WARNING_RULES
+interface DbWarningRule {
+  id: string;
+  rule_name: string;
+  template_names: string[];
+  threshold_amount: number;
+  threshold_direction: string;
+  threshold_max: number | null;
+  warning_message: string;
+  warning_type: string;
+  is_active: boolean;
+}
 
-const WARNING_RULES: WarningRule[] = [
-  {
-    templates: ['Extern representation mat'],
-    check: (amount) =>
-      amount > LIMITS.REPRESENTATION_MOMS_PER_PERSON
-        ? `⚠️ Momsavdrag för representation är max ${LIMITS.REPRESENTATION_MOMS_PER_PERSON} kr/person exkl moms. Om beloppet avser flera personer, kontrollera att det understiger gränsen per person. Överskjutande moms är ej avdragsgill.`
-        : null,
-  },
-  {
-    templates: ['Intern representation'],
-    check: (amount) =>
-      amount > LIMITS.REPRESENTATION_MOMS_PER_PERSON
-        ? `⚠️ Intern representation: momsavdrag max ${LIMITS.REPRESENTATION_MOMS_PER_PERSON} kr/person exkl moms. Ange antal deltagare för att beräkna korrekt avdrag.`
-        : null,
-  },
-  {
-    templates: ['Friskvårdsbidrag'],
-    check: (amount) =>
-      amount > LIMITS.FRISKVARD_MAX
-        ? `⚠️ Friskvårdsbidrag över ${LIMITS.FRISKVARD_MAX.toLocaleString('sv-SE')} kr/år är en skattepliktig förmån. Beloppet ${amount.toLocaleString('sv-SE')} kr överstiger gränsen.`
-        : null,
-  },
-  {
-    templates: ['Förbrukningsinventarie'],
-    check: (amount) =>
-      amount > LIMITS.FORBRUKNINGSINVENTARIE_MAX
-        ? `⚠️ Belopp över ${LIMITS.FORBRUKNINGSINVENTARIE_MAX.toLocaleString('sv-SE')} kr (halva prisbasbeloppet) ska normalt bokföras som anläggningstillgång, inte förbrukningsinventarie.`
-        : null,
-  },
-  // Gåvor till personal
-  {
-    templates: ['Intern representation'],
-    check: (amount) => {
-      // If it looks like a gift amount per person
-      if (amount > LIMITS.GAVA_PERSONAL_MAX && amount <= 2000) {
-        return `⚠️ Gåva till anställd över ${LIMITS.GAVA_PERSONAL_MAX} kr/tillfälle (jul, jubileum) är en skattepliktig förmån som ska förmånsbeskattas.`;
-      }
-      return null;
-    },
-  },
-  // Traktamente inrikes
-  {
-    templates: ['Traktamente inrikes'],
-    check: (amount) =>
-      amount > LIMITS.TRAKTAMENTE_INRIKES_HELDAG
-        ? `⚠️ Skattefritt heldagstraktamente inrikes är max ${LIMITS.TRAKTAMENTE_INRIKES_HELDAG} kr/dag (2026). Belopp över detta ska förmånsbeskattas. Halvdag: max ${LIMITS.TRAKTAMENTE_INRIKES_HALVDAG} kr.`
-        : null,
-  },
-  // Milersättning
-  {
-    templates: ['Milersättning anställd'],
-    check: (amount) =>
-      amount > 5000
-        ? `⚠️ Skattefri milersättning är max ${LIMITS.MILERSATTNING_SKATTEFRI} kr/mil (2026). Kontrollera att beloppet inte överstiger schablonen — överskjutande del ska förmånsbeskattas.`
-        : null,
-  },
-  // Konferens — påminnelse om programkrav
-  {
-    templates: ['Konferens med övernattning'],
-    check: (amount) =>
-      amount > 5000
-        ? `💡 Konferens kräver program på minst 6 timmar/dag och 30 timmar/vecka för att vara avdragsgill. Spara programmet som underlag.`
-        : null,
-  },
-];
+async function fetchWarningRules(supabase: any): Promise<DbWarningRule[]> {
+  const { data, error } = await supabase
+    .from('warning_rules')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+
+  if (error) {
+    console.error('Failed to fetch warning rules:', error);
+    return [];
+  }
+  return data || [];
+}
+
+function checkDbWarningRule(rule: DbWarningRule, amount: number): string | null {
+  let triggered = false;
+
+  switch (rule.threshold_direction) {
+    case 'above':
+      triggered = amount > rule.threshold_amount;
+      break;
+    case 'below':
+      triggered = amount < rule.threshold_amount;
+      break;
+    case 'between':
+      triggered = amount > rule.threshold_amount && (rule.threshold_max ? amount <= rule.threshold_max : true);
+      break;
+  }
+
+  if (!triggered) return null;
+  return rule.warning_message.replace(/\{threshold\}/g, rule.threshold_amount.toLocaleString('sv-SE'));
+}
 
 // Templates that should be overridden based on amount thresholds
 const AMOUNT_OVERRIDES: Array<{
@@ -220,7 +194,7 @@ export async function matchTemplate(
   // 4. Apply amount-based overrides (e.g. inventarie vs anläggningstillgång)
   if (match) {
     match = applyAmountOverride(match, intent.extracted_data.amount, templates);
-    match = applyWarnings(match, intent.extracted_data.amount);
+    match = await applyWarningsFromDb(match, intent.extracted_data.amount, supabase);
     return match;
   }
 
@@ -261,20 +235,22 @@ function applyAmountOverride(
 }
 
 /**
- * Apply warning rules based on amount and matched template.
+ * Apply warning rules from DB based on amount and matched template.
  */
-function applyWarnings(
+async function applyWarningsFromDb(
   match: TemplateMatch,
-  amount: number | undefined | null
-): TemplateMatch {
+  amount: number | undefined | null,
+  supabase: any
+): Promise<TemplateMatch> {
   if (!amount || amount <= 0) return match;
 
+  const dbRules = await fetchWarningRules(supabase);
   const warnings: string[] = [];
   const matchedName = match.template.template_name;
 
-  for (const rule of WARNING_RULES) {
-    if (!rule.templates.includes(matchedName)) continue;
-    const warning = rule.check(amount);
+  for (const rule of dbRules) {
+    if (!rule.template_names.includes(matchedName)) continue;
+    const warning = checkDbWarningRule(rule, amount);
     if (warning) warnings.push(warning);
   }
 

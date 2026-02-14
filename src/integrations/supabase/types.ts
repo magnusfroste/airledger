@@ -462,6 +462,51 @@ export type Database = {
         }
         Relationships: []
       }
+      warning_rules: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          rule_name: string
+          sort_order: number
+          template_names: string[]
+          threshold_amount: number
+          threshold_direction: string
+          threshold_max: number | null
+          updated_at: string
+          warning_message: string
+          warning_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          rule_name: string
+          sort_order?: number
+          template_names?: string[]
+          threshold_amount?: number
+          threshold_direction?: string
+          threshold_max?: number | null
+          updated_at?: string
+          warning_message: string
+          warning_type?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          rule_name?: string
+          sort_order?: number
+          template_names?: string[]
+          threshold_amount?: number
+          threshold_direction?: string
+          threshold_max?: number | null
+          updated_at?: string
+          warning_message?: string
+          warning_type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
