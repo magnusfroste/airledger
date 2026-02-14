@@ -1,55 +1,107 @@
 
-# Ta bort hårdkodade konton och lägga till kontovalidering
 
-## Bakgrund
-Idag filtrerar `context-builder.ts` kontoplanen till bara 11 hårdkodade konton. Det begränsar AI:ns förmåga att bokföra korrekt utanför mallarna. Vi har redan 812 BAS 2024-konton i databasen som täcker 98% av BAS 2026.
+# Utvidga AI-assistenten Air med moms, avstämning och bokslut
 
-## Ändringar
+## Sammanfattning
+Utvidga assistenten Air från enkel transaktionsbokforing till att stodja momsrapporter, periodavstemningar och arsbokslut. Lagg till kontextuella snabbknappar i chatten som anpassas efter vad anvandaren behover just nu.
 
-### 1. context-builder.ts — Ta bort hårdkodade konton
-Ersätt det hårdkodade filtret (rad 47-53) med en smart gruppering som skickar kontoplanen organiserad per kontoklass (1xxx-8xxx). Detta ger AI:n tillgång till hela kontoplanen utan att spränga token-budgeten.
+## 1. Nya intent-typer i Intent Router
 
-Strategi: Skicka kontoklasser som rubriker med underliggande konton, t.ex.:
-```
-KONTOKLASS 1 - Tillgångar:
-1010 Balanserade utgifter
-1930 Checkkonto
-...
-```
+Lagg till foljande intents i `intent-classifier.ts`:
 
-### 2. save-general-transaction — Kontovalidering
-Lägg till en databasvalidering som kontrollerar att varje `accountCode` i inkommande entries faktiskt existerar i `airledger_chart_of_accounts` innan transaktionen sparas. Om ett konto inte finns returneras ett tydligt felmeddelande.
+| Intent | Trigger-fraser | Vad den gor |
+|--------|---------------|-------------|
+| `vat_report` | "momsrapport", "moms kvartal", "momsdeklaration", "redovisa moms" | Beraknar utgaende vs ingaende moms for vald period |
+| `period_reconciliation` | "avstamning", "stammer kontot", "kontrollera", "periodavstemning" | Jamfor IB + transaktioner mot forvantad UB for ett konto |
+| `year_end` | "arsbokslut", "stang aret", "bokslut", "arsredovisning" | Guidar genom bokslutsprocessen steg for steg |
+| `account_balance` | "saldo pa", "vad star det pa", "hur mycket finns" | Visar aktuellt saldo for ett specifikt konto |
 
-### 3. function-definitions.ts — Uppdatera beskrivning
-Ändra "BAS 2024" till "BAS-kontoplanen" i function definitions så att det inte refererar till ett specifikt år.
+## 2. Backend: Nya berakningsfunktioner
 
-## Tekniska detaljer
+### 2a. Momsberakning (i `data-fetcher.ts` + ny handler)
+- Hamta alla entries pa momskonton (2610-2650) for angiven period
+- Berakna: Utgaende moms (2610/2611) - Ingaende moms (2640/2641)
+- Returnera formaterad sammanfattning med nettomoms att betala/fa tillbaka
+- Ingen ny edge function -- berakningen gors i `chat-assistant` med befintlig data
 
-### context-builder.ts
-- Ta bort `filter`-logiken på rad 49-51
-- Gruppera konton per kontoklass (första siffran) för läsbarhet
-- Begränsa till ~200 vanligaste konton baserat på `account_type` för att hålla token-användningen rimlig
+### 2b. Kontosaldo / Periodavstemning
+- Berakna: IB + debet - kredit = saldo for givet konto och period
+- Anvand `airledger_opening` + `airledger_entries` filtrerat pa `transaction_date`
+- Visa i tabellformat: IB, rorelse under perioden, UB
 
-### save-general-transaction/index.ts
-- Efter entry-validering (rad 35-57), lägg till en lookup mot `airledger_chart_of_accounts`
-- Hämta alla unika `accountCode` från entries i en enda query
-- Jämför mot resultatet — om något konto saknas, returnera fel med kontonummer och förslag
+### 2c. Arsbokslutsguid
+- Stegvis konversationsflode:
+  1. "Har du bokfort alla transaktioner for 2025?" 
+  2. Visa checklista: avskrivningar, periodiseringar, skatteavsattning
+  3. Visa resultatrakning och balansrakning for aret
+  4. Erbjud att lasa rakenskapsaret (nar steg 4 i plan.md ar implementerat)
 
-### function-definitions.ts
-- Rad 81, 98: Ändra "BAS 2024" till "BAS-kontoplanen"
+## 3. Nya function definitions
+
+Lagg till i `function-definitions.ts`:
+- `calculate_vat_report` -- parametrar: `periodStart`, `periodEnd`
+- `calculate_account_balance` -- parametrar: `accountCode`, `periodStart`, `periodEnd`
+- `get_year_end_checklist` -- parametrar: `fiscalYear`
+
+Dessa funktioner kor deterministisk SQL (inga AI-hallucinationer i siffror).
+
+## 4. Kontextuella snabbknappar i chatten
+
+### 4a. Quick Suggestions-komponent
+Ny komponent `ChatQuickActions.tsx` som visar horisontellt scrollbara knappar ovanfor textfaltet. Knapparna andras baserat pa kontext:
+
+**Standardlage (tom chatt / efter bokning):**
+- "Bokfor utgift" 
+- "Momsrapport Q{current}" 
+- "Kontosaldo"
+- "Avstamning"
+
+**Efter bokforing:**
+- "Bokfor en till"
+- "Visa saldo"
+- "Tillbaka till dashboard"
+
+**Vid kvartalsskifte (jan, apr, jul, okt):**
+- "Momsrapport Q{prev}" visas prominent
+
+**Vid arsskifte (jan-feb):**
+- "Paborja bokslut {prev year}" laggs till
+
+### 4b. Implementation
+- Knapparna skickar fordefinierade meddelanden via `onAction`-callbacken som redan finns
+- Renderas i `InputArea.tsx` ovanfor ActionButtons
+- Stiliserade som pills/chips (Apple-inspirerat, avrundade, minimal)
+
+## 5. Uppdatera system-prompt
+
+Lagg till instruktioner i `system-prompt.ts`:
+- Moms: "Nar anvandaren fragar om moms, berakna fran konton 2610-2650"
+- Avstamning: "Visa alltid IB + rorelse + UB i tabellformat"
+- Bokslut: "Guid anvandaren steg for steg, fraga aldrig om allt pa en gang"
+
+## 6. Uppdatera context-builder
+
+Lagg till i `data-fetcher.ts`:
+- Hamta aggregerade momssiffror for innevarande kvartal (effektivt, en query)
+- Skicka med som del av kontexten sa AI:n har siffrorna redo
 
 ---
 
-# Nästa steg — Bokföringskvalitet & regelefterlevnad
+## Tekniska detaljer
 
-## 4. Räkenskapsårslåsning
-Skapa tabell `fiscal_year_locks` (year, locked_at, locked_by) med RLS. Lägg till validering i `save-transaction` och `save-general-transaction` som blockerar bokföring på låst år. Bygg UI under Rapporter/Inställningar med bekräftelsedialog som visar årssammanfattning innan låsning. Admin kan låsa upp igen vid behov.
+### Filandringar:
+1. `supabase/functions/chat-assistant/intent-classifier.ts` -- Lagg till 4 nya intent-typer i enum och klassificeringsregler
+2. `supabase/functions/chat-assistant/function-definitions.ts` -- 3 nya funktioner
+3. `supabase/functions/chat-assistant/function-handlers.ts` -- Hanterare for nya funktioner (SQL-berakningar)
+4. `supabase/functions/chat-assistant/data-fetcher.ts` -- Ny `fetchVatSummary()` och `fetchAccountBalance()`
+5. `supabase/functions/chat-assistant/context-builder.ts` -- Inkludera momssammanfattning i kontext
+6. `supabase/functions/chat-assistant/index.ts` -- Nya routing-cases
+7. `supabase/functions/chat-assistant/system-prompt.ts` -- Utokade instruktioner
+8. `supabase/functions/chat-assistant/types.ts` -- Uppdatera IntentClassification med nya typer
+9. `src/components/chat/ChatQuickActions.tsx` -- Ny komponent for snabbknappar
+10. `src/components/chat/InputArea.tsx` -- Integrera ChatQuickActions
+11. `.lovable/plan.md` -- Uppdatera med dessa steg
 
-## 5. Mjuk varning vid gammal datering
-Lägg till en varning i chatten om `transaction_date` är >30 dagar äldre än dagens datum. Varningen blockerar inte — den informerar användaren och ber om bekräftelse.
+### Ingen ny databastabell behovs
+Allt beraknas fran befintliga `airledger_entries` och `airledger_opening`.
 
-## 6. Rättelseverifikationer istället för radering
-På sikt: blockera radering av bokförda transaktioner. Ersätt med motbokningsfunktion som skapar en ny verifikation som reverserar den ursprungliga. Behåller verifikationskedjan intakt enligt BFL.
-
-## 7. Designbeslut: Ingående balanser — Modell B (beräknad IB)
-IB sätts *en gång* i `airledger_opening` (första året i systemet). För efterföljande år beräknas IB on-the-fly: IB(år X) = airledger_opening + ackumulerade entries på balanskonton (klass 1-2) t.o.m. 31/12 år X-1, plus årets resultat (klass 3-8) fört till konto 2099 (eget kapital). Ingen ny tabell eller duplicering behövs — en enda källa till sanning.
