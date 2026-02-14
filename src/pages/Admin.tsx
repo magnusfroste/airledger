@@ -2,12 +2,13 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminRole } from '@/hooks/useAdminRole';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, FileText, List, Users, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Shield, FileText, List, Users, MessageSquare, AlertTriangle, Plug } from 'lucide-react';
 import AdminTemplates from '@/components/admin/AdminTemplates';
 import AdminAccounts from '@/components/admin/AdminAccounts';
 import AdminUsers from '@/components/admin/AdminUsers';
 import AdminPrompt from '@/components/admin/AdminPrompt';
 import AdminWarningRules from '@/components/admin/AdminWarningRules';
+import AdminIntegrations from '@/components/admin/AdminIntegrations';
 
 const Admin = () => {
   const { isAdmin, loading } = useAdminRole();
@@ -37,7 +38,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="templates" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="templates" className="flex items-center gap-1.5 text-xs sm:text-sm">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Mallar</span>
@@ -58,6 +59,10 @@ const Admin = () => {
             <MessageSquare className="h-4 w-4" />
             <span className="hidden sm:inline">AI-prompt</span>
           </TabsTrigger>
+          <TabsTrigger value="integrations" className="flex items-center gap-1.5 text-xs sm:text-sm">
+            <Plug className="h-4 w-4" />
+            <span className="hidden sm:inline">Integrationer</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="templates">
@@ -74,6 +79,9 @@ const Admin = () => {
         </TabsContent>
         <TabsContent value="prompt">
           <AdminPrompt />
+        </TabsContent>
+        <TabsContent value="integrations">
+          <AdminIntegrations />
         </TabsContent>
       </Tabs>
     </div>
