@@ -53,6 +53,15 @@ const INTEGRATIONS: Integration[] = [
     docsUrl: undefined,
     envKey: 'LOVABLE_API_KEY',
   },
+  {
+    id: 'stripe',
+    name: 'Stripe (Betalningar)',
+    description: 'Hanterar prenumerationer, checkout och kundportal. Används för premium-planer.',
+    edgeFunction: 'create-checkout',
+    testPayload: {},
+    docsUrl: 'https://stripe.com/docs/api',
+    envKey: 'STRIPE_SECRET_KEY',
+  },
 ];
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
