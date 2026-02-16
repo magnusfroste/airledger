@@ -233,6 +233,7 @@ export type Database = {
           is_system_template: boolean
           keywords: string[] | null
           last_used_at: string | null
+          required_fields: Json | null
           template_entries: Json
           template_name: string
           updated_at: string
@@ -249,6 +250,7 @@ export type Database = {
           is_system_template?: boolean
           keywords?: string[] | null
           last_used_at?: string | null
+          required_fields?: Json | null
           template_entries?: Json
           template_name: string
           updated_at?: string
@@ -265,6 +267,7 @@ export type Database = {
           is_system_template?: boolean
           keywords?: string[] | null
           last_used_at?: string | null
+          required_fields?: Json | null
           template_entries?: Json
           template_name?: string
           updated_at?: string

@@ -4,7 +4,8 @@ export function formatBookingProposal(
   match: TemplateMatch,
   amount: number,
   date: string,
-  description?: string
+  description?: string,
+  calculatedAmounts?: number[]
 ): string {
   const template = match.template;
   const entries = template.template_entries || [];
@@ -20,8 +21,9 @@ export function formatBookingProposal(
   response += `| Konto | Debet | Kredit |\n`;
   response += `|-------|-------|--------|\n`;
 
-  for (const entry of entries) {
-    const entryAmount = calculateEntryAmount(entry, amount);
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const entryAmount = calculatedAmounts ? calculatedAmounts[i] : calculateEntryAmount(entry, amount);
     const isDebit = entry.type === 'debit' || (entry.debit_amount && !entry.credit_amount);
     const isCredit = entry.type === 'credit' || (entry.credit_amount && !entry.debit_amount);
     const debit = isDebit ? formatKr(entryAmount) : '';

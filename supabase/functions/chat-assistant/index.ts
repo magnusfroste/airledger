@@ -8,6 +8,7 @@ import { buildLightContext, buildBookkeepingContext } from './context-builder.ts
 import { classifyIntent } from './intent-classifier.ts';
 import { matchTemplate } from './template-matcher.ts';
 import { formatBookingProposal, formatClarificationRequest, formatConfirmation, formatMissingDataPrompt, formatFollowUpSuggestion } from './response-formatter.ts';
+import { analyzeRequiredFields, calculateTemplateAmounts } from './field-analyzer.ts';
 import { buildFinancialSnapshot } from './context-builder.ts';
 import { handleFunctionCall } from './function-handlers.ts';
 import { SYSTEM_PROMPT, getSystemPrompt } from './system-prompt.ts';
@@ -91,21 +92,36 @@ serve(async (req) => {
         const hasEnoughData = d.amount || d.vendor || d.description;
 
         if (!hasEnoughData) {
-          aiResponse = formatMissingDataPrompt(intent.intent);
-          break;
+          // Check if user is answering a field question from conversation history
+          const fieldContext = extractFieldContext(conversationHistory);
+          if (!fieldContext) {
+            aiResponse = formatMissingDataPrompt(intent.intent);
+            break;
+          }
+          // If field context found, fall through to template matching below
         }
 
-        // Check if previous AI message was asking for amount on a specific template
-        // e.g. "Jag hittade mallen Försäljning fond med förlust. Vilket belopp..."
-        if (d.amount && conversationHistory?.length) {
+        // Check if previous AI message was asking about a specific template
+        // (either legacy "Jag hittade mallen" or new field marker format)
+        if (conversationHistory?.length) {
           const lastAiMsg = [...conversationHistory].reverse().find(
-            (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('Jag hittade mallen')
+            (msg: ConversationMessage) => msg.sender === 'ai' && (
+              msg.content.includes('Jag hittade mallen') ||
+              msg.content.includes('<!-- field:')
+            )
           );
           if (lastAiMsg) {
-            const templateMatch = lastAiMsg.content.match(/Jag hittade mallen \*\*(.+?)\*\*/);
-            if (templateMatch) {
-              console.log('Resuming template from context:', templateMatch[1]);
-              intent.matched_template_hint = templateMatch[1];
+            // Try field marker first
+            const fieldMarker = lastAiMsg.content.match(/<!-- field:(\w+) template:(.+?) -->/);
+            if (fieldMarker) {
+              console.log('Resuming field collection for template:', fieldMarker[2]);
+              intent.matched_template_hint = fieldMarker[2];
+            } else {
+              const templateMatch = lastAiMsg.content.match(/Jag hittade mallen \*\*(.+?)\*\*/);
+              if (templateMatch) {
+                console.log('Resuming template from context:', templateMatch[1]);
+                intent.matched_template_hint = templateMatch[1];
+              }
             }
           }
         }
@@ -115,17 +131,33 @@ serve(async (req) => {
 
         if (intent.clarification_needed && !intent.extracted_data.amount) {
           aiResponse = formatClarificationRequest(intent.clarification_needed);
-        } else if (match && !intent.extracted_data.amount) {
-          // Template matched but no amount — ask for it instead of proposing 0 kr
-          aiResponse = formatClarificationRequest(`Jag hittade mallen **${match.template.template_name}**. Vilket belopp ska bokföras?`);
         } else if (match) {
-          const amount = intent.extracted_data.amount;
-          const date = intent.extracted_data.date || new Date().toISOString().split('T')[0];
-          const desc = intent.extracted_data.description || intent.extracted_data.vendor || match.template.template_name;
-          aiResponse = formatBookingProposal(match, amount, date, desc);
+          // === NEW: Template-driven field analysis ===
+          const requiredFields = match.template.required_fields as any[] | null;
+          const fieldResult = analyzeRequiredFields(
+            requiredFields,
+            intent.extracted_data,
+            conversationHistory,
+            match.template.template_name
+          );
+
+          if (!fieldResult.complete) {
+            // Ask for next missing field
+            aiResponse = `❓ ${fieldResult.nextQuestion}`;
+          } else {
+            // All fields collected — calculate amounts and show proposal
+            const calculatedAmounts = calculateTemplateAmounts(
+              match.template.template_entries || [],
+              requiredFields,
+              fieldResult.fieldValues
+            );
+            const date = (fieldResult.fieldValues.date as string) || intent.extracted_data.date || new Date().toISOString().split('T')[0];
+            const desc = intent.extracted_data.description || intent.extracted_data.vendor || match.template.template_name;
+            const totalAmount = calculatedAmounts.reduce((sum, a) => sum + a, 0) / 2; // debit=credit, so total is half
+            aiResponse = formatBookingProposal(match, totalAmount, date, desc, calculatedAmounts);
+          }
         } else {
           // No template match — use full AI call with function calling
-          // so the AI can create a freeform transaction via save_general_transaction
           console.log('No template match — falling back to freeform AI booking');
           const fullContext = buildBookkeepingContext(userData);
           aiResponse = await handleFreeformBooking(message, conversationHistory, fullContext, lovableApiKey, supabase, userId, livePrompt);
@@ -511,6 +543,25 @@ function buildMessages(message: string, conversationHistory: ConversationMessage
   }
   messages.push({ role: 'user', content: message });
   return messages;
+}
+
+/**
+ * Extract field context from conversation history when user is answering a field question.
+ * Returns the template name if found, null otherwise.
+ */
+function extractFieldContext(conversationHistory: ConversationMessage[] | undefined): string | null {
+  if (!conversationHistory?.length) return null;
+
+  const lastAiMsg = [...conversationHistory].reverse().find(
+    (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('<!-- field:')
+  );
+
+  if (lastAiMsg) {
+    const match = lastAiMsg.content.match(/<!-- field:\w+ template:(.+?) -->/);
+    return match ? match[1] : null;
+  }
+
+  return null;
 }
 
 /**
