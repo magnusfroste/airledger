@@ -44,7 +44,27 @@ export const useBankStatementAnalysis = () => {
 
     if (error) {
       console.error("Bank statement analysis error:", error);
-      throw new Error(error.message || "Failed to analyze bank statement");
+      // Try to extract specific error from response
+      let specificError = "Kunde inte analysera bankutdraget";
+      try {
+        const errorData = typeof error.context === 'object' ? error.context : null;
+        if (data?.error) {
+          specificError = data.error;
+        } else if (errorData) {
+          specificError = JSON.stringify(errorData);
+        }
+      } catch {}
+
+      const errorMsg: Message = {
+        id: (Date.now() + Math.random()).toString(),
+        content: `⚠️ **Bankutdragsanalys misslyckades**\n\n${specificError}\n\nTips: Försök med en tydligare bild eller ett mindre utdrag.`,
+        sender: "ai",
+        timestamp: new Date(),
+        type: "text",
+      };
+      onMessage(errorMsg);
+      await saveMessage(errorMsg);
+      return null;
     }
 
     if (data?.success && data?.analysis) {
