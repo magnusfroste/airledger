@@ -99,8 +99,11 @@ serve(async (req) => {
 
         if (intent.clarification_needed && !intent.extracted_data.amount) {
           aiResponse = formatClarificationRequest(intent.clarification_needed);
+        } else if (match && !intent.extracted_data.amount) {
+          // Template matched but no amount — ask for it instead of proposing 0 kr
+          aiResponse = formatClarificationRequest(`Jag hittade mallen **${match.template.template_name}**. Vilket belopp ska bokföras?`);
         } else if (match) {
-          const amount = intent.extracted_data.amount || 0;
+          const amount = intent.extracted_data.amount;
           const date = intent.extracted_data.date || new Date().toISOString().split('T')[0];
           const desc = intent.extracted_data.description || intent.extracted_data.vendor || match.template.template_name;
           aiResponse = formatBookingProposal(match, amount, date, desc);
