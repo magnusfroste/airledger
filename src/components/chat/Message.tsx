@@ -122,7 +122,7 @@ const Message = ({ content, sender, type, images, isLastAiMessage, onAction, ban
                   li: ({ children }) => <li className="flex gap-1"><span>•</span><span>{children}</span></li>,
                 }}
               >
-                {content}
+                {content.replace(/<!--[\s\S]*?-->/g, '').trim()}
               </ReactMarkdown>
             </div>
           )}
