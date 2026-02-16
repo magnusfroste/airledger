@@ -31,34 +31,44 @@ const Reports = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const fetchReportData = async () => {
     if (!user) return;
 
     setLoading(true);
     try {
       // Determine date range based on period
-      let startDate = new Date();
-      let endDate = new Date();
+      const now = new Date();
+      let startDate: Date;
+      let endDate: Date;
       
       switch (period) {
         case "current-month":
-          startDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
           break;
         case "last-month":
-          const lastMonth = new Date();
-          lastMonth.setMonth(lastMonth.getMonth() - 1);
-          startDate = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
-          endDate = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          endDate = new Date(now.getFullYear(), now.getMonth(), 0);
           break;
         case "current-year":
-          startDate = new Date(startDate.getFullYear(), 0, 1);
-          endDate = new Date(startDate.getFullYear(), 11, 31);
+          startDate = new Date(now.getFullYear(), 0, 1);
+          endDate = new Date(now.getFullYear(), 11, 31);
           break;
         case "last-year":
-          const lastYear = startDate.getFullYear() - 1;
+          const lastYear = now.getFullYear() - 1;
           startDate = new Date(lastYear, 0, 1);
           endDate = new Date(lastYear, 11, 31);
           break;
+        default:
+          startDate = new Date(now.getFullYear(), 0, 1);
+          endDate = new Date(now.getFullYear(), 11, 31);
       }
 
       // Fetch all entries for the period with transaction date
@@ -75,8 +85,8 @@ const Reports = () => {
           )
         `)
         .eq('airledger_transactions.user_id', user.id)
-        .gte('airledger_transactions.transaction_date', startDate.toISOString().split('T')[0])
-        .lte('airledger_transactions.transaction_date', endDate.toISOString().split('T')[0]);
+        .gte('airledger_transactions.transaction_date', formatLocalDate(startDate))
+        .lte('airledger_transactions.transaction_date', formatLocalDate(endDate));
 
       if (error) {
         throw error;
