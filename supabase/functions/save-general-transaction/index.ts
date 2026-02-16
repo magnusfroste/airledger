@@ -37,8 +37,8 @@ serve(async (req) => {
         throw new Error('Each entry must have accountCode and accountName')
       }
       
-      const debit = Number(entry.debitAmount || 0)
-      const credit = Number(entry.creditAmount || 0)
+      const debit = Number(entry.debitAmount || entry.debit_amount || entry.debit || 0)
+      const credit = Number(entry.creditAmount || entry.credit_amount || entry.credit || 0)
       
       if (debit < 0 || credit < 0) {
         throw new Error('Debit and credit amounts cannot be negative')
@@ -192,8 +192,8 @@ serve(async (req) => {
       transaction_id: transaction.id,
       account_code: entry.accountCode,
       account_name: entry.accountName,
-      debit_amount: Number(entry.debitAmount || 0),
-      credit_amount: Number(entry.creditAmount || 0),
+      debit_amount: Number(entry.debitAmount || entry.debit_amount || entry.debit || 0),
+      credit_amount: Number(entry.creditAmount || entry.credit_amount || entry.credit || 0),
       description: entry.description || description
     }))
 
