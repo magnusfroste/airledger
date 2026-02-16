@@ -1,63 +1,61 @@
 
+# Lägg till "Klistra in"-flik i importdialogen
 
-# Fix: "Bokför utgift" ska fråga användaren vad som ska bokföras
+## Sammanfattning
+Utökar den befintliga importdialogen med en andra flik -- "Klistra in data" -- där användaren kan copy/paste CSV-data direkt från Google Sheets, Excel eller en texteditor. Samma validering och förhandsvisning som filuppladdningen.
 
-## Problem
-När användaren trycker "Bokför utgift" skickas meddelandet "Jag vill bokföra en utgift" till chat-assistant. Intent-klassificeraren returnerar `book_expense` men utan belopp, leverantör eller beskrivning. Koden försöker då matcha en mall (misslyckas utan data) och faller igenom till freeform AI-bokföring som inte heller har tillräcklig information -- resultatet blir ett tomt eller förvirrande svar.
+## Vad ändras?
 
-## Orsak
-I `chat-assistant/index.ts` (rad 146-167) kontrolleras bara `clarification_needed && !amount`, men intent-klassificeraren ställer `clarification_needed` till momsfrågan, inte till den grundläggande frågan "vad vill du bokföra?". Det saknas en kontroll för när **all data saknas**.
+Importdialogen får två flikar:
+1. **Ladda upp fil** (befintlig funktionalitet, oförändrad)
+2. **Klistra in data** (nytt -- textarea med placeholder-exempel)
 
-## Lösning
-Lägg till en tidig kontroll i `book_expense/book_sale/book_payment`-grenen: om varken belopp, leverantör eller beskrivning finns, returnera en tydlig fråga som guidar användaren att antingen beskriva utgiften eller bifoga ett kvitto/faktura.
+```text
++-----------------------------------------------+
+|  Importera ingående balanser                   |
+|                                                |
+|  [Ladda upp fil]  [Klistra in data]            |
+|                                                |
+|  +-------------------------------------------+ |
+|  | account_code,account_name,opening_bala...  | |
+|  | 1510,Kundfordringar,25000,debit            | |
+|  | 1930,Företagskonto,150000,debit            | |
+|  | 2440,Leverantörsskulder,30000,credit       | |
+|  +-------------------------------------------+ |
+|                                                |
+|  [Validera & förhandsgranska]                  |
+|                                                |
+|  (samma preview-tabell som idag)               |
++-----------------------------------------------+
+```
 
 ## Teknisk plan
 
-### 1. Uppdatera `supabase/functions/chat-assistant/index.ts`
-I `book_expense/book_sale/book_payment`-casen, lägg till kontroll **före** mallmatchning:
+### Fil: `src/pages/OpeningBalances.tsx`
 
-```text
-case 'book_expense':
-case 'book_sale':
-case 'book_payment': {
-  const d = intent.extracted_data;
-  const hasEnoughData = d.amount || d.vendor || d.description;
+**Nya state-variabler:**
+- `importMode`: `'file' | 'paste'` -- styr aktiv flik
+- `pasteText`: `string` -- innehållet i textarea
 
-  if (!hasEnoughData) {
-    // Användaren har bara sagt "bokför en utgift" utan detaljer
-    const typeLabel = intent.intent === 'book_sale' ? 'intäkt' : 
-                      intent.intent === 'book_payment' ? 'betalning' : 'utgift';
-    aiResponse = `Självklart! Jag hjälper dig bokföra en ${typeLabel}. Du kan:\n\n` +
-      `- **Beskriv transaktionen** — t.ex. "Köpt kontorsmaterial för 500 kr"\n` +
-      `- **Bifoga ett kvitto eller faktura** — så analyserar jag det automatiskt\n\n` +
-      `Vad vill du bokföra?`;
-    break;
-  }
+**Ny funktion:**
+- `handlePastePreview()` -- tar `pasteText`, skickar till befintliga `parseCSVForPreview()`
 
-  // Befintlig logik: mallmatchning, clarification, freeform...
-}
+**UI-ändringar i importdialogen:**
+- Lägg till `Tabs` (redan finns som UI-komponent) med två flikar
+- Flik 1: Befintlig filinput (oförändrad)
+- Flik 2: `Textarea` med placeholder som visar exempelformat + en "Förhandsgranska"-knapp
+- Resten av dialogen (preview-tabell, import-knapp) delas av båda flikarna
+
+**Placeholder-text i textarea:**
 ```
-
-### 2. Uppdatera `supabase/functions/chat-assistant/response-formatter.ts`
-Lägg till en ny formatteringsfunktion (valfritt, för konsekvens):
-
-```typescript
-export function formatMissingDataPrompt(transactionType: string): string {
-  const typeLabel = transactionType === 'book_sale' ? 'intäkt' : 
-                    transactionType === 'book_payment' ? 'betalning' : 'utgift';
-  return `Självklart! Jag hjälper dig bokföra en ${typeLabel}. Du kan:\n\n` +
-    `- **Beskriv transaktionen** — t.ex. "Köpt kontorsmaterial för 500 kr"\n` +
-    `- **Bifoga ett kvitto eller faktura** — så analyserar jag det automatiskt\n\n` +
-    `Vad vill du bokföra?`;
-}
+account_code,account_name,opening_balance,balance_type
+1510,Kundfordringar,25000,debit
+1930,Företagskonto,150000,debit
+2440,Leverantörsskulder,30000,credit
 ```
 
 ## Filer som ändras
-- `supabase/functions/chat-assistant/index.ts` -- tidig kontroll för saknad data
-- `supabase/functions/chat-assistant/response-formatter.ts` -- ny formatteringsfunktion
+- `src/pages/OpeningBalances.tsx` -- enda filen
 
-## Resultat
-- "Bokför utgift"-knappen ger nu ett tydligt svar som guidar användaren
-- Användaren förstår att hen kan beskriva transaktionen i text eller bifoga bild
-- Ingen breaking change -- befintlig logik för när data finns kvar oförändrad
-
+## Inga nya beroenden
+Tabs-komponenten och Textarea finns redan i projektet.
