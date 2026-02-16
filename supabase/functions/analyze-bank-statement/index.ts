@@ -150,7 +150,9 @@ REGLER:
 - Gissa bästa kontokod baserat på beskrivningen
 - Om du ser "Swish", "Överföring", "Lön" etc, använd rätt konton
 - Belopp ska vara absoluta värden (positiva), type anger riktning
-- Sortera kronologiskt efter datum`
+- Sortera kronologiskt efter datum
+
+VIKTIGT: Svara ENBART med JSON-objektet. Ingen inledande text, ingen förklaring, bara ren JSON utan markdown-kodblock.`
           },
           {
             role: 'user',
@@ -160,7 +162,7 @@ REGLER:
             ]
           }
         ],
-        max_tokens: 4000,
+        max_tokens: 16000,
         temperature: 0.1,
       }),
     });
