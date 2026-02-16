@@ -80,6 +80,23 @@ serve(async (req) => {
     const intent = await classifyIntent(message, templateNames, lovableApiKey);
     console.log('Intent:', intent.intent, 'confidence:', intent.confidence);
 
+    // === PRE-ROUTING: Check if user is answering a field collection question ===
+    // If so, override intent to continue the template flow regardless of classification
+    const activeFieldContext = extractFieldContext(conversationHistory);
+    if (activeFieldContext) {
+      console.log('Active field collection detected for template:', activeFieldContext);
+      // Force into booking flow so field-analyzer can process the answer
+      if (!['book_expense', 'book_sale', 'book_payment'].includes(intent.intent)) {
+        intent.intent = 'book_expense'; // Route into booking flow
+      }
+      intent.matched_template_hint = activeFieldContext;
+      // Try to extract amount from the raw message
+      const parsedAmount = parseSimpleAmount(message);
+      if (parsedAmount !== null) {
+        intent.extracted_data.amount = parsedAmount;
+      }
+    }
+
     let aiResponse = '';
 
     // === ROUTING ===
@@ -597,4 +614,16 @@ async function getFollowUpSuggestion(
     console.error('Follow-up suggestion error:', err);
     return '';
   }
+}
+
+/**
+ * Parse a simple amount from user text like "0", "14700", "14 700 kr"
+ */
+function parseSimpleAmount(text: string): number | null {
+  const cleaned = text.replace(/\s/g, '').replace(/kr$/i, '').replace(/SEK$/i, '').trim();
+  const match = cleaned.match(/^-?[\d]+([.,]\d+)?$/);
+  if (match) {
+    return parseFloat(cleaned.replace(',', '.'));
+  }
+  return null;
 }
