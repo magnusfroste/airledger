@@ -187,14 +187,15 @@ export async function handleFunctionCall(
       const periodStart = args.periodStart || `${new Date().getFullYear()}-01-01`;
       const periodEnd = args.periodEnd || new Date().toISOString().split('T')[0];
 
-      // Get opening balance
+      // Get opening balance (respect balance_type for credit accounts)
       const { data: opening } = await supabase
         .from('airledger_opening')
-        .select('opening_balance')
+        .select('opening_balance, balance_type')
         .eq('account_code', accountCode)
         .single();
 
-      const ib = opening?.opening_balance || 0;
+      const rawOb = Number(opening?.opening_balance || 0);
+      const ib = opening?.balance_type === 'credit' ? -rawOb : rawOb;
 
       // Get all entries for this account in the period
       const { data: entries, error: entriesError } = await supabase
