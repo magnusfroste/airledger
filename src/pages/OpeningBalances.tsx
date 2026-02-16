@@ -330,7 +330,7 @@ const OpeningBalances = () => {
       .select('account_code, account_name')
       .eq('is_active', true);
 
-    const validAccountCodes = new Set(accountsData?.map(acc => acc.account_code) || []);
+    const accountMap = new Map(accountsData?.map(acc => [acc.account_code, acc.account_name]) || []);
     
     const preview = [];
     const errors = [];
@@ -354,9 +354,12 @@ const OpeningBalances = () => {
       if (!row.account_code) {
         row.errors.push('Kontokod saknas');
         row.valid = false;
-      } else if (!validAccountCodes.has(row.account_code)) {
+      } else if (!accountMap.has(row.account_code)) {
         row.errors.push('Kontokod finns inte i BAS 2024');
         row.valid = false;
+      } else {
+        // Use the official BAS account name from chart of accounts
+        row.account_name = accountMap.get(row.account_code)!;
       }
       
       if (!row.account_name) {
