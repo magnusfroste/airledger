@@ -339,16 +339,17 @@ serve(async (req) => {
       }
 
       case 'year_end': {
-        // Extract year: first from extracted_data.date, then from message text, then default
+        // Extract year: FIRST check message text for explicit year, then extracted_data, then default
+        const yearMatch = message.match(/\b(20\d{2})\b/);
         let year: number;
-        if (intent.extracted_data.date) {
+        if (yearMatch) {
+          year = parseInt(yearMatch[1]);
+        } else if (intent.extracted_data.date) {
           year = parseInt(intent.extracted_data.date.substring(0, 4));
         } else {
-          const yearMatch = message.match(/\b(20\d{2})\b/);
-          year = yearMatch 
-            ? parseInt(yearMatch[1]) 
-            : new Date().getFullYear() - (new Date().getMonth() < 3 ? 1 : 0);
+          year = new Date().getFullYear() - (new Date().getMonth() < 3 ? 1 : 0);
         }
+        console.log('Year-end: extracted year =', year, 'from message:', message, 'yearMatch:', yearMatch?.[1], 'extracted_data.date:', intent.extracted_data.date);
         const sessionId = `${userId}_${Date.now()}`;
         aiResponse = await handleFunctionCall('get_year_end_checklist', { fiscalYear: year }, supabase, sessionId);
         break;
