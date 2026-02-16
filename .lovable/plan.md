@@ -1,136 +1,94 @@
 
 
-# Robust konversationsstyrd datainsamling
+# Årsbokslut med Air -- Förbättringsplan
 
-## Problem
+## Nuläge
 
-Idag hanterar systemet bara **ett belopp** per mall. Mallar som "Försäljning fond med förlust" kräver dock **flera datapunkter** (försäljningspris + anskaffningsvärde) for att kunna beräkna alla poster korrekt. Resultatet blir att Air antingen frågar "Vilket belopp?" utan kontext, eller sätter alla poster till samma belopp.
+Air har idag en grundläggande bokslutscheck (`get_year_end_checklist`) som visar en statisk checklista med:
+- Antal transaktioner bokförda
+- Om avskrivningar finns (konto 7800-7899)
+- Om periodiseringar finns (1700-1799, 2900-2999)
+- Om skatteavsättning finns (8910)
+- Tre manuella steg: "Resultaträkning granskad", "Balansräkning granskad", "Räkenskapsåret låst"
 
-## Lösning: Template-Driven Data Collection
+Mallar finns för avskrivningar och periodiseringar, men saknas for flera bokslutsposter. Flödet är inte interaktivt -- Air presenterar listan men guidar inte användaren vidare.
 
-Varje mall definierar vilka fält den behöver. Air inspekterar mallen, jämför med vad användaren redan angett, och frågar bara om det som saknas -- steg for steg.
+## Mål
 
-```text
-+------------------+     +-------------------+     +------------------+
-| 1. Intent        | --> | 2. Mall matchad   | --> | 3. Fält-analys   |
-| Klassificering   |     | (template-matcher)|     | (required_fields)|
-+------------------+     +-------------------+     +------------------+
-                                                          |
-                                              +-----------+-----------+
-                                              |                       |
-                                        Allt finns             Fält saknas
-                                              |                       |
-                                    +-------------------+   +-------------------+
-                                    | 4a. Förslag       |   | 4b. Fråga om      |
-                                    | med alla belopp   |   | nästa saknade fält|
-                                    +-------------------+   +-------------------+
-                                                                      |
-                                                              Användaren svarar
-                                                                      |
-                                                              +-------v-------+
-                                                              | Tillbaka till  |
-                                                              | steg 3        |
-                                                              +--------------+
-```
+Göra Air till en steg-för-steg bokslutsguide som proaktivt leder användaren genom hela processen.
 
-## Tekniska ändringar
+---
 
-### 1. Utöka mallschemat med `required_fields`
+## Plan
 
-Ny kolumn `required_fields` (jsonb) i `airledger_transaction_templates`. Fält som mallen behöver utöver standardfälten (belopp, datum, beskrivning).
+### 1. Nya bokslutsmallar
 
-Exempel för "Försäljning fond med förlust":
+Skapa mallar i databasen för vanliga bokslutsposter som saknas:
 
-```json
-[
-  {
-    "key": "selling_price",
-    "label": "Försäljningspris",
-    "prompt": "Vilket belopp fick du vid försäljningen?",
-    "type": "amount",
-    "maps_to_entry": 0
-  },
-  {
-    "key": "acquisition_value",
-    "label": "Anskaffningsvärde",
-    "prompt": "Vad var anskaffningsvärdet (det du betalade för fondandelarna)?",
-    "type": "amount",
-    "maps_to_entry": 2
-  }
-]
-```
+- **Skatteavsättning bolagsskatt** -- Debet 8910 Skatt på årets resultat / Kredit 2510 Skatteskulder (nyckelord: skatteavsättning, bolagsskatt, inkomstskatt, bokslut skatt)
+- **Avsättning till periodiseringsfond** -- Debet 8811 Avsättning periodiseringsfond / Kredit 2110 Periodiseringsfond (nyckelord: periodiseringsfond, avsättning)
+- **Upplupna kostnader (bokslut)** -- Debet kostnadskonto / Kredit 2990 Övriga upplupna kostnader (generisk periodisering)
+- **Förutbetalda intäkter** -- Debet 3001 Försäljning / Kredit 2990 Övriga upplupna kostnader
 
-`maps_to_entry` pekar på index i `template_entries`-arrayen. Post 1 (8370, förlusten) beräknas automatiskt: `acquisition_value - selling_price`.
+### 2. Förbättrad checklista med beräknade värden
 
-### 2. Ny hjälpfunktion: `analyzeRequiredFields`
+Uppgradera `get_year_end_checklist` i function-handlers.ts:
 
-I `chat-assistant/index.ts`. Tar mall + extracted_data + conversationHistory och returnerar:
-- `{ complete: true, fieldValues: {...} }` om all data finns
-- `{ complete: false, nextQuestion: "..." }` om fält saknas
+- Beräkna **årets resultat** (intäkter klass 3 minus kostnader klass 4-7) och visa det
+- Beräkna **uppskattad skatt** (20.6% av resultat om positivt) som hjälp
+- Visa **antal ej avstämda konton** (konton med "orimliga" saldon)
+- Visa totalsummor per kontoklass för snabb överblick
+- Returnera strukturerad data, inte bara text, så AI kan agera på den
 
-Logik:
-1. Om mallen har `required_fields` -- iterera och matcha mot `extracted_data` + historik
-2. Om mallen INTE har `required_fields` -- fallback till dagens beteende (kräv bara `amount`)
-3. Sök i konversationshistoriken efter tidigare svar på fältfrågor (mönster: `❓ ... Försäljningspris` + användarens svar)
+### 3. Steg-för-steg guidning i systemprompt
 
-### 3. Ny hjälpfunktion: `calculateTemplateAmounts`
-
-Tar mallens `template_entries`, `required_fields` och insamlade `fieldValues`. Beräknar varje posts belopp:
-- Poster med `maps_to_entry` --> direkt koppling till fältvärde
-- Poster utan koppling --> beräknas (t.ex. förlust = anskaffningsvärde - försäljningspris)
-- Stödjer beräkningsuttryck som `"calc": "acquisition_value - selling_price"`
-
-### 4. Uppdatera routing i `index.ts`
-
-Nuvarande flöde (book_expense/book_sale/book_payment):
+Uppdatera system-prompten med tydligare årsbokslutslogik:
 
 ```text
-Mall matchad + amount finns? --> Förslag
-Mall matchad + amount saknas? --> "Vilket belopp?"
+ÅRSBOKSLUT GUIDE:
+1. Visa checklista med get_year_end_checklist
+2. Gå igenom ETT steg i taget -- fråga aldrig om allt på en gång
+3. För varje steg:
+   a) Förklara kort vad steget innebär
+   b) Visa aktuella saldon som är relevanta
+   c) Föreslå bokföring med mall om sådan finns
+   d) Bekräfta att steget är klart innan nästa
+4. Ordning: Transaktioner -> Avskrivningar -> Periodiseringar -> 
+   Skatteavsättning -> Granska resultat -> Granska balans
 ```
 
-Nytt flöde:
+### 4. Bokslutssammanfattning (ny funktion)
 
-```text
-Mall matchad --> analyzeRequiredFields()
-  --> Alla fält finns? --> calculateTemplateAmounts() --> Förslag med korrekta belopp
-  --> Fält saknas? --> Fråga om nästa fält med mallens prompt-text
-```
+Ny funktion `generate_year_end_summary` som:
 
-### 5. Uppdatera `formatBookingProposal`
+- Hämtar resultaträkning (intäkter - kostnader per kontoklass)
+- Hämtar balansräkning (tillgångar vs skulder + eget kapital)
+- Kontrollerar att balansen går jämnt ut
+- Visar som formaterad rapport i chatten
+- Flaggar eventuella varningar (t.ex. balans stämmer inte, saknade avskrivningar)
 
-Istället för att anropa `calculateEntryAmount(entry, amount)` för alla poster, ta emot redan beräknade belopp per post. Visa rätt belopp i tabellen.
+### 5. Koppling till befintliga rapporter
 
-### 6. Konversationskontext för flerstegsflödet
+Lägga till snabblänkar i Air:s svar som pekar till `/reports` och `/balance-sheet` så användaren kan granska i gränssnittet.
 
-Vid fråga om fält, inkludera en strukturerad markör i AI-svaret:
+---
 
-```
-❓ Vad var anskaffningsvärdet (det du betalade for fondandelarna)?
-<!-- field:acquisition_value template:Försäljning fond med förlust -->
-```
+## Tekniska detaljer
 
-När användaren svarar, letar index.ts efter denna markör i historiken och extraherar:
-- Vilket fält som besvarades
-- Vilken mall som avses
-- Samlar ihop alla hittills besvarade fält
-
-### 7. Uppdatera befintlig fondmall
-
-Sätt `required_fields` på "Försäljning fond med förlust" och lägg till beräkningsregel for förlustposten.
-
-## Filändringar
+### Filer som ändras
 
 | Fil | Ändring |
 |-----|---------|
-| `supabase/migrations/...` | Ny kolumn `required_fields` (jsonb) |
-| `supabase/functions/chat-assistant/index.ts` | Nytt flöde med `analyzeRequiredFields` och konversationskontext |
-| `supabase/functions/chat-assistant/response-formatter.ts` | `formatBookingProposal` tar emot beräknade belopp per post |
-| `supabase/functions/_shared/template-matcher.ts` | Ingen ändring -- mallen matchas som idag |
-| `supabase/functions/_shared/types.ts` | Ny typ `RequiredField` och `FieldAnalysisResult` |
-| SQL data-update | Sätt `required_fields` på fondförlustmallen |
+| `supabase/functions/chat-assistant/function-definitions.ts` | Lägg till `generate_year_end_summary` |
+| `supabase/functions/chat-assistant/function-handlers.ts` | Förbättra `get_year_end_checklist` + ny handler för summary |
+| `supabase/functions/chat-assistant/system-prompt.ts` | Utökad bokslutsguide-sektion |
+| Databas (migration) | Nya bokslutsmallar |
 
-## Bakåtkompatibilitet
+### Stegordning
 
-Mallar utan `required_fields` fungerar exakt som idag (ett belopp). Systemet faller tillbaka till nuvarande logik om fältet är null/tomt. Inga breaking changes.
+1. Skapa bokslutsmallar via databasinsättning
+2. Uppgradera `get_year_end_checklist` med resultatberäkning och bättre struktur
+3. Lägg till `generate_year_end_summary` funktion
+4. Uppdatera systemprompt med bokslutsguide-instruktioner
+5. Uppdatera function-definitions med ny funktion
 
