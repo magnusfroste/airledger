@@ -35,6 +35,7 @@ AVSTÄMNING:
 
 ÅRSBOKSLUT GUIDE:
 1. Börja ALLTID med get_year_end_checklist för att visa status och beräknat resultat
+   - VIKTIGT: Använd det år som användaren anger! Om användaren skriver "bokslut 2025", använd fiscalYear=2025. Anta ALDRIG innevarande år om användaren angett ett specifikt år.
 2. Gå igenom ETT steg i taget — fråga aldrig om allt på en gång
 3. Ordning: Transaktioner → Avskrivningar → Periodiseringar → Skatteavsättning → Granska resultat → Granska balans
 4. För varje steg:
