@@ -60,8 +60,17 @@ const AdminUsers = () => {
   const getUsage = (userId: string) =>
     usage.find(u => u.user_id === userId && u.month_year === currentMonth);
 
+  const TIER_LIMITS: Record<string, number> = {
+    free: 50,
+    premium: 500,
+    professional: -1,
+  };
+
+  const getTierLimit = (tier: string | null) => TIER_LIMITS[tier || 'free'] ?? 50;
+
   const tierColor = (tier: string | null) => {
-    if (tier === 'premium' || tier === 'professional') return 'default' as const;
+    if (tier === 'professional') return 'default' as const;
+    if (tier === 'premium') return 'default' as const;
     return 'secondary' as const;
   };
 
@@ -145,7 +154,10 @@ const AdminUsers = () => {
         <CardContent className="space-y-3 max-h-[60vh] overflow-y-auto">
           {users.map(u => {
             const sub = getSubscription(u.id);
+            const tier = sub?.subscription_tier || 'free';
+            const limit = getTierLimit(tier);
             const monthUsage = getUsage(u.id);
+            const used = monthUsage?.ai_analyses_used ?? 0;
             const isActing = actionLoading === u.id;
             return (
               <div key={u.id} className="p-3 rounded-lg border space-y-2">
@@ -155,13 +167,23 @@ const AdminUsers = () => {
                     <p className="text-xs text-muted-foreground">{u.email}</p>
                   </div>
                   <div className="flex items-center gap-2 ml-2">
-                    <Badge variant={tierColor(sub?.subscription_tier)} className="text-xs">
-                      {sub?.subscription_tier || 'free'}
+                    <Badge variant={tierColor(tier)} className="text-xs capitalize">
+                      {tier}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {monthUsage?.ai_analyses_used ?? 0} / 50 AI
-                    </span>
+                    {sub?.subscribed && (
+                      <Badge variant="outline" className="text-xs text-green-600 border-green-300">
+                        Aktiv
+                      </Badge>
+                    )}
                   </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  AI-användning: <span className="font-medium text-foreground">{used}</span> / {limit === -1 ? '∞' : limit}
+                  {sub?.subscribed && sub?.subscription_tier !== 'free' && (
+                    <span className="ml-2">
+                      · Prenumeration gäller
+                    </span>
+                  )}
                 </div>
                 {/* Credit actions */}
                 <div className="flex items-center gap-2">
