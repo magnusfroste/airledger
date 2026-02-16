@@ -371,7 +371,7 @@ const ChatInterface = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-3rem)] bg-background flex flex-col">
+    <div className="h-[calc(100vh-3rem-4rem)] bg-background flex flex-col">
       {quotaError.show && (
         <div className="shrink-0 p-4 border-b border-border/20">
           <QuotaExceeded
@@ -401,7 +401,7 @@ const ChatInterface = () => {
         />
       </div>
 
-      <div className="shrink-0 bg-background border-t border-border/20 relative z-50 pb-16 sm:pb-4">
+      <div className="shrink-0 bg-background border-t border-border/20 sm:pb-4">
         <InputArea
           inputValue={inputValue}
           setInputValue={setInputValue}
