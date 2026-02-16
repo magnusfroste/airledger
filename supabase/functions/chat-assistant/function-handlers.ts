@@ -253,39 +253,43 @@ export async function handleFunctionCall(
         .gte('transaction_date', yearStart)
         .lte('transaction_date', yearEnd);
 
-      // Check for entries on depreciation accounts (7800-7899)
-      const { data: depEntries } = await supabase
+      // Get ALL entries for the year to compute class totals
+      const { data: allEntries } = await supabase
         .from('airledger_entries')
-        .select('id, airledger_transactions!inner(transaction_date)')
-        .gte('account_code', '7800')
-        .lte('account_code', '7899')
+        .select('account_code, debit_amount, credit_amount, airledger_transactions!inner(transaction_date)')
         .gte('airledger_transactions.transaction_date', yearStart)
-        .lte('airledger_transactions.transaction_date', yearEnd)
-        .limit(1);
+        .lte('airledger_transactions.transaction_date', yearEnd);
 
-      const hasDepreciation = (depEntries?.length || 0) > 0;
+      const entries = allEntries || [];
 
-      // Check for accrual entries (1700-1799, 2900-2999)
-      const { data: accrualEntries } = await supabase
-        .from('airledger_entries')
-        .select('id, airledger_transactions!inner(transaction_date)')
-        .or('and(account_code.gte.1700,account_code.lte.1799),and(account_code.gte.2900,account_code.lte.2999)')
-        .gte('airledger_transactions.transaction_date', yearStart)
-        .lte('airledger_transactions.transaction_date', yearEnd)
-        .limit(1);
+      // Classify entries by account class
+      let hasDepreciation = false;
+      let hasAccruals = false;
+      let hasTaxProvision = false;
+      const classTotals: Record<string, { debit: number; credit: number }> = {};
 
-      const hasAccruals = (accrualEntries?.length || 0) > 0;
+      for (const e of entries) {
+        const code = e.account_code;
+        const cls = code.charAt(0); // first digit = class
+        if (!classTotals[cls]) classTotals[cls] = { debit: 0, credit: 0 };
+        classTotals[cls].debit += Number(e.debit_amount) || 0;
+        classTotals[cls].credit += Number(e.credit_amount) || 0;
 
-      // Check for tax provision (8910)
-      const { data: taxEntries } = await supabase
-        .from('airledger_entries')
-        .select('id, airledger_transactions!inner(transaction_date)')
-        .eq('account_code', '8910')
-        .gte('airledger_transactions.transaction_date', yearStart)
-        .lte('airledger_transactions.transaction_date', yearEnd)
-        .limit(1);
+        const codeNum = parseInt(code);
+        if (codeNum >= 7800 && codeNum <= 7899) hasDepreciation = true;
+        if ((codeNum >= 1700 && codeNum <= 1799) || (codeNum >= 2900 && codeNum <= 2999)) hasAccruals = true;
+        if (code === '8910') hasTaxProvision = true;
+      }
 
-      const hasTaxProvision = (taxEntries?.length || 0) > 0;
+      // Calculate net result: revenue (class 3 credit-debit) minus costs (class 4-7 debit-credit)
+      const revenue = (classTotals['3']?.credit || 0) - (classTotals['3']?.debit || 0);
+      const costs = ['4', '5', '6', '7'].reduce((sum, c) => {
+        return sum + ((classTotals[c]?.debit || 0) - (classTotals[c]?.credit || 0));
+      }, 0);
+      // Financial items class 8
+      const financial = (classTotals['8']?.credit || 0) - (classTotals['8']?.debit || 0);
+      const netResult = revenue - costs + financial;
+      const estimatedTax = netResult > 0 ? Math.round(netResult * 0.206) : 0;
 
       const check = (done: boolean) => done ? '✅' : '⬜';
 
@@ -297,11 +301,139 @@ export async function handleFunctionCall(
         `⬜ Resultaträkning granskad\n` +
         `⬜ Balansräkning granskad\n` +
         `⬜ Räkenskapsåret låst\n\n` +
-        `💡 Vill du att jag visar resultaträkningen för ${year}, eller hjälper med något av stegen ovan?`;
-      callResult = { success: true, data: { txCount, hasDepreciation, hasAccruals, hasTaxProvision } };
+        `---\n\n` +
+        `📊 **Beräknat resultat ${year}**\n\n` +
+        `| Post | Belopp |\n|------|--------|\n` +
+        `| Intäkter (klass 3) | ${revenue.toLocaleString('sv-SE')} kr |\n` +
+        `| Kostnader (klass 4–7) | -${costs.toLocaleString('sv-SE')} kr |\n` +
+        `| Finansiellt netto (klass 8) | ${financial.toLocaleString('sv-SE')} kr |\n` +
+        `| **Resultat före skatt** | **${netResult.toLocaleString('sv-SE')} kr** |\n` +
+        (estimatedTax > 0 ? `| Uppskattad skatt (20.6%) | ${estimatedTax.toLocaleString('sv-SE')} kr |\n` : '') +
+        `\n💡 Vill du att jag guidar dig genom bokslutet steg för steg?`;
+
+      callResult = {
+        success: true,
+        data: {
+          txCount, hasDepreciation, hasAccruals, hasTaxProvision,
+          revenue, costs, financial, netResult, estimatedTax,
+          classTotals,
+        },
+      };
     } catch (err) {
       console.error('Year-end checklist error:', err);
       response += `\n\n❌ Ett fel uppstod vid hämtning av bokslutsdata.`;
+      callResult = { success: false, error: err.message };
+    }
+  } else if (functionName === 'generate_year_end_summary') {
+    try {
+      const year = args.fiscalYear;
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
+
+      // Get opening balances
+      const { data: openings } = await supabase
+        .from('airledger_opening')
+        .select('account_code, account_name, opening_balance, balance_type');
+
+      // Get all entries for the year
+      const { data: allEntries } = await supabase
+        .from('airledger_entries')
+        .select('account_code, account_name, debit_amount, credit_amount, airledger_transactions!inner(transaction_date)')
+        .gte('airledger_transactions.transaction_date', yearStart)
+        .lte('airledger_transactions.transaction_date', yearEnd);
+
+      const entries = allEntries || [];
+      const obs = openings || [];
+
+      // Build account balances
+      const balances: Record<string, { name: string; debit: number; credit: number; ob: number }> = {};
+
+      for (const o of obs) {
+        balances[o.account_code] = {
+          name: o.account_name,
+          debit: 0, credit: 0,
+          ob: o.balance_type === 'credit' ? -Number(o.opening_balance) : Number(o.opening_balance),
+        };
+      }
+
+      for (const e of entries) {
+        if (!balances[e.account_code]) {
+          balances[e.account_code] = { name: e.account_name, debit: 0, credit: 0, ob: 0 };
+        }
+        balances[e.account_code].debit += Number(e.debit_amount) || 0;
+        balances[e.account_code].credit += Number(e.credit_amount) || 0;
+      }
+
+      // Classify into income statement vs balance sheet
+      let totalRevenue = 0;
+      let totalCosts = 0;
+      let totalAssets = 0;
+      let totalLiabilitiesEquity = 0;
+      const warnings: string[] = [];
+
+      const incomeRows: string[] = [];
+      const balanceRows: string[] = [];
+
+      const sorted = Object.entries(balances).sort(([a], [b]) => a.localeCompare(b));
+
+      for (const [code, b] of sorted) {
+        const cls = parseInt(code.charAt(0));
+        const ub = b.ob + b.debit - b.credit;
+
+        if (cls >= 3 && cls <= 8) {
+          // Income statement
+          const net = cls === 3 ? (b.credit - b.debit) : (b.debit - b.credit);
+          if (Math.abs(net) > 0) {
+            incomeRows.push(`| ${code} ${b.name} | ${net.toLocaleString('sv-SE')} kr |`);
+          }
+          if (cls === 3) totalRevenue += b.credit - b.debit;
+          else totalCosts += b.debit - b.credit;
+        } else if (cls >= 1 && cls <= 2) {
+          // Balance sheet
+          if (Math.abs(ub) > 0) {
+            balanceRows.push(`| ${code} ${b.name} | ${ub.toLocaleString('sv-SE')} kr |`);
+          }
+          if (cls === 1) totalAssets += ub;
+          else totalLiabilitiesEquity += ub; // liabilities are credit-heavy so ub is negative
+        }
+      }
+
+      const netResult = totalRevenue - totalCosts;
+      const balanceDiff = totalAssets + totalLiabilitiesEquity + netResult; // should be ~0
+
+      if (Math.abs(balanceDiff) > 1) {
+        warnings.push(`⚠️ Balansen stämmer inte — differens ${balanceDiff.toLocaleString('sv-SE')} kr`);
+      }
+      if (totalCosts === 0 && totalRevenue === 0) {
+        warnings.push('⚠️ Inga intäkter eller kostnader bokförda');
+      }
+
+      response += `\n\n📊 **Bokslutssammanfattning ${year}**\n\n`;
+
+      response += `### Resultaträkning\n\n| Konto | Belopp |\n|-------|--------|\n`;
+      response += incomeRows.join('\n') + '\n';
+      response += `| **Intäkter totalt** | **${totalRevenue.toLocaleString('sv-SE')} kr** |\n`;
+      response += `| **Kostnader totalt** | **-${totalCosts.toLocaleString('sv-SE')} kr** |\n`;
+      response += `| **Årets resultat** | **${netResult.toLocaleString('sv-SE')} kr** |\n\n`;
+
+      response += `### Balansräkning\n\n| Konto | Belopp |\n|-------|--------|\n`;
+      response += balanceRows.join('\n') + '\n';
+      response += `| **Tillgångar totalt** | **${totalAssets.toLocaleString('sv-SE')} kr** |\n`;
+      response += `| **Skulder + EK totalt** | **${Math.abs(totalLiabilitiesEquity).toLocaleString('sv-SE')} kr** |\n\n`;
+
+      if (warnings.length > 0) {
+        response += warnings.join('\n') + '\n\n';
+      }
+
+      response += `🔗 Granska i detalj: [Resultaträkning](/reports) | [Balansräkning](/balance-sheet)`;
+
+      callResult = {
+        success: true,
+        data: { totalRevenue, totalCosts, netResult, totalAssets, totalLiabilitiesEquity, balanceDiff, warnings },
+      };
+    } catch (err) {
+      console.error('Year-end summary error:', err);
+      response += `\n\n❌ Ett fel uppstod vid generering av bokslutssammanfattning.`;
       callResult = { success: false, error: err.message };
     }
   }
