@@ -97,7 +97,7 @@ serve(async (req) => {
 
         // Check if previous AI message was asking for amount on a specific template
         // e.g. "Jag hittade mallen Försäljning fond med förlust. Vilket belopp..."
-        if (d.amount && !intent.matched_template_hint && conversationHistory?.length) {
+        if (d.amount && conversationHistory?.length) {
           const lastAiMsg = [...conversationHistory].reverse().find(
             (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('Jag hittade mallen')
           );
