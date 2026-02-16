@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Activity, CreditCard } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { Users, Activity, CreditCard, Plus, RotateCcw } from 'lucide-react';
 
 interface UserInfo {
   id: string;
@@ -29,22 +32,24 @@ const AdminUsers = () => {
   const [subscribers, setSubscribers] = useState<SubscriberInfo[]>([]);
   const [usage, setUsage] = useState<UsageInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creditInputs, setCreditInputs] = useState<Record<string, string>>({});
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const fetch = async () => {
-      const [profilesRes, subsRes, usageRes] = await Promise.all([
-        supabase.from('profiles').select('id, email, full_name, created_at').order('created_at', { ascending: false }),
-        supabase.from('subscribers').select('user_id, email, subscription_tier, subscribed'),
-        supabase.from('usage_tracking').select('user_id, month_year, ai_analyses_used').order('month_year', { ascending: false }).limit(100),
-      ]);
+  const fetchData = async () => {
+    const [profilesRes, subsRes, usageRes] = await Promise.all([
+      supabase.from('profiles').select('id, email, full_name, created_at').order('created_at', { ascending: false }),
+      supabase.from('subscribers').select('user_id, email, subscription_tier, subscribed'),
+      supabase.from('usage_tracking').select('user_id, month_year, ai_analyses_used').order('month_year', { ascending: false }).limit(100),
+    ]);
 
-      if (profilesRes.data) setUsers(profilesRes.data);
-      if (subsRes.data) setSubscribers(subsRes.data);
-      if (usageRes.data) setUsage(usageRes.data as UsageInfo[]);
-      setLoading(false);
-    };
-    fetch();
-  }, []);
+    if (profilesRes.data) setUsers(profilesRes.data);
+    if (subsRes.data) setSubscribers(subsRes.data);
+    if (usageRes.data) setUsage(usageRes.data as UsageInfo[]);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchData(); }, []);
 
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -56,9 +61,49 @@ const AdminUsers = () => {
     usage.find(u => u.user_id === userId && u.month_year === currentMonth);
 
   const tierColor = (tier: string | null) => {
-    if (tier === 'premium') return 'default';
-    if (tier === 'professional') return 'default';
-    return 'secondary';
+    if (tier === 'premium' || tier === 'professional') return 'default' as const;
+    return 'secondary' as const;
+  };
+
+  const handleAddCredits = async (userId: string) => {
+    const amount = parseInt(creditInputs[userId] || '0');
+    if (!amount || amount <= 0) return;
+    setActionLoading(userId);
+    try {
+      const existing = getUsage(userId);
+      if (existing) {
+        const newValue = Math.max(0, existing.ai_analyses_used - amount);
+        await supabase
+          .from('usage_tracking')
+          .update({ ai_analyses_used: newValue })
+          .eq('user_id', userId)
+          .eq('month_year', currentMonth);
+      }
+      toast({ title: "Klart", description: `${amount} krediter tillagda.` });
+      setCreditInputs(prev => ({ ...prev, [userId]: '' }));
+      await fetchData();
+    } catch {
+      toast({ title: "Fel", description: "Kunde inte lägga till krediter.", variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResetUsage = async (userId: string) => {
+    setActionLoading(userId);
+    try {
+      await supabase
+        .from('usage_tracking')
+        .update({ ai_analyses_used: 0 })
+        .eq('user_id', userId)
+        .eq('month_year', currentMonth);
+      toast({ title: "Nollställt", description: "AI-användningen har nollställts." });
+      await fetchData();
+    } catch {
+      toast({ title: "Fel", description: "Kunde inte nollställa.", variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   if (loading) return <div className="text-muted-foreground">Laddar användare...</div>;
@@ -97,25 +142,57 @@ const AdminUsers = () => {
         <CardHeader>
           <CardTitle className="text-lg">Registrerade användare</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 max-h-[50vh] overflow-y-auto">
+        <CardContent className="space-y-3 max-h-[60vh] overflow-y-auto">
           {users.map(u => {
             const sub = getSubscription(u.id);
             const monthUsage = getUsage(u.id);
+            const isActing = actionLoading === u.id;
             return (
-              <div key={u.id} className="flex items-center justify-between p-3 rounded-lg border">
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{u.full_name || u.email || 'Okänd'}</p>
-                  <p className="text-xs text-muted-foreground">{u.email}</p>
-                </div>
-                <div className="flex items-center gap-2 ml-2">
-                  <Badge variant={tierColor(sub?.subscription_tier)} className="text-xs">
-                    {sub?.subscription_tier || 'free'}
-                  </Badge>
-                  {monthUsage && (
+              <div key={u.id} className="p-3 rounded-lg border space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{u.full_name || u.email || 'Okänd'}</p>
+                    <p className="text-xs text-muted-foreground">{u.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2 ml-2">
+                    <Badge variant={tierColor(sub?.subscription_tier)} className="text-xs">
+                      {sub?.subscription_tier || 'free'}
+                    </Badge>
                     <span className="text-xs text-muted-foreground">
-                      {monthUsage.ai_analyses_used} AI
+                      {monthUsage?.ai_analyses_used ?? 0} / 50 AI
                     </span>
-                  )}
+                  </div>
+                </div>
+                {/* Credit actions */}
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="Krediter"
+                    value={creditInputs[u.id] || ''}
+                    onChange={e => setCreditInputs(prev => ({ ...prev, [u.id]: e.target.value }))}
+                    className="h-8 text-xs w-24"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    disabled={isActing || !creditInputs[u.id]}
+                    onClick={() => handleAddCredits(u.id)}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Lägg till
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 text-xs"
+                    disabled={isActing}
+                    onClick={() => handleResetUsage(u.id)}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Nollställ
+                  </Button>
                 </div>
               </div>
             );
