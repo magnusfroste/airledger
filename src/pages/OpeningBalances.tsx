@@ -617,6 +617,21 @@ const OpeningBalances = () => {
                         </tbody>
                       </table>
                     </div>
+                    
+                    {/* Balance check */}
+                    {(() => {
+                      const validRows = importPreview.filter(r => r.valid);
+                      const debit = validRows.filter(r => r.balance_type === 'debit').reduce((s, r) => s + r.opening_balance, 0);
+                      const credit = validRows.filter(r => r.balance_type === 'credit').reduce((s, r) => s + r.opening_balance, 0);
+                      const balanced = Math.abs(debit - credit) < 0.01;
+                      return (
+                        <div className={`flex items-center justify-between text-xs px-2 py-1.5 rounded ${balanced ? 'bg-muted text-muted-foreground' : 'bg-destructive/10 text-destructive'}`}>
+                          <span>Debet: {formatCurrency(debit)} · Kredit: {formatCurrency(credit)}</span>
+                          {!balanced && <span className="font-medium">Differens: {formatCurrency(Math.abs(debit - credit))}</span>}
+                          {balanced && <span className="font-medium">✓ Balanserar</span>}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
                 
