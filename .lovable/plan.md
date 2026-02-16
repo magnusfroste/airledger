@@ -1,61 +1,56 @@
 
-# Lägg till "Klistra in"-flik i importdialogen
 
-## Sammanfattning
-Utökar den befintliga importdialogen med en andra flik -- "Klistra in data" -- där användaren kan copy/paste CSV-data direkt från Google Sheets, Excel eller en texteditor. Samma validering och förhandsvisning som filuppladdningen.
+# Bankutdragsgranskning inline i chatten
 
-## Vad ändras?
+## Problem
 
-Importdialogen får två flikar:
-1. **Ladda upp fil** (befintlig funktionalitet, oförändrad)
-2. **Klistra in data** (nytt -- textarea med placeholder-exempel)
+Granskningskortet for bankutdrag renderas utanfor meddelandelistan (under MessageList i ChatInterface), vilket gor det otydligt och "Bokfor"-knappen fungerar inte som forvantat. Anvandaren ser kortet avskilt fran konversationen.
 
-```text
-+-----------------------------------------------+
-|  Importera ingående balanser                   |
-|                                                |
-|  [Ladda upp fil]  [Klistra in data]            |
-|                                                |
-|  +-------------------------------------------+ |
-|  | account_code,account_name,opening_bala...  | |
-|  | 1510,Kundfordringar,25000,debit            | |
-|  | 1930,Företagskonto,150000,debit            | |
-|  | 2440,Leverantörsskulder,30000,credit       | |
-|  +-------------------------------------------+ |
-|                                                |
-|  [Validera & förhandsgranska]                  |
-|                                                |
-|  (samma preview-tabell som idag)               |
-+-----------------------------------------------+
-```
+## Losning
 
-## Teknisk plan
+Flytta granskningskortet sa det visas som ett meddelande i chatfloden. Nar AI:n analyserat ett bankutdrag laggs ett speciellt meddelande till i chatten som innehaller analysdata. Message-komponenten renderar BankStatementReview inline for det meddelandet.
 
-### Fil: `src/pages/OpeningBalances.tsx`
+## Andringar
 
-**Nya state-variabler:**
-- `importMode`: `'file' | 'paste'` -- styr aktiv flik
-- `pasteText`: `string` -- innehållet i textarea
+### 1. Utoka Message-typen (`src/hooks/useMessages.ts`)
+- Lagg till `'bank_review'` som giltig `type`
+- Lagg till optional `bankAnalysis` property pa Message-interfacet
 
-**Ny funktion:**
-- `handlePastePreview()` -- tar `pasteText`, skickar till befintliga `parseCSVForPreview()`
+### 2. Uppdatera `useBankStatementAnalysis.ts`
+- Nar analysen lyckas: skapa ett meddelande med `type: 'bank_review'` och bifoga `bankAnalysis`-data direkt i meddelandet
+- Ta bort separat `isBankReviewVisible` / `bankAnalysis` state -- all data lever i meddelandet
+- Flytta `saveBatchTransactions` och `dismissBankReview` sa de arbetar mot meddelandestate istallet
 
-**UI-ändringar i importdialogen:**
-- Lägg till `Tabs` (redan finns som UI-komponent) med två flikar
-- Flik 1: Befintlig filinput (oförändrad)
-- Flik 2: `Textarea` med placeholder som visar exempelformat + en "Förhandsgranska"-knapp
-- Resten av dialogen (preview-tabell, import-knapp) delas av båda flikarna
+### 3. Uppdatera `Message.tsx`
+- Importera BankStatementReview
+- Nar `type === 'bank_review'` och `bankAnalysis` finns: rendera BankStatementReview inline istallet for vanlig markdown
+- Skicka callbacks for `onConfirmSelected` och `onDismiss` via props
 
-**Placeholder-text i textarea:**
-```
-account_code,account_name,opening_balance,balance_type
-1510,Kundfordringar,25000,debit
-1930,Företagskonto,150000,debit
-2440,Leverantörsskulder,30000,credit
-```
+### 4. Uppdatera `MessageList.tsx`
+- Lagg till `bankAnalysis` i MessageType-interfacet
+- Skicka ned callbacks for bankutdragsbokning: `onBankConfirm` och `onBankDismiss`
+- Vidarebefordra dessa till Message-komponenten
 
-## Filer som ändras
-- `src/pages/OpeningBalances.tsx` -- enda filen
+### 5. Uppdatera `ChatInterface.tsx`
+- Ta bort det separata `BankStatementReview`-blocket (rad 438-452)
+- Ta bort import av BankStatementReview
+- Skicka `onBankConfirm` och `onBankDismiss` callbacks till MessageList
+- Nar bokning ar klar eller avbruten: uppdatera meddelandets state (t.ex. markera som "bokfort" eller ta bort analysen)
 
-## Inga nya beroenden
-Tabs-komponenten och Textarea finns redan i projektet.
+### 6. Forbattra `BankStatementReview.tsx`
+- Lagg till instruktionstext overst: "Avmarkera rader du inte vill bokfora"
+- Visa progress under bokning: "Bokfor 3 av 7..."
+- Markera rader som misslyckats i rott med felmeddelande
+- Gor "Bokfor"-knappen tydligare med storre storlek
+
+## Teknisk filmatris
+
+| Fil | Andring |
+|-----|---------|
+| `src/hooks/useMessages.ts` | Utoka Message-typ med `bankAnalysis?` och `'bank_review'` |
+| `src/hooks/useBankStatementAnalysis.ts` | Returnera meddelande med analysdata, ta bort separat UI-state |
+| `src/components/chat/Message.tsx` | Rendera BankStatementReview inline for `bank_review`-typ |
+| `src/components/chat/MessageList.tsx` | Ny prop: `onBankConfirm`, `onBankDismiss`, skicka vidare till Message |
+| `src/components/ChatInterface.tsx` | Ta bort separat review-block, koppla callbacks via MessageList |
+| `src/components/chat/BankStatementReview.tsx` | Progress-feedback, instruktionstext, felmarkering per rad |
+
