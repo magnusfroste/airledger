@@ -7,7 +7,8 @@ import { fetchUserData } from './data-fetcher.ts';
 import { buildLightContext, buildBookkeepingContext } from './context-builder.ts';
 import { classifyIntent } from './intent-classifier.ts';
 import { matchTemplate } from './template-matcher.ts';
-import { formatBookingProposal, formatClarificationRequest, formatConfirmation, formatMissingDataPrompt } from './response-formatter.ts';
+import { formatBookingProposal, formatClarificationRequest, formatConfirmation, formatMissingDataPrompt, formatFollowUpSuggestion } from './response-formatter.ts';
+import { buildFinancialSnapshot } from './context-builder.ts';
 import { handleFunctionCall } from './function-handlers.ts';
 import { SYSTEM_PROMPT, getSystemPrompt } from './system-prompt.ts';
 import { FUNCTION_DEFINITIONS } from './function-definitions.ts';
@@ -158,6 +159,9 @@ serve(async (req) => {
                 };
                 aiResponse = await handleFunctionCall('use_transaction_template', args, supabase, sessionId);
                 if (!aiResponse) aiResponse = '✅ Transaktionen är bokförd!';
+
+                // Check for follow-up templates
+                aiResponse += await getFollowUpSuggestion(originalIntent.matched_template_hint, supabase, userData);
               } else {
                 aiResponse = 'Jag kunde inte hitta den tidigare transaktionen. Kan du upprepa vad du vill bokföra?';
               }
@@ -492,4 +496,39 @@ function buildMessages(message: string, conversationHistory: ConversationMessage
   }
   messages.push({ role: 'user', content: message });
   return messages;
+}
+
+/**
+ * Look up follow-up templates for a just-booked template and format suggestions.
+ */
+async function getFollowUpSuggestion(
+  templateName: string,
+  supabase: any,
+  userData: any
+): Promise<string> {
+  try {
+    // Fetch the booked template to check for follow_up_templates
+    const { data: bookedTemplate } = await supabase
+      .from('airledger_transaction_templates')
+      .select('follow_up_templates')
+      .eq('template_name', templateName)
+      .single();
+
+    if (!bookedTemplate?.follow_up_templates?.length) return '';
+
+    // Fetch the follow-up template details
+    const followUpName = bookedTemplate.follow_up_templates[0];
+    const { data: followUp } = await supabase
+      .from('airledger_transaction_templates')
+      .select('template_name, description, template_entries')
+      .eq('template_name', followUpName)
+      .single();
+
+    if (!followUp) return '';
+
+    return formatFollowUpSuggestion(followUp, userData?.accountBalances);
+  } catch (err) {
+    console.error('Follow-up suggestion error:', err);
+    return '';
+  }
 }
