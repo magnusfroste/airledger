@@ -339,9 +339,16 @@ serve(async (req) => {
       }
 
       case 'year_end': {
-        const year = intent.extracted_data.date 
-          ? parseInt(intent.extracted_data.date.substring(0, 4))
-          : new Date().getFullYear() - (new Date().getMonth() < 3 ? 1 : 0);
+        // Extract year: first from extracted_data.date, then from message text, then default
+        let year: number;
+        if (intent.extracted_data.date) {
+          year = parseInt(intent.extracted_data.date.substring(0, 4));
+        } else {
+          const yearMatch = message.match(/\b(20\d{2})\b/);
+          year = yearMatch 
+            ? parseInt(yearMatch[1]) 
+            : new Date().getFullYear() - (new Date().getMonth() < 3 ? 1 : 0);
+        }
         const sessionId = `${userId}_${Date.now()}`;
         aiResponse = await handleFunctionCall('get_year_end_checklist', { fiscalYear: year }, supabase, sessionId);
         break;
