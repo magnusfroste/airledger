@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Template {
@@ -156,6 +156,12 @@ const AdminTemplates = () => {
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm truncate">{t.template_name}</span>
                 <Badge variant="secondary" className="text-xs">{t.category}</Badge>
+                {t.follow_up_templates && t.follow_up_templates.length > 0 && (
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <Link2 className="h-3 w-3" />
+                    {t.follow_up_templates.length}
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate mt-0.5">{t.description}</p>
             </div>
