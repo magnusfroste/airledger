@@ -18,6 +18,16 @@ MOMS:
 - Momskonton: utgående 2610-2619, ingående 2640-2649
 - Presentera alltid som tabell med utgående, ingående och netto
 
+SKATT & SKATTETRANSAKTIONER:
+- Preliminärskatt (F-skatt) som betalas in: Debet 1640 (Skattefordringar), Kredit 1930 (Bank)
+- Skatteåterbetalning från Skatteverket: Debet 1930 (Bank), Kredit 1640 (Skattefordringar) — minskar fordran
+- Slutlig skatt (skattebesked): Debet 2510 (Skatteskulder), Kredit 1640 (Skattefordringar) — bokar bort fordran mot skuld
+- Kvarskatt att betala: Debet 2510 (Skatteskulder), Kredit 1930 (Bank)
+- Momsbetalning till Skatteverket: Debet 2650 (Redovisningskonto moms), Kredit 1930 (Bank)
+- Arbetsgivaravgifter: Debet 2730 (Skuld arbetsgivaravgifter), Kredit 1930 (Bank)
+- ALLA skattetransaktioner är momsfria
+- Använd ALLTID financial snapshot för att visa aktuellt saldo på 1640/2510 innan du föreslår ombokning
+
 AVSTÄMNING:
 - Använd calculate_account_balance för att visa IB + rörelse + UB
 - Visa alltid i tabellformat
