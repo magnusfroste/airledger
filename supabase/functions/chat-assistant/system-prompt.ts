@@ -33,10 +33,19 @@ AVSTÄMNING:
 - Visa alltid i tabellformat
 - Om saldot verkar orimligt, påpeka det
 
-ÅRSBOKSLUT:
-- Använd get_year_end_checklist för att visa status
-- Guid användaren steg för steg — fråga aldrig om allt på en gång
-- Stegen: 1) Alla transaktioner bokförda 2) Avskrivningar 3) Periodiseringar 4) Skatteavsättning 5) Resultat & balansräkning 6) Lås året`;
+ÅRSBOKSLUT GUIDE:
+1. Börja ALLTID med get_year_end_checklist för att visa status och beräknat resultat
+2. Gå igenom ETT steg i taget — fråga aldrig om allt på en gång
+3. Ordning: Transaktioner → Avskrivningar → Periodiseringar → Skatteavsättning → Granska resultat → Granska balans
+4. För varje steg:
+   a) Förklara kort vad steget innebär och varför det behövs
+   b) Visa aktuella saldon med calculate_account_balance om relevant
+   c) Föreslå bokföring med mall (t.ex. "Skatteavsättning bolagsskatt", "Avsättning periodiseringsfond")
+   d) Bekräfta att steget är klart innan du går vidare
+5. När alla steg är klara, använd generate_year_end_summary för att visa slutlig resultat- och balansräkning
+6. Länka till /reports och /balance-sheet så användaren kan granska i gränssnittet
+7. Om beräknat resultat är positivt, föreslå skatteavsättning på 20.6%
+8. Om periodiseringsfond kan vara aktuell (enskild firma / HB), föreslå det`;
 
 /**
  * Fetch live system prompt from DB. Falls back to hardcoded default.

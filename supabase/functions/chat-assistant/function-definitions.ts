@@ -176,6 +176,23 @@ export const FUNCTION_DEFINITIONS = [
         required: ["fiscalYear"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_year_end_summary",
+      description: "Generera en komplett bokslutssammanfattning med resultaträkning och balansräkning. Visar intäkter, kostnader, årets resultat, tillgångar, skulder och eget kapital. Kontrollerar att balansen stämmer. Använd efter att alla bokslutssteg är genomförda.",
+      parameters: {
+        type: "object",
+        properties: {
+          fiscalYear: {
+            type: "number",
+            description: "Räkenskapsåret att sammanfatta (ex: 2025)"
+          }
+        },
+        required: ["fiscalYear"]
+      }
+    }
   }
 ];
 
