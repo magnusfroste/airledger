@@ -1,6 +1,77 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
+// --- Template matching helpers ---
+
+interface Template {
+  template_name: string;
+  keywords: string[] | null;
+  template_entries: any[];
+  category: string;
+}
+
+function matchTransactionToTemplate(tx: any, templates: Template[]): Template | null {
+  const desc = (tx.description || '').toLowerCase();
+  let bestMatch: Template | null = null;
+  let bestScore = 0;
+
+  for (const tpl of templates) {
+    const keywords = (tpl.keywords || []).map((k: string) => k.toLowerCase());
+    const tplName = tpl.template_name.toLowerCase();
+
+    let score = 0;
+    for (const kw of keywords) {
+      if (desc.includes(kw)) score += 2;
+    }
+    // Also check template name words
+    for (const word of tplName.split(/\s+/)) {
+      if (word.length > 2 && desc.includes(word)) score += 1;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = tpl;
+    }
+  }
+
+  return bestScore >= 2 ? bestMatch : null;
+}
+
+function applyTemplateToTransaction(tx: any, template: Template): void {
+  const entries = template.template_entries;
+  if (!entries || entries.length === 0) return;
+
+  // Check if template has any VAT entry (account 26xx)
+  const hasVat = entries.some((e: any) => {
+    const code = e.account_code || '';
+    return code.startsWith('264') || code.startsWith('261') || code.startsWith('262') || code.startsWith('263');
+  });
+
+  // Apply VAT rule from template
+  tx.vat_applicable = hasVat;
+  if (!hasVat) {
+    tx.vat_rate = 0;
+  }
+
+  // Find the primary expense/income entry (not bank account 1930, not VAT 26xx)
+  const primaryEntry = entries.find((e: any) => {
+    const code = e.account_code || '';
+    return !code.startsWith('193') && !code.startsWith('264') && !code.startsWith('261') && !code.startsWith('262') && !code.startsWith('263');
+  });
+
+  if (primaryEntry) {
+    tx.suggested_account_code = primaryEntry.account_code;
+    tx.suggested_account_name = primaryEntry.account_name;
+  }
+
+  // Find counterpart (bank) entry
+  const bankEntry = entries.find((e: any) => (e.account_code || '').startsWith('193'));
+  if (bankEntry) {
+    tx.counterpart_account_code = bankEntry.account_code;
+    tx.counterpart_account_name = bankEntry.account_name;
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -204,6 +275,25 @@ VIKTIGT: Svara ENBART med JSON-objektet. Ingen inledande text, ingen förklaring
     }
 
     console.log(`Extracted ${analysis.transactions.length} transactions from bank statement`);
+
+    // Post-process: match each transaction against template library
+    const { data: templates } = await serviceSupabase
+      .from('airledger_transaction_templates')
+      .select('template_name, keywords, template_entries, category')
+      .eq('is_system_template', true)
+      .eq('auto_suggest', true);
+
+    if (templates && templates.length > 0) {
+      for (const tx of analysis.transactions) {
+        const matched = matchTransactionToTemplate(tx, templates);
+        if (matched) {
+          tx._matched_template = matched.template_name;
+          // Apply template's account codes and VAT rules
+          applyTemplateToTransaction(tx, matched);
+        }
+      }
+      console.log(`Template matching complete for ${analysis.transactions.length} transactions`);
+    }
 
     return new Response(
       JSON.stringify({ success: true, analysis, user_id: userId }),
