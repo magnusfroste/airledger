@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
@@ -44,6 +45,15 @@ const InputArea = ({
   hasMessages = false,
   lastMessageIsBooking = false,
 }: InputAreaProps) => {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Keep focus on textarea after sending / loading completes
+  useEffect(() => {
+    if (!isLoading && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isLoading]);
+
   return (
     <div className="p-3 space-y-3">
       {/* Pending Images Preview */}
@@ -77,7 +87,9 @@ const InputArea = ({
       <div className="flex gap-2 items-end">
         {/* Text input */}
         <div className="flex-1 relative">
-          <Textarea 
+          <Textarea
+            ref={textareaRef}
+            autoFocus
             value={inputValue} 
             onChange={e => setInputValue(e.target.value)} 
             onKeyPress={onKeyPress} 
