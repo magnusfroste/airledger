@@ -174,15 +174,28 @@ REGLER:
     const aiResult = await response.json();
     const rawContent = aiResult.choices?.[0]?.message?.content || '{}';
 
-    // Parse JSON from response
+    // Parse JSON from response - robust extraction
     let cleaned = rawContent;
-    if (cleaned.includes('```json')) {
-      cleaned = cleaned.replace(/```json\s*/, '').replace(/\s*```$/, '');
-    } else if (cleaned.includes('```')) {
-      cleaned = cleaned.replace(/```\s*/, '').replace(/\s*```$/, '');
+    // Extract JSON from markdown code blocks
+    const jsonBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonBlockMatch) {
+      cleaned = jsonBlockMatch[1].trim();
+    } else {
+      // Try to find raw JSON object
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleaned = jsonMatch[0];
+      }
     }
 
-    const analysis = JSON.parse(cleaned);
+    let analysis;
+    try {
+      analysis = JSON.parse(cleaned);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError.message);
+      console.error('Raw content (first 500 chars):', rawContent.substring(0, 500));
+      throw new Error('Kunde inte tolka AI-svaret. Försök igen.');
+    }
 
     if (!analysis.transactions || !Array.isArray(analysis.transactions) || analysis.transactions.length === 0) {
       throw new Error('Inga transaktioner hittades i bilden');
