@@ -14,13 +14,39 @@ export interface MessageImage {
   };
 }
 
+export interface BankTransaction {
+  date: string;
+  description: string;
+  amount: number;
+  type: "expense" | "income";
+  suggested_category: string;
+  suggested_account_code: string;
+  suggested_account_name: string;
+  counterpart_account_code: string;
+  counterpart_account_name: string;
+  vat_applicable: boolean;
+  vat_rate: number;
+  confidence: number;
+}
+
+export interface BankStatementAnalysis {
+  bank_name: string;
+  account_number?: string;
+  period?: string;
+  transactions: BankTransaction[];
+  total_transactions: number;
+  summary: string;
+}
+
 export interface Message {
   id: string;
   content: string;
   sender: 'user' | 'ai';
   timestamp: Date;
-  type?: 'text' | 'voice' | 'image';
+  type?: 'text' | 'voice' | 'image' | 'bank_review';
   images?: MessageImage[];
+  bankAnalysis?: BankStatementAnalysis;
+  bankReviewStatus?: 'pending' | 'booking' | 'done';
 }
 
 const WELCOME_MESSAGE: Message = {
@@ -165,6 +191,13 @@ export const useMessages = (conversationId: string | null) => {
     setMessages(prev => [...prev, message]);
   };
 
+  // Update a message by id (partial update)
+  const updateMessage = (messageId: string, updates: Partial<Message>) => {
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId ? { ...msg, ...updates } : msg
+    ));
+  };
+
   // Reset messages to welcome only
   const resetMessages = () => {
     setMessages([WELCOME_MESSAGE]);
@@ -176,6 +209,7 @@ export const useMessages = (conversationId: string | null) => {
     hasMoreMessages,
     loadingOlderMessages,
     addMessage,
+    updateMessage,
     resetMessages,
     loadOlderMessages,
     saveMessageToDatabase
