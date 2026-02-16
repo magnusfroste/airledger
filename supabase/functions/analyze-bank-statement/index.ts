@@ -1,129 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-
-// --- Template matching helpers ---
-
-interface Template {
-  template_name: string;
-  keywords: string[] | null;
-  template_entries: any[];
-  category: string;
-}
-
-function matchTransactionToTemplate(tx: any, templates: Template[]): Template | null {
-  const desc = (tx.description || '').toLowerCase();
-  let bestMatch: Template | null = null;
-  let bestScore = 0;
-
-  for (const tpl of templates) {
-    const keywords = (tpl.keywords || []).map((k: string) => k.toLowerCase());
-    const tplName = tpl.template_name.toLowerCase();
-
-    let score = 0;
-    for (const kw of keywords) {
-      if (desc.includes(kw)) score += 2;
-    }
-    // Also check template name words
-    for (const word of tplName.split(/\s+/)) {
-      if (word.length > 2 && desc.includes(word)) score += 1;
-    }
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = tpl;
-    }
-  }
-
-  return bestScore >= 2 ? bestMatch : null;
-}
-
-function applyTemplateToTransaction(tx: any, template: Template): void {
-  const entries = template.template_entries;
-  if (!entries || entries.length === 0) return;
-
-  // Check if template has any VAT entry (account 26xx)
-  const hasVat = entries.some((e: any) => {
-    const code = e.account_code || '';
-    return code.startsWith('264') || code.startsWith('261') || code.startsWith('262') || code.startsWith('263');
-  });
-
-  // Apply VAT rule from template
-  tx.vat_applicable = hasVat;
-  if (!hasVat) {
-    tx.vat_rate = 0;
-  }
-
-  // Find the primary expense/income entry (not bank account 1930, not VAT 26xx)
-  const primaryEntry = entries.find((e: any) => {
-    const code = e.account_code || '';
-    return !code.startsWith('193') && !code.startsWith('264') && !code.startsWith('261') && !code.startsWith('262') && !code.startsWith('263');
-  });
-
-  if (primaryEntry) {
-    tx.suggested_account_code = primaryEntry.account_code;
-    tx.suggested_account_name = primaryEntry.account_name;
-  }
-
-  // Find counterpart (bank) entry
-  const bankEntry = entries.find((e: any) => (e.account_code || '').startsWith('193'));
-  if (bankEntry) {
-    tx.counterpart_account_code = bankEntry.account_code;
-    tx.counterpart_account_name = bankEntry.account_name;
-  }
-}
+import { checkAndUpdateQuota } from '../_shared/quota.ts';
+import { fetchUserData } from '../_shared/data-fetcher.ts';
+import { buildFinancialSnapshot } from '../_shared/context-builder.ts';
+import { matchSingleTransaction, applyTemplateToTransaction } from '../_shared/template-matcher.ts';
+import { BankTransaction } from '../_shared/types.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-// Quota helper (same as analyze-receipt)
-const TIER_LIMITS: Record<string, { ai_analyses: number }> = {
-  free: { ai_analyses: 50 },
-  premium: { ai_analyses: 500 },
-  professional: { ai_analyses: -1 },
-};
-
-async function checkAndUpdateQuota(userId: string, supabase: any): Promise<{ allowed: boolean; subscription_tier: string; usage: any }> {
-  const now = new Date();
-  const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  const { data: subscriber } = await supabase
-    .from('subscribers')
-    .select('subscription_tier')
-    .eq('user_id', userId)
-    .single();
-
-  const tier = subscriber?.subscription_tier || 'free';
-  const limits = TIER_LIMITS[tier];
-
-  let { data: usage } = await supabase
-    .from('usage_tracking')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('month_year', monthYear)
-    .single();
-
-  if (!usage) {
-    const { data: newUsage } = await supabase
-      .from('usage_tracking')
-      .insert({ user_id: userId, month_year: monthYear, ai_analyses_used: 0, storage_used_mb: 0 })
-      .select()
-      .single();
-    usage = newUsage;
-  }
-
-  const current = usage?.ai_analyses_used || 0;
-  const allowed = limits.ai_analyses === -1 || current < limits.ai_analyses;
-
-  if (allowed) {
-    await supabase
-      .from('usage_tracking')
-      .update({ ai_analyses_used: current + 1, updated_at: new Date().toISOString() })
-      .eq('id', usage.id);
-  }
-
-  return { allowed, subscription_tier: tier, usage };
 }
 
 serve(async (req) => {
@@ -161,15 +46,24 @@ serve(async (req) => {
       userId = user.id;
     }
 
-    // Quota check
+    // Service client for privileged operations
     const serviceSupabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-    const quota = await checkAndUpdateQuota(userId, serviceSupabase);
+
+    // Quota check
+    const quota = await checkAndUpdateQuota(userId, serviceSupabase, true);
     if (!quota.allowed) {
       return new Response(
         JSON.stringify({ error: 'AI-analyskvoter överskridna', success: false, subscription_tier: quota.subscription_tier, usage: quota.usage }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Fetch user data + financial snapshot for context-aware AI prompt
+    const userData = await fetchUserData(userId, serviceSupabase);
+    const financialSnapshot = buildFinancialSnapshot(userData);
+
+    // Build context-aware system prompt
+    const systemPrompt = buildBankStatementPrompt(financialSnapshot);
 
     // Call Lovable AI Gateway with vision model
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -181,9 +75,87 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-pro',
         messages: [
+          { role: 'system', content: systemPrompt },
           {
-            role: 'system',
-            content: `Du är en svensk bokföringsassistent. Analysera bilden av ett bankutdrag/kontoutdrag och extrahera ALLA transaktioner du kan se.
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Analysera detta bankutdrag och extrahera alla transaktioner:' },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
+            ]
+          }
+        ],
+        max_tokens: 16000,
+        temperature: 0.1,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('AI Gateway error:', errText);
+      throw new Error('AI analysis failed');
+    }
+
+    const aiResult = await response.json();
+    const rawContent = aiResult.choices?.[0]?.message?.content || '{}';
+
+    // Parse JSON from response
+    let cleaned = rawContent;
+    const jsonBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonBlockMatch) {
+      cleaned = jsonBlockMatch[1].trim();
+    } else {
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) cleaned = jsonMatch[0];
+    }
+
+    let analysis;
+    try {
+      analysis = JSON.parse(cleaned);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError.message);
+      console.error('Raw content (first 500 chars):', rawContent.substring(0, 500));
+      throw new Error('Kunde inte tolka AI-svaret. Försök igen.');
+    }
+
+    if (!analysis.transactions || !Array.isArray(analysis.transactions) || analysis.transactions.length === 0) {
+      throw new Error('Inga transaktioner hittades i bilden');
+    }
+
+    console.log(`Extracted ${analysis.transactions.length} transactions from bank statement`);
+
+    // Post-process: match each transaction against template library using shared matcher
+    const templates = userData.templates || [];
+    if (templates.length > 0) {
+      for (const tx of analysis.transactions) {
+        const result = matchSingleTransaction(tx as BankTransaction, templates);
+        if (result) {
+          tx._matched_template = result.template.template_name;
+          applyTemplateToTransaction(tx, result.template);
+        }
+      }
+      console.log(`Template matching complete for ${analysis.transactions.length} transactions`);
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, analysis, user_id: userId }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error in analyze-bank-statement:', error);
+    return new Response(
+      JSON.stringify({ error: error.message || 'An unexpected error occurred', success: false }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
+
+/**
+ * Build a context-aware system prompt for bank statement analysis.
+ * Includes financial snapshot so AI can interpret ambiguous transactions.
+ */
+function buildBankStatementPrompt(financialSnapshot: string): string {
+  let prompt = `Du är en svensk bokföringsassistent. Analysera bilden av ett bankutdrag/kontoutdrag och extrahera ALLA transaktioner du kan se.
 
 Returnera ett JSON-objekt med denna exakta struktur:
 {
@@ -223,88 +195,18 @@ REGLER:
 - Belopp ska vara absoluta värden (positiva), type anger riktning
 - Sortera kronologiskt efter datum
 
-VIKTIGT: Svara ENBART med JSON-objektet. Ingen inledande text, ingen förklaring, bara ren JSON utan markdown-kodblock.`
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Analysera detta bankutdrag och extrahera alla transaktioner:' },
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
-            ]
-          }
-        ],
-        max_tokens: 16000,
-        temperature: 0.1,
-      }),
-    });
+MÖNSTER ATT KÄNNA IGEN:
+- "sk" + organisationsnummer (t.ex. "sk5566161658") = Skatteverket
+- Positiv insättning från Skatteverket = skatteåterbetalning (kredit 1640)
+- Negativ till Skatteverket = preliminärskatt (debet 1640)
+- Bankavgifter = momsfria (konto 6570)`;
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('AI Gateway error:', errText);
-      throw new Error('AI analysis failed');
-    }
-
-    const aiResult = await response.json();
-    const rawContent = aiResult.choices?.[0]?.message?.content || '{}';
-
-    // Parse JSON from response - robust extraction
-    let cleaned = rawContent;
-    // Extract JSON from markdown code blocks
-    const jsonBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonBlockMatch) {
-      cleaned = jsonBlockMatch[1].trim();
-    } else {
-      // Try to find raw JSON object
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleaned = jsonMatch[0];
-      }
-    }
-
-    let analysis;
-    try {
-      analysis = JSON.parse(cleaned);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError.message);
-      console.error('Raw content (first 500 chars):', rawContent.substring(0, 500));
-      throw new Error('Kunde inte tolka AI-svaret. Försök igen.');
-    }
-
-    if (!analysis.transactions || !Array.isArray(analysis.transactions) || analysis.transactions.length === 0) {
-      throw new Error('Inga transaktioner hittades i bilden');
-    }
-
-    console.log(`Extracted ${analysis.transactions.length} transactions from bank statement`);
-
-    // Post-process: match each transaction against template library
-    const { data: templates } = await serviceSupabase
-      .from('airledger_transaction_templates')
-      .select('template_name, keywords, template_entries, category')
-      .eq('is_system_template', true)
-      .eq('auto_suggest', true);
-
-    if (templates && templates.length > 0) {
-      for (const tx of analysis.transactions) {
-        const matched = matchTransactionToTemplate(tx, templates);
-        if (matched) {
-          tx._matched_template = matched.template_name;
-          // Apply template's account codes and VAT rules
-          applyTemplateToTransaction(tx, matched);
-        }
-      }
-      console.log(`Template matching complete for ${analysis.transactions.length} transactions`);
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, analysis, user_id: userId }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error) {
-    console.error('Error in analyze-bank-statement:', error);
-    return new Response(
-      JSON.stringify({ error: error.message || 'An unexpected error occurred', success: false }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  if (financialSnapshot) {
+    prompt += `\n\nANVÄNDARENS BOKFÖRINGSSTATUS:\n${financialSnapshot}`;
+    prompt += `\nAnvänd kontosaldona ovan för att tolka transaktioner. T.ex. om det finns en fordran på konto 1640 och en insättning från Skatteverket, är det troligen en återbetalning mot den fordran.`;
   }
-});
+
+  prompt += `\n\nVIKTIGT: Svara ENBART med JSON-objektet. Ingen inledande text, ingen förklaring, bara ren JSON utan markdown-kodblock.`;
+
+  return prompt;
+}
