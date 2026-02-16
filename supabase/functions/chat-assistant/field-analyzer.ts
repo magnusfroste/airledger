@@ -8,7 +8,8 @@ export function analyzeRequiredFields(
   requiredFields: RequiredField[] | null | undefined,
   extractedData: Record<string, any>,
   conversationHistory: ConversationMessage[] | undefined,
-  templateName: string
+  templateName: string,
+  currentMessage?: string
 ): FieldAnalysisResult {
   // No required_fields → fall back to legacy single-amount behavior
   if (!requiredFields || requiredFields.length === 0) {
@@ -33,7 +34,7 @@ export function analyzeRequiredFields(
 
   // Parse conversation history for previously answered field questions
   if (conversationHistory?.length) {
-    for (let i = 0; i < conversationHistory.length - 1; i++) {
+    for (let i = 0; i < conversationHistory.length; i++) {
       const msg = conversationHistory[i];
       if (msg.sender !== 'ai') continue;
 
@@ -45,7 +46,7 @@ export function analyzeRequiredFields(
       const markerTemplate = markerMatch[2];
       if (markerTemplate !== templateName) continue;
 
-      // The next user message is the answer
+      // The next user message is the answer (either in history or currentMessage)
       const nextMsg = conversationHistory[i + 1];
       if (nextMsg?.sender === 'user') {
         const parsed = parseAmountFromText(nextMsg.content);
@@ -53,6 +54,14 @@ export function analyzeRequiredFields(
           fieldValues[fieldKey] = parsed;
         } else {
           fieldValues[fieldKey] = nextMsg.content.trim();
+        }
+      } else if (!nextMsg && currentMessage) {
+        // Last AI message in history — currentMessage is the answer
+        const parsed = parseAmountFromText(currentMessage);
+        if (parsed !== null) {
+          fieldValues[fieldKey] = parsed;
+        } else {
+          fieldValues[fieldKey] = currentMessage.trim();
         }
       }
     }
