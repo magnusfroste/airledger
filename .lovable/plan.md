@@ -1,70 +1,136 @@
 
 
-# Air som kontextmedveten assistent -- Sammanlänkade bokföringsflöden
+# Robust konversationsstyrd datainsamling
 
-## Problemet
+## Problem
 
-Idag matchar systemet **en mall per meddelande**. Men verkliga bokföringshändelser (som skatteåterbetalning) kräver ofta **två eller fler relaterade verifikationer**:
+Idag hanterar systemet bara **ett belopp** per mall. Mallar som "Försäljning fond med förlust" kräver dock **flera datapunkter** (försäljningspris + anskaffningsvärde) for att kunna beräkna alla poster korrekt. Resultatet blir att Air antingen frågar "Vilket belopp?" utan kontext, eller sätter alla poster till samma belopp.
 
-1. Skatteåterbetalning: Debet 1930 / Kredit 1640
-2. Boka bort skatteskuld: Debet 2510 / Kredit 1640
+## Lösning: Template-Driven Data Collection
 
-Användaren förväntar sig att Air guidar genom hela flödet -- inte bara steg 1.
-
-## Lösning: Sammanlänkade mallar (Follow-up Templates)
-
-Istället för att göra AI-prompten smartare, utökar vi **mallsystemet** med ett nytt fält: `follow_up_templates`. Efter att en mall bokförts, kollar systemet om det finns uppföljningsmallar och föreslår dem automatiskt.
+Varje mall definierar vilka fält den behöver. Air inspekterar mallen, jämför med vad användaren redan angett, och frågar bara om det som saknas -- steg for steg.
 
 ```text
-Användare: "Skatteåterbetalning 12000 kr 9 dec"
-    |
-    v
-[Mall: Skatteåterbetalning] --> Bokför Debet 1930 / Kredit 1640
-    |
-    v
-[follow_up_templates: "Slutlig skatt"]
-    |
-    v
-Air: "Vill du också boka bort skatteskulden mot skattefordran?
-     Mall: Slutlig skatt -- Debet 2510 / Kredit 1640"
++------------------+     +-------------------+     +------------------+
+| 1. Intent        | --> | 2. Mall matchad   | --> | 3. Fält-analys   |
+| Klassificering   |     | (template-matcher)|     | (required_fields)|
++------------------+     +-------------------+     +------------------+
+                                                          |
+                                              +-----------+-----------+
+                                              |                       |
+                                        Allt finns             Fält saknas
+                                              |                       |
+                                    +-------------------+   +-------------------+
+                                    | 4a. Förslag       |   | 4b. Fråga om      |
+                                    | med alla belopp   |   | nästa saknade fält|
+                                    +-------------------+   +-------------------+
+                                                                      |
+                                                              Användaren svarar
+                                                                      |
+                                                              +-------v-------+
+                                                              | Tillbaka till  |
+                                                              | steg 3        |
+                                                              +--------------+
 ```
 
-## Tekniska steg
+## Tekniska ändringar
 
-### 1. Utöka mallschemat
+### 1. Utöka mallschemat med `required_fields`
 
-Ny kolumn `follow_up_templates` (text-array) i `airledger_transaction_templates`. Innehaller mallnamn som ska foreslas efter bokning.
+Ny kolumn `required_fields` (jsonb) i `airledger_transaction_templates`. Fält som mallen behöver utöver standardfälten (belopp, datum, beskrivning).
 
-### 2. Uppdatera bekraftelseflödet
+Exempel för "Försäljning fond med förlust":
 
-I `response-formatter.ts`, efter en lyckad bokning (`formatConfirmation`), kolla om mallen har `follow_up_templates`. Om ja, lägga till ett förslag i svaret:
+```json
+[
+  {
+    "key": "selling_price",
+    "label": "Försäljningspris",
+    "prompt": "Vilket belopp fick du vid försäljningen?",
+    "type": "amount",
+    "maps_to_entry": 0
+  },
+  {
+    "key": "acquisition_value",
+    "label": "Anskaffningsvärde",
+    "prompt": "Vad var anskaffningsvärdet (det du betalade för fondandelarna)?",
+    "type": "amount",
+    "maps_to_entry": 2
+  }
+]
+```
 
-"Vill du också bokföra [Mallnamn]? Belopp: [fråga eller hämta från snapshot]"
+`maps_to_entry` pekar på index i `template_entries`-arrayen. Post 1 (8370, förlusten) beräknas automatiskt: `acquisition_value - selling_price`.
 
-### 3. Berika med Financial Snapshot
+### 2. Ny hjälpfunktion: `analyzeRequiredFields`
 
-Använd existerande `buildFinancialSnapshot` för att visa aktuellt saldo:
+I `chat-assistant/index.ts`. Tar mall + extracted_data + conversationHistory och returnerar:
+- `{ complete: true, fieldValues: {...} }` om all data finns
+- `{ complete: false, nextQuestion: "..." }` om fält saknas
 
-"Saldo på 1640 Skattefordringar: 36 000 kr. Saldo på 2510 Skatteskulder: -24 000 kr. Vill du boka bort skatteskulden?"
+Logik:
+1. Om mallen har `required_fields` -- iterera och matcha mot `extracted_data` + historik
+2. Om mallen INTE har `required_fields` -- fallback till dagens beteende (kräv bara `amount`)
+3. Sök i konversationshistoriken efter tidigare svar på fältfrågor (mönster: `❓ ... Försäljningspris` + användarens svar)
 
-### 4. Konfigurera mallrelationer
+### 3. Ny hjälpfunktion: `calculateTemplateAmounts`
 
-Uppdatera relevanta mallar med `follow_up_templates`:
+Tar mallens `template_entries`, `required_fields` och insamlade `fieldValues`. Beräknar varje posts belopp:
+- Poster med `maps_to_entry` --> direkt koppling till fältvärde
+- Poster utan koppling --> beräknas (t.ex. förlust = anskaffningsvärde - försäljningspris)
+- Stödjer beräkningsuttryck som `"calc": "acquisition_value - selling_price"`
 
-- **Skatteåterbetalning** -> follow_up: `["Slutlig skatt"]`
-- **Preliminärskatt (F-skatt)** -> follow_up: (ingen, det är en löpande betalning)
-- **Momsbetalning** -> follow_up: (ingen)
+### 4. Uppdatera routing i `index.ts`
 
-Fler relationer kan läggas till löpande via admin-gränssnittet.
+Nuvarande flöde (book_expense/book_sale/book_payment):
 
-### 5. Ingen prompt-ändring
+```text
+Mall matchad + amount finns? --> Förslag
+Mall matchad + amount saknas? --> "Vilket belopp?"
+```
 
-Systemprompten förblir enkel. All logik ligger i malldata och deterministisk kod.
+Nytt flöde:
 
-## Sammanfattning
+```text
+Mall matchad --> analyzeRequiredFields()
+  --> Alla fält finns? --> calculateTemplateAmounts() --> Förslag med korrekta belopp
+  --> Fält saknas? --> Fråga om nästa fält med mallens prompt-text
+```
 
-- Mallsystemet utökas med `follow_up_templates` -- en array med mallnamn
-- Efter lyckad bokning föreslår Air automatiskt nästa steg med saldo från snapshot
-- Inga ändringar i AI-prompten -- logiken är helt malldriven
-- Skalbart: nya flöden konfigureras genom att redigera mallar i admin
+### 5. Uppdatera `formatBookingProposal`
+
+Istället för att anropa `calculateEntryAmount(entry, amount)` för alla poster, ta emot redan beräknade belopp per post. Visa rätt belopp i tabellen.
+
+### 6. Konversationskontext för flerstegsflödet
+
+Vid fråga om fält, inkludera en strukturerad markör i AI-svaret:
+
+```
+❓ Vad var anskaffningsvärdet (det du betalade for fondandelarna)?
+<!-- field:acquisition_value template:Försäljning fond med förlust -->
+```
+
+När användaren svarar, letar index.ts efter denna markör i historiken och extraherar:
+- Vilket fält som besvarades
+- Vilken mall som avses
+- Samlar ihop alla hittills besvarade fält
+
+### 7. Uppdatera befintlig fondmall
+
+Sätt `required_fields` på "Försäljning fond med förlust" och lägg till beräkningsregel for förlustposten.
+
+## Filändringar
+
+| Fil | Ändring |
+|-----|---------|
+| `supabase/migrations/...` | Ny kolumn `required_fields` (jsonb) |
+| `supabase/functions/chat-assistant/index.ts` | Nytt flöde med `analyzeRequiredFields` och konversationskontext |
+| `supabase/functions/chat-assistant/response-formatter.ts` | `formatBookingProposal` tar emot beräknade belopp per post |
+| `supabase/functions/_shared/template-matcher.ts` | Ingen ändring -- mallen matchas som idag |
+| `supabase/functions/_shared/types.ts` | Ny typ `RequiredField` och `FieldAnalysisResult` |
+| SQL data-update | Sätt `required_fields` på fondförlustmallen |
+
+## Bakåtkompatibilitet
+
+Mallar utan `required_fields` fungerar exakt som idag (ett belopp). Systemet faller tillbaka till nuvarande logik om fältet är null/tomt. Inga breaking changes.
 
