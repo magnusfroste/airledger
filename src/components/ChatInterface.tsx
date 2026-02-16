@@ -226,11 +226,12 @@ const ChatInterface = () => {
           }
 
           if (docType === 'bank_statement') {
-            await analyzeBankStatement(
+            const result = await analyzeBankStatement(
               imageBase64,
               addMessage,
               (msg) => saveMessageToDatabase(msg, limitMessagesInConversation)
             );
+            // analyzeBankStatement handles its own error messages, no throw needed
           } else {
             // receipt, invoice, or unknown → treat as receipt
             await analyzeReceipt(
