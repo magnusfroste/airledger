@@ -401,7 +401,7 @@ const ChatInterface = () => {
         />
       </div>
 
-      <div className="shrink-0 bg-background border-t border-border/20 pb-24 sm:pb-4">
+      <div className="shrink-0 bg-background border-t border-border/20 pb-28 sm:pb-4">
         <InputArea
           inputValue={inputValue}
           setInputValue={setInputValue}
