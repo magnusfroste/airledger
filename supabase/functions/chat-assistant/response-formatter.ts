@@ -22,8 +22,10 @@ export function formatBookingProposal(
 
   for (const entry of entries) {
     const entryAmount = calculateEntryAmount(entry, amount);
-    const debit = entry.type === 'debit' ? formatKr(entryAmount) : '';
-    const credit = entry.type === 'credit' ? formatKr(entryAmount) : '';
+    const isDebit = entry.type === 'debit' || (entry.debit_amount && !entry.credit_amount);
+    const isCredit = entry.type === 'credit' || (entry.credit_amount && !entry.debit_amount);
+    const debit = isDebit ? formatKr(entryAmount) : '';
+    const credit = isCredit ? formatKr(entryAmount) : '';
     response += `| ${entry.account_code} ${entry.account_name} | ${debit} | ${credit} |\n`;
   }
 
