@@ -95,6 +95,21 @@ serve(async (req) => {
           break;
         }
 
+        // Check if previous AI message was asking for amount on a specific template
+        // e.g. "Jag hittade mallen Försäljning fond med förlust. Vilket belopp..."
+        if (d.amount && !intent.matched_template_hint && conversationHistory?.length) {
+          const lastAiMsg = [...conversationHistory].reverse().find(
+            (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('Jag hittade mallen')
+          );
+          if (lastAiMsg) {
+            const templateMatch = lastAiMsg.content.match(/Jag hittade mallen \*\*(.+?)\*\*/);
+            if (templateMatch) {
+              console.log('Resuming template from context:', templateMatch[1]);
+              intent.matched_template_hint = templateMatch[1];
+            }
+          }
+        }
+
         // Deterministic template matching
         const match = await matchTemplate(intent, supabase, userId);
 
