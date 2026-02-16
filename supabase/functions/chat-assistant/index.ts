@@ -86,7 +86,7 @@ serve(async (req) => {
     if (activeFieldContext) {
       console.log('Active field collection detected for template:', activeFieldContext);
       // Force into booking flow so field-analyzer can process the answer
-      if (!['book_expense', 'book_sale', 'book_payment'].includes(intent.intent)) {
+      if (!['book_expense', 'book_sale', 'book_payment', 'confirm_booking'].includes(intent.intent)) {
         intent.intent = 'book_expense'; // Route into booking flow
       }
       intent.matched_template_hint = activeFieldContext;
@@ -185,54 +185,79 @@ serve(async (req) => {
 
       case 'confirm_booking': {
         if (conversationHistory?.length) {
-          // Check for freeform proposal first
-          const lastFreeformProposal = [...(conversationHistory || [])].reverse().find(
-            (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('Bokföringsförslag (utan mall)')
+          // Find the last booking proposal in conversation
+          const lastProposal = [...(conversationHistory || [])].reverse().find(
+            (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('Bokföringsförslag')
           );
 
-          const lastUserBooking = [...(conversationHistory || [])].reverse().find(
-            (msg: ConversationMessage) => msg.sender === 'user' && msg.content !== message
-          );
+          if (lastProposal) {
+            // Try to parse entries from the markdown table in the proposal
+            const parsedEntries = parseProposalEntries(lastProposal.content);
+            const parsedDate = lastProposal.content.match(/\*\*Datum:\*\*\s*(\d{4}-\d{2}-\d{2})/)?.[1] || new Date().toISOString().split('T')[0];
+            const parsedDesc = lastProposal.content.match(/\*\*Beskrivning:\*\*\s*(.+)/)?.[1] || 'Bokförd transaktion';
 
-          if (lastFreeformProposal && lastUserBooking) {
-            // Re-run the freeform AI call but this time execute the function
-            console.log('Confirming freeform booking...');
-            const fullContext = buildBookkeepingContext(userData);
-            
-            // Re-classify to get the transaction data, then execute
-            const freeformResult = await executeFreeformBooking(
-              lastUserBooking.content, conversationHistory, fullContext, lovableApiKey, supabase, userId, livePrompt
-            );
-            aiResponse = freeformResult || '✅ Transaktionen är bokförd!';
-          } else {
-            // Template-based confirmation (existing logic)
-            const lastProposal = [...(conversationHistory || [])].reverse().find(
-              (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('Bokföringsförslag')
-            );
+            if (parsedEntries.length > 0) {
+              // Use save-general-transaction directly
+              console.log('Confirming template booking with parsed entries:', parsedEntries.length);
+              const sessionId = `${userId}_${Date.now()}`;
+              aiResponse = await handleFunctionCall('save_general_transaction', {
+                description: parsedDesc,
+                entries: parsedEntries,
+                transactionDate: parsedDate,
+              }, supabase, sessionId);
+              if (!aiResponse) aiResponse = '✅ Transaktionen är bokförd!';
 
-            if (lastUserBooking) {
-              const originalIntent = await classifyIntent(lastUserBooking.content, templateNames, lovableApiKey);
-              
-              if (originalIntent.matched_template_hint && originalIntent.extracted_data.amount) {
-                const sessionId = `${userId}_${Date.now()}`;
-                const args = {
-                  templateName: originalIntent.matched_template_hint,
-                  amount: originalIntent.extracted_data.amount,
-                  description: originalIntent.extracted_data.description || originalIntent.extracted_data.vendor || '',
-                  transactionDate: originalIntent.extracted_data.date || new Date().toISOString().split('T')[0],
-                  referenceNumber: originalIntent.extracted_data.reference || undefined,
-                };
-                aiResponse = await handleFunctionCall('use_transaction_template', args, supabase, sessionId);
-                if (!aiResponse) aiResponse = '✅ Transaktionen är bokförd!';
-
-                // Check for follow-up templates
-                aiResponse += await getFollowUpSuggestion(originalIntent.matched_template_hint, supabase, userData);
-              } else {
-                aiResponse = 'Jag kunde inte hitta den tidigare transaktionen. Kan du upprepa vad du vill bokföra?';
+              // Check for follow-up suggestion
+              const templateNameMatch = lastProposal.content.match(/tolkar det som \*\*(.+?)\*\*/);
+              if (templateNameMatch) {
+                aiResponse += await getFollowUpSuggestion(templateNameMatch[1], supabase, userData);
               }
             } else {
-              aiResponse = 'Jag hittar ingen tidigare transaktion att bekräfta. Vad vill du bokföra?';
+              // Fallback: check for freeform proposal
+              const isFreeform = lastProposal.content.includes('utan mall');
+              if (isFreeform) {
+                const lastUserBooking = [...(conversationHistory || [])].reverse().find(
+                  (msg: ConversationMessage) => msg.sender === 'user' && msg.content !== message
+                );
+                if (lastUserBooking) {
+                  console.log('Confirming freeform booking...');
+                  const fullContext = buildBookkeepingContext(userData);
+                  const freeformResult = await executeFreeformBooking(
+                    lastUserBooking.content, conversationHistory, fullContext, lovableApiKey, supabase, userId, livePrompt
+                  );
+                  aiResponse = freeformResult || '✅ Transaktionen är bokförd!';
+                } else {
+                  aiResponse = 'Jag kunde inte hitta den tidigare transaktionen. Kan du upprepa vad du vill bokföra?';
+                }
+              } else {
+                // Legacy template-based confirmation
+                const lastUserBooking = [...(conversationHistory || [])].reverse().find(
+                  (msg: ConversationMessage) => msg.sender === 'user' && msg.content !== message
+                );
+                if (lastUserBooking) {
+                  const originalIntent = await classifyIntent(lastUserBooking.content, templateNames, lovableApiKey);
+                  if (originalIntent.matched_template_hint && originalIntent.extracted_data.amount) {
+                    const sessionId = `${userId}_${Date.now()}`;
+                    const args = {
+                      templateName: originalIntent.matched_template_hint,
+                      amount: originalIntent.extracted_data.amount,
+                      description: originalIntent.extracted_data.description || originalIntent.extracted_data.vendor || '',
+                      transactionDate: originalIntent.extracted_data.date || new Date().toISOString().split('T')[0],
+                      referenceNumber: originalIntent.extracted_data.reference || undefined,
+                    };
+                    aiResponse = await handleFunctionCall('use_transaction_template', args, supabase, sessionId);
+                    if (!aiResponse) aiResponse = '✅ Transaktionen är bokförd!';
+                    aiResponse += await getFollowUpSuggestion(originalIntent.matched_template_hint, supabase, userData);
+                  } else {
+                    aiResponse = 'Jag kunde inte hitta den tidigare transaktionen. Kan du upprepa vad du vill bokföra?';
+                  }
+                } else {
+                  aiResponse = 'Jag hittar ingen tidigare transaktion att bekräfta. Vad vill du bokföra?';
+                }
+              }
             }
+          } else {
+            aiResponse = 'Det finns ingen pågående bokning att bekräfta. Beskriv vad du vill bokföra.';
           }
         } else {
           aiResponse = 'Det finns ingen pågående bokning att bekräfta. Beskriv vad du vill bokföra.';
@@ -627,4 +652,41 @@ function parseSimpleAmount(text: string): number | null {
     return parseFloat(cleaned.replace(',', '.'));
   }
   return null;
+}
+
+/**
+ * Parse booking proposal entries from a markdown table in AI response.
+ * Expects format: | 1930 Företagskonto | 14 700 kr |  |
+ */
+function parseProposalEntries(proposalContent: string): Array<{
+  accountCode: string;
+  accountName: string;
+  debitAmount: number;
+  creditAmount: number;
+}> {
+  const entries: Array<{ accountCode: string; accountName: string; debitAmount: number; creditAmount: number }> = [];
+
+  // Match table rows: | account_code account_name | debit | credit |
+  const tableRows = proposalContent.match(/\|\s*(\d{4})\s+(.+?)\s*\|\s*([\d\s]*(?:kr)?)\s*\|\s*([\d\s]*(?:kr)?)\s*\|/g);
+  if (!tableRows) return entries;
+
+  for (const row of tableRows) {
+    const match = row.match(/\|\s*(\d{4})\s+(.+?)\s*\|\s*([\d\s,\.]*(?:kr)?)\s*\|\s*([\d\s,\.]*(?:kr)?)\s*\|/);
+    if (!match) continue;
+
+    const accountCode = match[1];
+    const accountName = match[2].trim();
+    const debitStr = match[3].replace(/\s/g, '').replace(/kr$/i, '').replace(',', '.').trim();
+    const creditStr = match[4].replace(/\s/g, '').replace(/kr$/i, '').replace(',', '.').trim();
+
+    const debit = debitStr ? parseFloat(debitStr) || 0 : 0;
+    const credit = creditStr ? parseFloat(creditStr) || 0 : 0;
+
+    // Skip rows where both are 0
+    if (debit === 0 && credit === 0) continue;
+
+    entries.push({ accountCode, accountName, debitAmount: debit, creditAmount: credit });
+  }
+
+  return entries;
 }
