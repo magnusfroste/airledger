@@ -1,56 +1,101 @@
 
 
-# Bankutdragsgranskning inline i chatten
+# Delad kontextplattform -- `_shared/` arkitektur
 
-## Problem
+## Problemet idag
 
-Granskningskortet for bankutdrag renderas utanfor meddelandelistan (under MessageList i ChatInterface), vilket gor det otydligt och "Bokfor"-knappen fungerar inte som forvantat. Anvandaren ser kortet avskilt fran konversationen.
+Logiken ar duplicerad mellan `chat-assistant` och `analyze-bank-statement`. Bankutdragsanalysen har en enklare, inline version av template-matchning och saknar helt kontext om anvandarens bokforing. Varje ny "kantboll" (skatt, lon, amortering) kraver ad hoc-fixar i tva separata filer.
 
-## Losning
+## Princip
 
-Flytta granskningskortet sa det visas som ett meddelande i chatfloden. Nar AI:n analyserat ett bankutdrag laggs ett speciellt meddelande till i chatten som innehaller analysdata. Message-komponenten renderar BankStatementReview inline for det meddelandet.
+**En transaktion ar en transaktion** -- oavsett om den kommer fran chatten, ett bankutdrag, en CSV-import eller framtida SIE-import. Alla ska ga genom samma pipeline:
 
-## Andringar
+```text
+Input --> Kontext --> Klassificering --> Mallmatchning --> Forslag --> Bekraftelse --> Bokforing
+```
 
-### 1. Utoka Message-typen (`src/hooks/useMessages.ts`)
-- Lagg till `'bank_review'` som giltig `type`
-- Lagg till optional `bankAnalysis` property pa Message-interfacet
+Bankutdrag ar bara ett batchlager dar Gemini extraherar radata fran en bild, sedan matas varje rad genom den ordinarie pipelinen.
 
-### 2. Uppdatera `useBankStatementAnalysis.ts`
-- Nar analysen lyckas: skapa ett meddelande med `type: 'bank_review'` och bifoga `bankAnalysis`-data direkt i meddelandet
-- Ta bort separat `isBankReviewVisible` / `bankAnalysis` state -- all data lever i meddelandet
-- Flytta `saveBatchTransactions` och `dismissBankReview` sa de arbetar mot meddelandestate istallet
+## Vad som flyttas till `_shared/`
 
-### 3. Uppdatera `Message.tsx`
-- Importera BankStatementReview
-- Nar `type === 'bank_review'` och `bankAnalysis` finns: rendera BankStatementReview inline istallet for vanlig markdown
-- Skicka callbacks for `onConfirmSelected` och `onDismiss` via props
+| Modul | Ansvar | Anvands av |
+|-------|--------|------------|
+| `types.ts` | Gemensamma typer (UserData, TemplateMatch, etc.) | Alla |
+| `data-fetcher.ts` | Hamta anvandardata + berakna kontosaldon | chat-assistant, analyze-bank-statement |
+| `context-builder.ts` | buildLightContext, buildBookkeepingContext, **ny: buildFinancialSnapshot** | chat-assistant, analyze-bank-statement |
+| `template-matcher.ts` | matchTemplate + **ny: matchSingleTransaction** (for bankutdrag) | chat-assistant, analyze-bank-statement |
+| `quota.ts` | checkAndUpdateQuota (idag duplicerad) | chat-assistant, analyze-bank-statement |
 
-### 4. Uppdatera `MessageList.tsx`
-- Lagg till `bankAnalysis` i MessageType-interfacet
-- Skicka ned callbacks for bankutdragsbokning: `onBankConfirm` och `onBankDismiss`
-- Vidarebefordra dessa till Message-komponenten
+## Ny funktion: `buildFinancialSnapshot`
 
-### 5. Uppdatera `ChatInterface.tsx`
-- Ta bort det separata `BankStatementReview`-blocket (rad 438-452)
-- Ta bort import av BankStatementReview
-- Skicka `onBankConfirm` och `onBankDismiss` callbacks till MessageList
-- Nar bokning ar klar eller avbruten: uppdatera meddelandets state (t.ex. markera som "bokfort" eller ta bort analysen)
+Beraknar aktuellt saldo per konto (IB + debet - kredit) for konton med aktivitet. Returnerar en komprimerad strang som injiceras i AI-prompter:
 
-### 6. Forbattra `BankStatementReview.tsx`
-- Lagg till instruktionstext overst: "Avmarkera rader du inte vill bokfora"
-- Visa progress under bokning: "Bokfor 3 av 7..."
-- Markera rader som misslyckats i rott med felmeddelande
-- Gor "Bokfor"-knappen tydligare med storre storlek
+```text
+KONTOSALDON:
+1640 Skattefordringar: 10 417 kr (debet)
+2510 Skatteskulder: 5 069 kr (kredit)
+1930 Bankkonto: 45 230 kr (debet)
+2641 Ingaende moms: 3 200 kr (debet)
+```
 
-## Teknisk filmatris
+Detta ger AI:n (bade i chat och bankutdrag) kontexten att forsta att "sk5566161658 +6 297 kr" troligen ar en aterbetalning mot den kanda skattefordran pa 1640.
+
+## Ny funktion: `matchSingleTransaction`
+
+En forenklad wrapper runt den befintliga `matchTemplate`-logiken, anpassad for bankutdragsrader:
+
+- Tar en enstaka transaktion (description, amount, type)
+- Matchar mot mallbiblioteket
+- Applicerar kontokoder och momsregler fran mallen
+- Returnerar matchad mall + entries
+
+Ersatter den inline-logiken som idag finns i `analyze-bank-statement`.
+
+## Filmatris
 
 | Fil | Andring |
 |-----|---------|
-| `src/hooks/useMessages.ts` | Utoka Message-typ med `bankAnalysis?` och `'bank_review'` |
-| `src/hooks/useBankStatementAnalysis.ts` | Returnera meddelande med analysdata, ta bort separat UI-state |
-| `src/components/chat/Message.tsx` | Rendera BankStatementReview inline for `bank_review`-typ |
-| `src/components/chat/MessageList.tsx` | Ny prop: `onBankConfirm`, `onBankDismiss`, skicka vidare till Message |
-| `src/components/ChatInterface.tsx` | Ta bort separat review-block, koppla callbacks via MessageList |
-| `src/components/chat/BankStatementReview.tsx` | Progress-feedback, instruktionstext, felmarkering per rad |
+| `supabase/functions/_shared/types.ts` | Ny: flytta typer fran chat-assistant/types.ts, utoka UserData med accountBalances |
+| `supabase/functions/_shared/data-fetcher.ts` | Ny: flytta fetchUserData, lagg till saldoberakning |
+| `supabase/functions/_shared/context-builder.ts` | Ny: flytta buildLightContext + buildBookkeepingContext, lagg till buildFinancialSnapshot |
+| `supabase/functions/_shared/template-matcher.ts` | Ny: flytta matchTemplate + warning-logik, lagg till matchSingleTransaction |
+| `supabase/functions/_shared/quota.ts` | Ny: flytta duplicerad checkAndUpdateQuota |
+| `supabase/functions/chat-assistant/types.ts` | Re-export fran _shared |
+| `supabase/functions/chat-assistant/data-fetcher.ts` | Re-export fran _shared |
+| `supabase/functions/chat-assistant/context-builder.ts` | Re-export fran _shared |
+| `supabase/functions/chat-assistant/template-matcher.ts` | Re-export fran _shared |
+| `supabase/functions/chat-assistant/index.ts` | Importera quota fran _shared, resten via re-exports |
+| `supabase/functions/analyze-bank-statement/index.ts` | Ta bort inline-logik, importera fran _shared, injicera financialSnapshot i prompt |
+| Databasmigration | 3 nya skattemallar (aterbetalning, inbetalning prelskatt, slutlig skatt) |
+
+## Hur bankutdraget andras
+
+Nuvarande flode:
+
+```text
+Bild --> Gemini (gissar kontokoder) --> Inline matchning (enkel keyword) --> Resultat
+```
+
+Nytt flode:
+
+```text
+Bild --> fetchUserData --> buildFinancialSnapshot
+     --> Gemini (med snapshot i prompt, gissar battre) --> matchSingleTransaction per rad --> Resultat
+```
+
+Gemini far kontexten **innan** den tolkar bilden, sa den kan koppla "sk5566161658" till skattefordran pa 1640 redan i sin gissning. Sedan validerar template-matchern resultatet mot mallbiblioteket.
+
+## Skattemallar (databasmigration)
+
+Tre nya systemmallar:
+- **Skatteaterbetalning fran Skatteverket**: Debet 1930 / Kredit 1640, keywords: `['skatteverket', 'aterbetalning', 'sk55', 'preliminarskatt']`, momsfri
+- **Inbetalning preliminarskatt (F-skatt)**: Debet 1640 / Kredit 1930, keywords: `['preliminarskatt', 'f-skatt', 'debiterad skatt']`, momsfri
+- **Slutlig skatt**: Debet 2510 / Kredit 1930, keywords: `['slutlig skatt', 'kvarskatt', 'restskatt']`, momsfri
+
+## Vad detta ger oss
+
+- **Ingen duplicering**: En andring i template-matchning eller kontext syns overallt
+- **Generellt**: Framtida importformat (CSV, SIE) importerar fran samma `_shared/`
+- **Kontextmedvetet**: AI:n ser alltid anvandarens bokforingsstatus, oavsett kanal
+- **Utbyggbart**: Nya monsterregler (lon, amortering) laggs till i _shared utan att rora enskilda funktioner
 
