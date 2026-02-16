@@ -155,7 +155,8 @@ serve(async (req) => {
             requiredFields,
             intent.extracted_data,
             conversationHistory,
-            match.template.template_name
+            match.template.template_name,
+            message
           );
 
           if (!fieldResult.complete) {
