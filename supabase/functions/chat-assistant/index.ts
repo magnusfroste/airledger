@@ -187,6 +187,17 @@ serve(async (req) => {
 
       case 'confirm_booking': {
         if (conversationHistory?.length) {
+          // Check if the last AI message was a year-end checklist or guide — route to full AI
+          const lastAiMessage = [...(conversationHistory || [])].reverse().find(
+            (msg: ConversationMessage) => msg.sender === 'ai'
+          );
+          if (lastAiMessage && (lastAiMessage.content.includes('årsbokslut') || lastAiMessage.content.includes('Checklista') || lastAiMessage.content.includes('bokslutet steg'))) {
+            console.log('Confirm in year-end context — routing to full AI for guided flow');
+            const fullContext = buildBookkeepingContext(userData);
+            aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+            break;
+          }
+
           // Find the last booking proposal in conversation
           const lastProposal = [...(conversationHistory || [])].reverse().find(
             (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('Bokföringsförslag')
