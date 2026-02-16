@@ -1,11 +1,14 @@
 import { useSubscription } from "@/hooks/useSubscription";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import SubscriptionCard from "@/components/SubscriptionCard";
+import AdminCreditManager from "@/components/AdminCreditManager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
 
 export default function Subscription() {
   const { subscription, usage, loading, error, refresh } = useSubscription();
+  const { isAdmin } = useAdminRole();
 
   if (loading) {
     return (
@@ -79,6 +82,9 @@ export default function Subscription() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Admin Credit Manager */}
+        {isAdmin && <AdminCreditManager />}
       </div>
     </div>
   );
