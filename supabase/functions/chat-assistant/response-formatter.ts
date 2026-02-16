@@ -67,6 +67,46 @@ export function formatConfirmation(
   return response;
 }
 
+export function formatFollowUpSuggestion(
+  followUpTemplate: any,
+  accountBalances?: Array<{ account_code: string; account_name: string; balance: number }>
+): string {
+  let response = `\n---\n\n💡 **Uppföljning: ${followUpTemplate.template_name}**\n`;
+  response += `${followUpTemplate.description}\n\n`;
+
+  // Show relevant account balances
+  if (accountBalances?.length && followUpTemplate.template_entries) {
+    const relevantCodes = new Set<string>();
+    for (const entry of followUpTemplate.template_entries) {
+      if (entry.account_code) relevantCodes.add(entry.account_code);
+    }
+
+    const relevant = accountBalances.filter(ab => relevantCodes.has(ab.account_code));
+    if (relevant.length > 0) {
+      response += `**Aktuella saldon:**\n`;
+      for (const ab of relevant) {
+        response += `• ${ab.account_code} ${ab.account_name}: ${ab.balance.toLocaleString('sv-SE')} kr\n`;
+      }
+      response += `\n`;
+    }
+  }
+
+  // Show what the template would book
+  if (followUpTemplate.template_entries) {
+    response += `| Konto | Debet | Kredit |\n`;
+    response += `|-------|-------|--------|\n`;
+    for (const entry of followUpTemplate.template_entries) {
+      const debit = entry.type === 'debit' ? '✓' : '';
+      const credit = entry.type === 'credit' ? '✓' : '';
+      response += `| ${entry.account_code} ${entry.account_name} | ${debit} | ${credit} |\n`;
+    }
+    response += `\n`;
+  }
+
+  response += `Vill du bokföra detta? Ange beloppet så skapar jag förslaget.`;
+  return response;
+}
+
 export function formatClarificationRequest(question: string): string {
   return `❓ ${question}`;
 }

@@ -16,6 +16,7 @@ interface Template {
   description: string;
   category: string;
   keywords: string[] | null;
+  follow_up_templates: string[] | null;
   template_entries: any;
   is_system_template: boolean;
   usage_count: number | null;
@@ -33,6 +34,7 @@ const AdminTemplates = () => {
     description: '',
     category: '',
     keywords: '',
+    follow_up_templates: '',
     template_entries: '',
   });
 
@@ -56,7 +58,7 @@ const AdminTemplates = () => {
 
   const openCreate = () => {
     setEditingTemplate(null);
-    setForm({ template_name: '', description: '', category: '', keywords: '', template_entries: '[]' });
+    setForm({ template_name: '', description: '', category: '', keywords: '', follow_up_templates: '', template_entries: '[]' });
     setDialogOpen(true);
   };
 
@@ -67,6 +69,7 @@ const AdminTemplates = () => {
       description: t.description,
       category: t.category,
       keywords: (t.keywords || []).join(', '),
+      follow_up_templates: (t.follow_up_templates || []).join(', '),
       template_entries: JSON.stringify(t.template_entries, null, 2),
     });
     setDialogOpen(true);
@@ -76,12 +79,14 @@ const AdminTemplates = () => {
     try {
       const entries = JSON.parse(form.template_entries);
       const keywords = form.keywords.split(',').map(k => k.trim()).filter(Boolean);
+      const followUps = form.follow_up_templates.split(',').map(k => k.trim()).filter(Boolean);
 
       const payload = {
         template_name: form.template_name,
         description: form.description,
         category: form.category,
         keywords,
+        follow_up_templates: followUps.length > 0 ? followUps : null,
         template_entries: entries,
         is_system_template: true,
         user_id: '00000000-0000-0000-0000-000000000000',
@@ -187,6 +192,10 @@ const AdminTemplates = () => {
             <div>
               <Label>Nyckelord (kommaseparerade)</Label>
               <Input value={form.keywords} onChange={e => setForm(f => ({ ...f, keywords: e.target.value }))} placeholder="hyra, lokal, kontor" />
+            </div>
+            <div>
+              <Label>Uppföljningsmallar (kommaseparerade mallnamn)</Label>
+              <Input value={form.follow_up_templates} onChange={e => setForm(f => ({ ...f, follow_up_templates: e.target.value }))} placeholder="Slutlig skatt, Momsbetalning" />
             </div>
             <div>
               <Label>Bokföringsposter (JSON)</Label>

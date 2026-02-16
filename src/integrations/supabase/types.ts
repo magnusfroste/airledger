@@ -228,6 +228,7 @@ export type Database = {
           category: string
           created_at: string
           description: string
+          follow_up_templates: string[] | null
           id: string
           is_system_template: boolean
           keywords: string[] | null
@@ -243,6 +244,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string
+          follow_up_templates?: string[] | null
           id?: string
           is_system_template?: boolean
           keywords?: string[] | null
@@ -258,6 +260,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string
+          follow_up_templates?: string[] | null
           id?: string
           is_system_template?: boolean
           keywords?: string[] | null
