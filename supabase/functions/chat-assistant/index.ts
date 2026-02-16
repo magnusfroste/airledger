@@ -80,6 +80,43 @@ serve(async (req) => {
     const intent = await classifyIntent(message, templateNames, lovableApiKey);
     console.log('Intent:', intent.intent, 'confidence:', intent.confidence);
 
+    // === PRE-ROUTING: Check if we're in a year-end guided flow ===
+    // If the last AI message is about årsbokslut, route ALL replies to full AI for continuity
+    const isYearEndContext = (() => {
+      if (!conversationHistory?.length) return false;
+      const lastAiMsg = [...conversationHistory].reverse().find(
+        (msg: ConversationMessage) => msg.sender === 'ai'
+      );
+      if (!lastAiMsg) return false;
+      return lastAiMsg.content.includes('årsbokslut') || 
+             lastAiMsg.content.includes('Checklista') || 
+             lastAiMsg.content.includes('bokslutet steg') ||
+             lastAiMsg.content.includes('Avskrivningar') ||
+             lastAiMsg.content.includes('Periodiseringar') ||
+             lastAiMsg.content.includes('Skatteavsättning') ||
+             lastAiMsg.content.includes('Bokslutssammanfattning');
+    })();
+
+    if (isYearEndContext && !message.match(/^(boka |bokför |köpt |betala |faktura )/i)) {
+      console.log('Year-end context detected — routing to full AI for guided flow');
+      const fullContext = buildBookkeepingContext(userData);
+      const aiResp = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          response: aiResp,
+          intent: 'year_end',
+          confidence: intent.confidence,
+          context_used: true,
+          quota_info: {
+            subscription_tier: quotaCheck.subscription_tier,
+            usage: quotaCheck.usage,
+          },
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // === PRE-ROUTING: Check if user is answering a field collection question ===
     // Only resume field collection if:
     // 1. There IS an active field context in the last AI message
