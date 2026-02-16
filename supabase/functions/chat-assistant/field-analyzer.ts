@@ -75,8 +75,9 @@ export function analyzeRequiredFields(
     }
   }
 
-  // Check which fields are still missing
+  // Check which fields are still missing (skip calc-only fields — they're auto-computed)
   for (const field of requiredFields) {
+    if (field.calc) continue; // Auto-calculated, not user-provided
     if (!(field.key in fieldValues)) {
       return {
         complete: false,
