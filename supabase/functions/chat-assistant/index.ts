@@ -81,19 +81,25 @@ serve(async (req) => {
     console.log('Intent:', intent.intent, 'confidence:', intent.confidence);
 
     // === PRE-ROUTING: Check if user is answering a field collection question ===
-    // If so, override intent to continue the template flow regardless of classification
+    // Only resume field collection if:
+    // 1. There IS an active field context in the last AI message
+    // 2. The intent classifier did NOT already find a specific template match
+    // 3. The message looks like a simple answer (not a full new booking request)
     const activeFieldContext = extractFieldContext(conversationHistory);
-    if (activeFieldContext) {
-      console.log('Active field collection detected for template:', activeFieldContext);
-      // Force into booking flow so field-analyzer can process the answer
-      if (!['book_expense', 'book_sale', 'book_payment', 'confirm_booking'].includes(intent.intent)) {
-        intent.intent = 'book_expense'; // Route into booking flow
-      }
-      intent.matched_template_hint = activeFieldContext;
-      // Try to extract amount from the raw message
-      const parsedAmount = parseSimpleAmount(message);
-      if (parsedAmount !== null) {
-        intent.extracted_data.amount = parsedAmount;
+    if (activeFieldContext && !intent.matched_template_hint) {
+      const isSimpleAnswer = message.trim().split(/\s+/).length <= 5 || parseSimpleAmount(message) !== null;
+      if (isSimpleAnswer) {
+        console.log('Resuming field collection for template:', activeFieldContext);
+        if (!['book_expense', 'book_sale', 'book_payment', 'confirm_booking'].includes(intent.intent)) {
+          intent.intent = 'book_expense';
+        }
+        intent.matched_template_hint = activeFieldContext;
+        const parsedAmount = parseSimpleAmount(message);
+        if (parsedAmount !== null) {
+          intent.extracted_data.amount = parsedAmount;
+        }
+      } else {
+        console.log('Ignoring old field context — new booking request detected');
       }
     }
 
@@ -119,16 +125,12 @@ serve(async (req) => {
         }
 
         // Check if previous AI message was asking about a specific template
-        // (either legacy "Jag hittade mallen" or new field marker format)
-        if (conversationHistory?.length) {
+        // Only use this fallback if intent classifier didn't already find a template
+        if (!intent.matched_template_hint && conversationHistory?.length) {
           const lastAiMsg = [...conversationHistory].reverse().find(
-            (msg: ConversationMessage) => msg.sender === 'ai' && (
-              msg.content.includes('Jag hittade mallen') ||
-              msg.content.includes('<!-- field:')
-            )
+            (msg: ConversationMessage) => msg.sender === 'ai'
           );
           if (lastAiMsg) {
-            // Try field marker first
             const fieldMarker = lastAiMsg.content.match(/<!-- field:(\w+) template:(.+?) -->/);
             if (fieldMarker) {
               console.log('Resuming field collection for template:', fieldMarker[2]);
