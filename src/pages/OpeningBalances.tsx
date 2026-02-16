@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Edit, Trash2, Calculator, TrendingUp, TrendingDown, Download, Upload, FileSpreadsheet, Info } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Edit, Trash2, Calculator, TrendingUp, TrendingDown, Download, Upload, FileSpreadsheet, Info, ClipboardPaste } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +40,7 @@ const OpeningBalances = () => {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importLoading, setImportLoading] = useState(false);
+  const [pasteText, setPasteText] = useState('');
   
   const { user } = useAuth();
   const { toast } = useToast();
@@ -508,22 +511,65 @@ const OpeningBalances = () => {
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <FileSpreadsheet className="h-5 w-5" />
-                    Importera ingående balanser från CSV
+                    Importera ingående balanser
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="csvFile">Välj CSV-fil</Label>
-                    <Input
-                      id="csvFile"
-                      type="file"
-                      accept=".csv"
-                      onChange={handleFileSelect}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      CSV-filen måste innehålla kolumnerna: account_code, account_name, opening_balance, balance_type
-                    </p>
-                  </div>
+                  <Tabs defaultValue="file" onValueChange={() => setImportPreview([])}>
+                    <TabsList className="w-full">
+                      <TabsTrigger value="file" className="flex-1 gap-1.5">
+                        <Upload className="h-3.5 w-3.5" />
+                        Ladda upp fil
+                      </TabsTrigger>
+                      <TabsTrigger value="paste" className="flex-1 gap-1.5">
+                        <ClipboardPaste className="h-3.5 w-3.5" />
+                        Klistra in data
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="file">
+                      <div className="space-y-2">
+                        <Label htmlFor="csvFile">Välj CSV-fil</Label>
+                        <Input
+                          id="csvFile"
+                          type="file"
+                          accept=".csv"
+                          onChange={handleFileSelect}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          CSV-filen måste innehålla kolumnerna: account_code, account_name, opening_balance, balance_type
+                        </p>
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="paste">
+                      <div className="space-y-2">
+                        <Label htmlFor="csvPaste">Klistra in CSV-data</Label>
+                        <Textarea
+                          id="csvPaste"
+                          value={pasteText}
+                          onChange={(e) => setPasteText(e.target.value)}
+                          placeholder={`account_code,account_name,opening_balance,balance_type\n1510,Kundfordringar,25000,debit\n1930,Företagskonto,150000,debit\n2440,Leverantörsskulder,30000,credit`}
+                          className="min-h-[140px] font-mono text-xs"
+                        />
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            Kopiera från Google Sheets, Excel eller textfil
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              if (pasteText.trim()) {
+                                parseCSVForPreview(pasteText);
+                              }
+                            }}
+                            disabled={!pasteText.trim()}
+                          >
+                            Förhandsgranska
+                          </Button>
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
                 
                 {importPreview.length > 0 && (
                   <div className="space-y-4">
@@ -586,6 +632,7 @@ const OpeningBalances = () => {
                     setImportDialogOpen(false);
                     setImportFile(null);
                     setImportPreview([]);
+                    setPasteText('');
                   }}>
                     Avbryt
                   </Button>
