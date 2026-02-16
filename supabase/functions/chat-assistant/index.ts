@@ -595,11 +595,12 @@ function buildMessages(message: string, conversationHistory: ConversationMessage
 function extractFieldContext(conversationHistory: ConversationMessage[] | undefined): string | null {
   if (!conversationHistory?.length) return null;
 
+  // Only check the LAST AI message for active field collection
   const lastAiMsg = [...conversationHistory].reverse().find(
-    (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('<!-- field:')
+    (msg: ConversationMessage) => msg.sender === 'ai'
   );
 
-  if (lastAiMsg) {
+  if (lastAiMsg && lastAiMsg.content.includes('<!-- field:')) {
     const match = lastAiMsg.content.match(/<!-- field:\w+ template:(.+?) -->/);
     return match ? match[1] : null;
   }
