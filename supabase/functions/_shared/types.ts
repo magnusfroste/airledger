@@ -89,6 +89,24 @@ export interface BookingProposal {
   description: string;
 }
 
+// Required field definition for template-driven data collection
+export interface RequiredField {
+  key: string;
+  label: string;
+  prompt: string;
+  type: 'amount' | 'text' | 'date';
+  maps_to_entry?: number;
+  calc?: string; // e.g. "acquisition_value - selling_price"
+}
+
+export interface FieldAnalysisResult {
+  complete: boolean;
+  fieldValues: Record<string, number | string>;
+  nextQuestion?: string;
+  nextFieldKey?: string;
+  templateName?: string;
+}
+
 // Bank statement transaction (used by analyze-bank-statement)
 export interface BankTransaction {
   date: string;

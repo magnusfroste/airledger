@@ -11,4 +11,6 @@ export {
   type TemplateMatch,
   type BookingProposal,
   type BankTransaction,
+  type RequiredField,
+  type FieldAnalysisResult,
 } from '../_shared/types.ts';
