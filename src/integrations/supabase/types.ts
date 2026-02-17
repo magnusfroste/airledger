@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_logs: {
+        Row: {
+          action_taken: string | null
+          agent_name: string
+          consulted_agents: string[] | null
+          created_at: string | null
+          error_message: string | null
+          execution_time_ms: number
+          id: string
+          intent: string
+          success: boolean | null
+          user_id: string
+        }
+        Insert: {
+          action_taken?: string | null
+          agent_name: string
+          consulted_agents?: string[] | null
+          created_at?: string | null
+          error_message?: string | null
+          execution_time_ms: number
+          id?: string
+          intent: string
+          success?: boolean | null
+          user_id: string
+        }
+        Update: {
+          action_taken?: string | null
+          agent_name?: string
+          consulted_agents?: string[] | null
+          created_at?: string | null
+          error_message?: string | null
+          execution_time_ms?: number
+          id?: string
+          intent?: string
+          success?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       airledger_chart_of_accounts: {
         Row: {
           account_category: string
