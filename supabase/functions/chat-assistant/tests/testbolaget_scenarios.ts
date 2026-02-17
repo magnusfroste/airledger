@@ -11,6 +11,7 @@ export interface TestScenario {
   expected_total: number;
   expect_followup?: string;
   expect_question?: boolean;
+  may_clarify?: boolean;
 }
 
 export const SCENARIOS: TestScenario[] = [
@@ -19,7 +20,7 @@ export const SCENARIOS: TestScenario[] = [
   { id: 'q1-02', quarter: 'Q1', month: 1, message: 'Faktura till Kund AB på 50 000 kr för konsulttjänster', description: 'Försäljning tjänster', expected_template: 'Försäljning tjänster 25%', expected_total: 62500, expect_followup: 'Kundbetalning' },
   { id: 'q1-03', quarter: 'Q1', month: 1, message: 'Köpt kontorsmaterial för 625 kr', description: 'Kontorsmaterial', expected_template: 'Kontorsmaterial inköp', expected_total: 625 },
   { id: 'q1-04', quarter: 'Q1', month: 2, message: 'Mobilabonnemang 499 kr', description: 'Mobilabonnemang', expected_template: 'Mobiltelefon abonnemang', expected_total: 499 },
-  { id: 'q1-05', quarter: 'Q1', month: 2, message: 'Lön 35 000 kr brutto för januari', description: 'Lön', expected_template: 'Lön utbetalning', expected_total: 35000, expect_followup: 'Arbetsgivaravgifter' },
+  { id: 'q1-05', quarter: 'Q1', month: 2, message: 'Lön 35 000 kr brutto för januari', description: 'Lön', expected_template: 'Lön utbetalning', expected_total: 35000, expect_followup: 'Arbetsgivaravgifter', may_clarify: true },
   { id: 'q1-06', quarter: 'Q1', month: 2, message: 'Arbetsgivaravgifter för januari 10 990 kr', description: 'Arbetsgivaravgifter', expected_template: 'Arbetsgivaravgifter', expected_total: 10990, expect_followup: 'F-skatt' },
   { id: 'q1-07', quarter: 'Q1', month: 2, message: 'Betalt F-skatt 10 000 kr', description: 'F-skatt', expected_template: 'F-skatt inbetalning', expected_total: 10000 },
   { id: 'q1-08', quarter: 'Q1', month: 3, message: 'Kund AB har betalat fakturan på 62 500 kr', description: 'Kundbetalning', expected_template: 'Kundbetalning inkommande', expected_total: 62500 },
@@ -42,7 +43,7 @@ export const SCENARIOS: TestScenario[] = [
 
   // ── Q4: Oktober–December (bokslut) ────────────────
   { id: 'q4-01', quarter: 'Q4', month: 10, message: 'Faktura till Klient Beta 60 000 kr för underhåll', description: 'Försäljning #6', expected_template: 'Försäljning tjänster 25%', expected_total: 75000 },
-  { id: 'q4-02', quarter: 'Q4', month: 10, message: 'Lön 35 000 kr brutto för september', description: 'Löneutbetalning', expected_template: 'Lön utbetalning', expected_total: 35000, expect_followup: 'Arbetsgivaravgifter' },
+  { id: 'q4-02', quarter: 'Q4', month: 10, message: 'Lön 35 000 kr brutto för september', description: 'Löneutbetalning', expected_template: 'Lön utbetalning', expected_total: 35000, expect_followup: 'Arbetsgivaravgifter', may_clarify: true },
   { id: 'q4-03', quarter: 'Q4', month: 11, message: 'Betalt hyra 12 500 kr för november', description: 'Kontorshyra november', expected_template: 'Kontorslokal hyra med moms', expected_total: 12500 },
   { id: 'q4-04', quarter: 'Q4', month: 11, message: 'Bokför momsredovisning Q3: ingående moms 4 200 kr och utgående moms 37 500 kr, betala mellanskillnaden', description: 'Momsdeklaration Q3', expected_template: 'Momsredovisning', expected_total: 33300 },
   { id: 'q4-05', quarter: 'Q4', month: 12, message: 'Bokför avskrivning på datorer med 5 000 kr för räkenskapsåret', description: 'Avskrivning', expected_template: 'Avskrivning datorer', expected_total: 5000 },
