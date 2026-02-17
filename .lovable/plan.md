@@ -1,187 +1,153 @@
 
-# AirLedger AI -- Fullstandig Systemanalys och Vagkarta
 
-## 1. Nuvarande Arkitektur (Inventering)
+# Live Demo: "Testbolaget AB -- Ett helt bokforingsår"
 
-### 1.1 Backend: Agent-Orkestrator-Modell
+## Oversikt
+
+Skapa ett dubbelanvandnings-system:
+1. **Backend-testsvit** (Deno) -- for kvalitetssakring, kor tyst, ger pass/fail
+2. **Frontend demo-mode** -- spelar upp scenarierna i det riktiga chattgranssnittet sa besokare (och teamet) ser Air bokfora i realtid
+
+Bada delar anvander samma scenariodata.
+
+---
+
+## Arkitektur
 
 ```text
-Anvandare
-   |
-   v
-[chat-assistant/index.ts] -- Orkestrator
-   |
-   +-- classifyIntent() --> AI-baserad intent-klassificering
-   |
-   +-- routeToAgent() --> Agent Registry
-   |       |
-   |       +-- BookingAgent   (book_expense, book_sale, book_payment, confirm_booking, opening_balance)
-   |       +-- ReportingAgent (vat_report, account_balance, period_reconciliation, year_end, view_report)
-   |       +-- AdvisoryAgent  (ask_question, analyze_image, unknown)
-   |       +-- DynamicAgent   (admin-konfigurerade via agent_config-tabell)
-   |
-   +-- logAgentExecution() --> agent_logs (asynkront)
+testbolaget_scenarios.ts (delad data)
+       |
+       +---> Deno-tester (backend, verifierar korrekthet)
+       |
+       +---> DemoRunner (frontend, visuell uppspelning i chatten)
 ```
 
-### 1.2 Dataflode vid Bokning
+## Del 1: Scenariodata (delad)
+
+**Ny fil:** `src/data/testbolaget-scenarios.ts`
+
+En array med ~35 scenarier, grupperade per kvartal:
 
 ```text
-Anvandardinput
-   |
-   v
-Intent Classifier (AI + Function Calling)
-   |
-   v
-Template Matcher (4 steg: exakt -> kategori -> nyckelord -> beloppoverride)
-   |
-   +-- Mall hittad --> Field Analyzer --> Proposal --> Bekraftelse --> use-transaction-template (edge fn)
-   |
-   +-- Ingen mall --> Freeform AI --> save-general-transaction (edge fn)
+interface DemoScenario {
+  id: string
+  quarter: string          // "Q1", "Q2", "Q3", "Q4"
+  month: number
+  message: string          // Meddelandet som skickas till Air
+  description: string      // Kort forklaring for publiken ("Hyra for kontoret")
+  expected_template: string // For backend-test: forvantad mall
+  expected_total: number   // For backend-test: forvantad totalsumma
+}
 ```
 
-### 1.3 Kontextlager (vad AI:n "vet")
-
-| Kontextkalla | Data | Injiceras var |
-|---|---|---|
-| Profil | Foretagsnamn, bransch | buildBookkeepingContext |
-| Mallar (103 st, 22 kategorier) | Namn, poster, nyckelord | buildLightContext + buildBookkeepingContext |
-| Senaste transaktioner (20 st) | Datum, beskrivning, belopp | buildBookkeepingContext |
-| BAS-kontoplan (1222 konton) | Koder, namn, typ, normalbalans | buildBookkeepingContext |
-| Ingaende balanser | Konto, belopp, typ | buildBookkeepingContext |
-| Momsammanfattning | Utg/Ing/Netto for kvartalet | buildBookkeepingContext |
-| Kontosaldon (Financial Snapshot) | IB + debet - kredit per konto | buildFinancialSnapshot |
-| Leverantorsmonster (NY) | Vendor -> mall, snittbelopp, frekvens | buildBookkeepingContext |
-| Mallpreferenser (NY) | Mest anvanda mallar | buildBookkeepingContext |
-
-### 1.4 Valideringsmekanismer (befintliga)
-
-| Kontroll | Plats | Typ |
-|---|---|---|
-| Debet = Kredit | save-general-transaction | Hard (blockerar) |
-| Kontokod existerar i BAS | save-general-transaction | Hard (blockerar) |
-| Dubblettskydd (5 min) | save-general-transaction | Hard (returnerar befintlig) |
-| Negativa belopp | save-general-transaction | Hard (blockerar) |
-| Beloppbaserade overrides | template-matcher (prisbasbelopp) | Auto-switch mall |
-| DB-drivna varningsregler | template-matcher (warning_rules) | Soft (visas i forslag) |
-| In-memory deduplicering | deduplication.ts | Per edge function-anrop |
-
-### 1.5 Frontend-struktur
-
-| Sida | Funktion |
-|---|---|
-| / (LandingPage) | Landning, demo-chatt |
-| /chat | Huvudgranssnitt -- AI-konversation |
-| /transactions | Transaktionslista |
-| /templates | Mallhantering |
-| /reports | Resultatrakning |
-| /balance-sheet | Balansrakning |
-| /general-ledger | Huvudbok |
-| /opening-balances | Ingaende balanser |
-| /settings | Installningar + profil |
-| /subscription | Prenumerationshantering |
-| /admin | Admin (AI-provider, prompter, agenter, mallar, varningsregler, SEO, anvandare) |
-
-### 1.6 Edge Functions (14 st)
-
-| Funktion | Syfte |
-|---|---|
-| chat-assistant | Orkestrator + agenter |
-| analyze-receipt | Kvittoanalys (vision) |
-| analyze-bank-statement | Bankutdragstolkning (vision) |
-| classify-document | Dokumentklassificering |
-| save-transaction | Enkel transaktion |
-| save-general-transaction | Komplex transaktion (fria poster) |
-| use-transaction-template | Mallbaserad transaktion |
-| save-opening-balance | Ingaende balanser |
-| import-bas-accounts | Kontoplansimport |
-| check-subscription | Prenumerationskontroll |
-| create-checkout / customer-portal | Stripe-integration |
-| export-templates / import-templates / validate-templates | Mallhantering |
-| voice-to-text | Rostigenkanning |
-| get-seo-settings | SEO-metadata |
+Scenarierna inkluderar:
+- Q1: Hyra, forsaljning, kontorsmaterial, lon, F-skatt, kundbetalning
+- Q2: Momsredovisning, laptop, tjansteresa, hotell
+- Q3: Forsakring, friskvard, representation
+- Q4: Bokslut -- avskrivning, upplupna kostnader, periodiseringsfond, skatteavsattning
+- Kantfall: utan belopp, dubbletter, kreditfaktura
 
 ---
 
-## 2. Identifierade Gap och Prioriteringar
+## Del 2: Frontend Demo Runner
 
-### GAP 1: Mallbiblioteket ar underutnyttjat (HOGSTA PRIORITET)
+### Ny komponent: `DemoRunner.tsx`
 
-**Problem:** 103 mallar finns, men bara 1 har `required_fields` och bara 1 har `follow_up_templates`. Det innebar att:
-- 102 mallar behandlar allt som ett enda belopp -- trots att manga transaktioner har flera datapunkter (t.ex. forsaljning av inventarier kraver bade anskaffningsvarde och forsaljningspris)
-- Foljdtransaktioner (t.ex. "betala moms efter momsrapport") ar nastan helt oaktiverade
+En kontrollpanel som injiceras i ChatInterface nar demo-mode ar aktivt:
 
-**Atgard:** Systematiskt berika nyckelmallar med `required_fields` och `follow_up_templates`. Detta gor AI:n smartare utan att andra en enda rad kod -- det ar ren data.
+**Funktionalitet:**
+- **Play/Pause-knapp** -- startar/pausar uppspelningen
+- **Hastighetsvaljare** -- "Snabb" (2s), "Normal" (4s), "Steg-for-steg" (manuellt)
+- **Kvartalshopp** -- hoppa direkt till Q1/Q2/Q3/Q4
+- **Framstegsindikaor** -- "Scenario 7 av 35 -- Q1 Mars"
+- **Resultatsammanfattning** -- efter varje kvartal visas en liten sammanfattning
 
-**Specifika mallar att berika:**
-- Forsaljning med moms-mallar (behoer required_fields for att skilja netto/brutto)
-- Lonetransaktioner (bruttolo, skatt, arbetsgivaravgifter)
-- Boksluts-mallar (follow_up_templates: avskrivning -> periodisering -> skatteavsattning)
-- Skattetransaktioner (follow_up_templates mellan F-skatt, slutlig skatt, skattekonto)
+### Flode:
 
-### GAP 2: Konversationshistoriken skickas men lagras fragmenterat
+1. Anvandaren aktiverar demo-mode (via URL-parameter `?demo=testbolaget` eller en knapp)
+2. DemoRunner visar en introduktionsruta: "Testbolaget AB -- IT-konsult, omsattning 1,2 MSEK"
+3. For varje scenario:
+   a. Visar en liten etikett: "Q1 Januari -- Kontorshyra"
+   b. Skickar meddelandet till den riktiga `chat-assistant` edge function
+   c. Renderar svaret i chatten (precis som vanligt)
+   d. Vantar 3-4 sekunder (konfigurerbart)
+   e. Gar vidare till nasta scenario
+4. Mellan kvartalen visas en sammanfattning: "Q1 klart -- 8 transaktioner bokforda, 127 500 kr omsattning"
+5. Efter Q4 visas slutsammanfattning med arsbokslut
 
-**Problem:** Chatten sparar meddelanden i `airledger_messages` med `conversation_id`, men:
-- Bara de 20 senaste transaktionerna injiceras i kontexten
-- AI:n har ingen "minne" av vad den gjort -- om en session avbryts och aterupptas, tappar den traden
-- Konversationshistoriken skickas fran frontend, inte fran databasen
+### Integration med ChatInterface:
 
-**Atgard:** Forbattra kontextbyggaren att inkludera en kort sammanfattning av senaste konversationens bokningsaktivitet ("Du har bokfort 3 transaktioner idag: hyra 8000kr, el 1200kr, telefon 450kr").
+```text
+ChatInterface
+  |
+  +-- [demo-mode aktiv?]
+  |     |
+  |     +-- DemoRunner (kontrollpanel overst)
+  |     |     +-- Play/Pause, hastighet, framsteg
+  |     |
+  |     +-- MessageList (vanlig rendering av meddelanden)
+  |     +-- InputArea (doljs eller inaktiveras under demo)
+  |
+  +-- [vanlig mode]
+        +-- MessageList + InputArea (som idag)
+```
 
-### GAP 3: Token-effektivitet -- hela kontoplanen skickas
+### Aktivering:
 
-**Problem:** `buildBookkeepingContext` skickar alla 1222 BAS-konton till AI:n. Det ar ca 6000+ tokens som nistan aldrig behovs. AI:n anvander mallar for kontering, inte ra kontokoder.
-
-**Atgard:** Skicka bara konton som faktiskt forekommit i anvandarens transaktioner + konton i aktiva mallar. Sparar ca 80% av kontokontexten.
-
-### GAP 4: Freeform-bokning ar en svag punkt
-
-**Problem:** Nar ingen mall matchar, skickar booking-agent hela kontexten till AI:n och later den "skriva" poster fritt. Detta ar den enda vagen dar AI-hallucinationer kan leda till felaktiga kontokoder. Valideringen i `save-general-transaction` fangar ogiltiga koder, men inte "rimliga men fel" koder.
-
-**Atgard:** Nar freeform-bokning sker, logga att ingen mall matchade och flagga det i admin-panelen sa att en administrator kan skapa ratt mall. Over tid minskar freeform-fallen till nara noll.
-
-### GAP 5: Saknar proaktivitet
-
-**Problem:** Air reagerar bara -- den tar aldrig initiativ. En autonom assistent borde kunna saga "Du har 3 obetalda leverantorsfakturor som forfollar inom 7 dagar" nar anvandaren oppnar chatten.
-
-**Atgard:** Lagg till en "startup check" i orkestratorn som analyserar anvandardata vid sessionstart och genererar proaktiva forslag.
-
----
-
-## 3. Prioriterad Vagkarta
-
-### Fas 1: Data-enrichment (ingen kodandring kravs)
-- Berika 15-20 nyckelmallar med `required_fields`
-- Lagg till `follow_up_templates` for boksluts- och skattekedjan
-- Lagg till fler nyckelord pa mallar med laga traff
-
-### Fas 2: Optimera kontexten (sma kodandringar, stor effekt)
-- Filtrera BAS-kontoplanen till bara relevanta konton
-- Lagg till sessionssammanfattning ("du har bokfort X idag")
-- Logga freeform-fall for mallutveckling
-
-### Fas 3: Proaktiv assistent
-- Startup-analys: forfallna fakturor, momsfrist, onormala saldon
-- Snabbforslag baserat pa leverantorsmonster
-
-### Fas 4: Multi-step planner (bokslut)
-- Bryt ner "gor mitt bokslut" till automatiska delsteg
-- Human-in-the-loop bekraftelse per steg
-- Follow-up-chains for hela bokslutscykeln
+- **URL-parameter:** `/chat?demo=testbolaget` -- for saljdemos
+- **Admin-knapp:** I admin-panelen, en "Kor demo"-knapp
+- **Landing page:** Ersatt (eller komplettera) nuvarande DemoChat med en "Se Air i aktion"-knapp som oppnar demo-mode
 
 ---
 
-## 4. Teknisk Sammanfattning
+## Del 3: Backend-testsvit (Deno)
 
-| Dimension | Status | Mognad |
-|---|---|---|
-| Agentarkitektur (orkestrator + specialister) | Komplett | Hog |
-| Mallbibliotek (103 mallar, 22 kategorier) | Strukturellt komplett, data ej berikad | Medel |
-| Intent-klassificering (AI + function calling) | Fungerar bra | Hog |
-| Kontextmedvetenhet (financial snapshot, leverantorsmonster) | Nyligen forbattrad | Medel |
-| Validering (debet=kredit, kontokoder, dubbletter) | Robust pa edge function-niva | Hog |
-| Observabilitet (agent_logs, admin dashboard) | Grundlaggande | Medel |
-| Proaktivitet | Saknas helt | Lag |
-| Token-effektivitet | Ineffektiv (hela kontoplanen) | Lag |
-| Freeform-fallback | Funktionell men okontrollerad | Lag |
+**Nya filer:**
+- `supabase/functions/chat-assistant/tests/testbolaget_scenarios.ts` -- kopia av scenariodata (Deno-kompatibel)
+- `supabase/functions/chat-assistant/tests/testbolaget_test.ts` -- testfilen
 
-**Slutsats:** Den storsta forbattringen av Air:s formaga uppnas genom att berika befintliga mallar med `required_fields` och `follow_up_templates` -- det ar ren dataforandring som omedelbart gor AI:n smartare, utan att rora en rad kod. Fas 2 (kontextoptimering) ar nast viktigast for bade kvalitet och kostnad.
+### Vad testerna verifierar:
+
+For varje scenario:
+1. **Anropa edge function** med scenariots meddelande
+2. **Kontrollera intent** -- ratt intent returneras
+3. **Parsa bokforingsforslaget** ur AI-svaret
+4. **Verifiera balansering** -- summa debet === summa kredit
+5. **Verifiera totalbelopp** -- overensstammer med forvantning
+6. **Kontrollera follow-up** -- om scenario har forvantad follow-up, kontrollera att den namns
+
+### Begransningar:
+
+- Testerna kor mot den deployade edge function (integrationstester)
+- Kraver autentisering (testanvandare)
+- AI-svar ar icke-deterministiska, sa vi testar struktur och matematik, inte exakt text
+
+---
+
+## Del 4: Implementationsordning
+
+### Steg 1: Scenariodata
+Skapa den delade scenario-arrayen med alla 35 scenarier.
+
+### Steg 2: DemoRunner-komponent
+Bygg den visuella demo-runnern:
+- Play/pause/hastighet
+- Kvartalsetiketter och sammanfattningar
+- Integration med ChatInterface
+
+### Steg 3: Aktiveringsmekanismer
+- URL-parameter-stod i Chat.tsx
+- Eventuell knapp pa landing page
+
+### Steg 4: Backend-tester
+Skapa Deno-testfilen som anvander samma scenarier for automatiserad verifiering.
+
+---
+
+## Sekundara effekter
+
+- **Sales demo**: Visa potentiella kunder hur Air hanterar ett helt ar pa 2 minuter
+- **Regressionstest**: Om en mallandring gar sonder, syns det bade visuellt och i testerna
+- **Onboarding**: Nya anvandare kan kora demon for att forsta hur Air fungerar
+- **Dokumentation**: Scenarierna ar levande dokumentation av alla bokforingsscenarion
+
