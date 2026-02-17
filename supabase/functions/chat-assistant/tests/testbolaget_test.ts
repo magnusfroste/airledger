@@ -23,7 +23,6 @@ import {
 
 const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL") || Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_PUBLISHABLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const TEST_EMAIL = Deno.env.get("TEST_USER_EMAIL");
 const TEST_PASSWORD = Deno.env.get("TEST_USER_PASSWORD");
 
@@ -32,53 +31,22 @@ let accessToken: string | null = null;
 async function getAccessToken(): Promise<string> {
   if (accessToken) return accessToken;
 
+  if (!TEST_EMAIL || !TEST_PASSWORD) {
+    throw new Error("TEST_USER_EMAIL and TEST_USER_PASSWORD must be set in .env");
+  }
+
   const anon = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
+  const { data, error } = await anon.auth.signInWithPassword({
+    email: TEST_EMAIL,
+    password: TEST_PASSWORD,
+  });
 
-  // Strategy 1: Use test credentials directly
-  if (TEST_EMAIL && TEST_PASSWORD) {
-    const { data, error } = await anon.auth.signInWithPassword({
-      email: TEST_EMAIL,
-      password: TEST_PASSWORD,
-    });
-    if (data?.session) {
-      accessToken = data.session.access_token;
-      return accessToken;
-    }
-    throw new Error(`Sign in with TEST_USER creds failed: ${error?.message}`);
+  if (error || !data?.session) {
+    throw new Error(`Sign in failed: ${error?.message}. Register the user first via /auth.`);
   }
 
-  // Strategy 2: Auto-create test user via service role
-  if (SERVICE_ROLE_KEY) {
-    const admin = createClient(SUPABASE_URL!, SERVICE_ROLE_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    const autoEmail = "testbolaget@test.local";
-    const autoPass = "Testbolaget2026!";
-
-    // Try sign in first
-    const { data: signIn } = await anon.auth.signInWithPassword({
-      email: autoEmail, password: autoPass,
-    });
-    if (signIn?.session) {
-      accessToken = signIn.session.access_token;
-      return accessToken;
-    }
-
-    // Create
-    await admin.auth.admin.createUser({
-      email: autoEmail, password: autoPass, email_confirm: true,
-    });
-
-    const { data: newSignIn, error } = await anon.auth.signInWithPassword({
-      email: autoEmail, password: autoPass,
-    });
-    if (error || !newSignIn?.session) throw new Error(`Auto sign in failed: ${error?.message}`);
-    accessToken = newSignIn.session.access_token;
-    return accessToken;
-  }
-
-  throw new Error("No auth strategy available");
+  accessToken = data.session.access_token;
+  return accessToken;
 }
 
 async function callChatAssistant(message: string): Promise<{ response: string; success: boolean }> {
@@ -96,13 +64,13 @@ async function callChatAssistant(message: string): Promise<{ response: string; s
 }
 
 // ── Guard ───────────────────────────────────────────
-const canRun = !!(SUPABASE_URL && SUPABASE_ANON_KEY && (TEST_EMAIL || SERVICE_ROLE_KEY));
+const canRun = !!(SUPABASE_URL && SUPABASE_ANON_KEY && TEST_EMAIL && TEST_PASSWORD);
 
 if (!canRun) {
-  Deno.test("⚠️ Skipping — need TEST_USER_EMAIL+PASSWORD or SERVICE_ROLE_KEY", () => {
+  Deno.test("⚠️ Skipping — set TEST_USER_EMAIL + TEST_USER_PASSWORD in .env", () => {
     console.warn("Available:", {
       url: !!SUPABASE_URL, anon: !!SUPABASE_ANON_KEY,
-      testUser: !!TEST_EMAIL, serviceRole: !!SERVICE_ROLE_KEY,
+      testUser: !!TEST_EMAIL, testPass: !!TEST_PASSWORD,
     });
   });
 } else {
