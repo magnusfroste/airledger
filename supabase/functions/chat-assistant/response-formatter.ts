@@ -5,7 +5,8 @@ export function formatBookingProposal(
   amount: number,
   date: string,
   description?: string,
-  calculatedAmounts?: number[]
+  calculatedAmounts?: number[],
+  followUpNames?: string[]
 ): string {
   const template = match.template;
   const entries = template.template_entries || [];
@@ -43,6 +44,11 @@ export function formatBookingProposal(
       response += `${warning}\n`;
     }
     response += `\n`;
+  }
+
+  // Add follow-up tips if available
+  if (followUpNames?.length) {
+    response += `\n💡 **Tips:** Glöm inte att bokföra ${followUpNames.join(', ')} när det är aktuellt.\n`;
   }
 
   response += `\nSka jag bokföra detta?`;

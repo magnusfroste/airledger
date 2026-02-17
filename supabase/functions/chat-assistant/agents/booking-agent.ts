@@ -179,7 +179,11 @@ export class BookingAgent implements Agent {
       const date = (fieldResult.fieldValues.date as string) || intent.extracted_data.date || new Date().toISOString().split('T')[0];
       const desc = intent.extracted_data.description || intent.extracted_data.vendor || match.template.template_name;
       const totalAmount = calculatedAmounts.reduce((sum, a) => sum + a, 0) / 2;
-      return { response: formatBookingProposal(match, totalAmount, date, desc, calculatedAmounts), action_taken: 'proposed' };
+      
+      // Get follow-up template names for the proposal
+      const followUpNames = await this.getFollowUpTemplateNames(match.template.template_name, supabase);
+      
+      return { response: formatBookingProposal(match, totalAmount, date, desc, calculatedAmounts, followUpNames), action_taken: 'proposed' };
     }
 
     // No template — freeform
@@ -219,6 +223,17 @@ export class BookingAgent implements Agent {
       if (!followUp) return '';
       return formatFollowUpSuggestion(followUp, userData?.accountBalances);
     } catch { return ''; }
+  }
+
+  private async getFollowUpTemplateNames(templateName: string, supabase: any): Promise<string[]> {
+    try {
+      const { data: template } = await supabase
+        .from('airledger_transaction_templates')
+        .select('follow_up_templates')
+        .eq('template_name', templateName)
+        .single();
+      return template?.follow_up_templates || [];
+    } catch { return []; }
   }
 
   private async handleFullAICall(
