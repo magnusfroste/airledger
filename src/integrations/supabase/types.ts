@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_config: {
+        Row: {
+          agent_name: string
+          created_at: string | null
+          description: string | null
+          display_name: string
+          id: string
+          is_active: boolean | null
+          priority: number | null
+          system_prompt: string
+          tools: string[] | null
+          triggers: string[]
+          updated_at: string | null
+        }
+        Insert: {
+          agent_name: string
+          created_at?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          system_prompt: string
+          tools?: string[] | null
+          triggers?: string[]
+          updated_at?: string | null
+        }
+        Update: {
+          agent_name?: string
+          created_at?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          system_prompt?: string
+          tools?: string[] | null
+          triggers?: string[]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       agent_logs: {
         Row: {
           action_taken: string | null
