@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BookOpen, BarChart3, GraduationCap, Save, RotateCcw, Activity } from 'lucide-react';
+import AdminDynamicAgents from './AdminDynamicAgents';
 
 interface AgentStats {
   agent_name: string;
@@ -279,6 +280,8 @@ const AdminAgents = () => {
           </Tabs>
         </CardContent>
       </Card>
+      {/* Dynamic agents */}
+      <AdminDynamicAgents />
     </div>
   );
 };
