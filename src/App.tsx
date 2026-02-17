@@ -9,6 +9,7 @@ import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import Navigation from "./components/Navigation";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PageLayout from "./components/PageLayout";
+import DynamicSEO from "./components/DynamicSEO";
 import Index from "./pages/Index";
 import Chat from "./pages/Chat";
 import Transactions from "./pages/Transactions";
@@ -29,6 +30,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
+        <DynamicSEO />
         <Toaster />
         <Sonner />
         <BrowserRouter>
