@@ -95,6 +95,12 @@ if (!canRun) {
       async fn() {
         const r = await callChatAssistant(s.message);
         assert(r.success, "Fail");
+        // If AI asks a clarification question first (e.g. salary needs tax amount),
+        // the follow-up tip won't appear until all fields are filled — accept both outcomes
+        if (s.may_clarify && isAskingQuestion(r.response)) {
+          // Clarification is acceptable — follow-up will appear after completed fields
+          return;
+        }
         assert(mentionsFollowUp(r.response, s.expect_followup!), `Missing "${s.expect_followup}"`);
       },
       sanitizeResources: false, sanitizeOps: false,
