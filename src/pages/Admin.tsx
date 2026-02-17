@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminRole } from '@/hooks/useAdminRole';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, FileText, List, Users, MessageSquare, AlertTriangle, Plug, Search, Bot, ScrollText } from 'lucide-react';
+import { Shield, FileText, List, Users, MessageSquare, AlertTriangle, Plug, Search, Bot, ScrollText, Play } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import AdminTemplates from '@/components/admin/AdminTemplates';
 import AdminAccounts from '@/components/admin/AdminAccounts';
 import AdminUsers from '@/components/admin/AdminUsers';
@@ -35,9 +36,20 @@ const Admin = () => {
 
   return (
     <div className="container max-w-5xl mx-auto px-4 py-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Shield className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Admin</h1>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Shield className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">Admin</h1>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate('/chat?demo=testbolaget')}
+          className="flex items-center gap-2"
+        >
+          <Play className="h-4 w-4" />
+          Kör demo
+        </Button>
       </div>
 
       <Tabs defaultValue="templates" className="space-y-4">
