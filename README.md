@@ -2,7 +2,16 @@
 
 Air Ledger är en AI-assisterad bokföringsapplikation byggd för svenska småföretag. Applikationen använder avancerad AI för att automatisera bokföring, analysera kvitton och ge personlig vägledning baserat på BAS-kontoplanen 2024.
 
-## Översikt
+## 📖 Komplett Dokumentation
+
+För fullständig dokumentation, se **[MASTER.md](./MASTER.md)** som innehåller:
+- Arkitektur och systemdesign
+- AI-system och transaktionsmallar
+- API-dokumentation
+- Utvecklingsguide
+- Säkerhetsarkitektur
+
+## Snabböversikt
 
 Air Ledger kombinerar modern webbteknik med AI för att skapa en smidig bokföringsupplevelse:
 
