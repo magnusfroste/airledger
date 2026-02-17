@@ -5,6 +5,7 @@ import { fetchUserData } from '../_shared/data-fetcher.ts';
 import { buildFinancialSnapshot } from '../_shared/context-builder.ts';
 import { matchSingleTransaction, applyTemplateToTransaction } from '../_shared/template-matcher.ts';
 import { BankTransaction } from '../_shared/types.ts';
+import { getAIConfig, aiComplete, getContent } from '../_shared/ai-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,8 +24,8 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('No authorization header');
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableApiKey) throw new Error('AI API key not configured');
+    // Load AI provider config
+    const aiConfig = await getAIConfig(serviceSupabase);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -65,37 +66,22 @@ serve(async (req) => {
     // Build context-aware system prompt
     const systemPrompt = buildBankStatementPrompt(financialSnapshot);
 
-    // Call Lovable AI Gateway with vision model
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Analysera detta bankutdrag och extrahera alla transaktioner:' },
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
-            ]
-          }
-        ],
-        max_tokens: 16000,
-        temperature: 0.1,
-      }),
+    // Call AI with vision model via abstraction layer
+    const aiResult = await aiComplete(aiConfig, {
+      model: aiConfig.visionModel,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Analysera detta bankutdrag och extrahera alla transaktioner:' },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
+          ]
+        }
+      ],
+      max_tokens: 16000,
+      temperature: 0.1,
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('AI Gateway error:', errText);
-      throw new Error('AI analysis failed');
-    }
-
-    const aiResult = await response.json();
     const rawContent = aiResult.choices?.[0]?.message?.content || '{}';
 
     // Parse JSON from response

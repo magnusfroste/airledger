@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plug, CheckCircle2, XCircle, Loader2, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import AdminAIProvider from './AdminAIProvider';
 
 interface Integration {
   id: string;
@@ -151,6 +152,8 @@ const AdminIntegrations = () => {
 
   return (
     <div className="space-y-4">
+      <AdminAIProvider />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">

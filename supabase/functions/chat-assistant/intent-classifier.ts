@@ -1,4 +1,5 @@
 import { IntentClassification } from './types.ts';
+import { AIProviderConfig, aiComplete, getToolCalls } from '../_shared/ai-client.ts';
 
 const INTENT_SYSTEM_PROMPT = `Du är en svensk bokföringsassistent. Klassificera användarens avsikt och extrahera relevant data.
 
@@ -42,7 +43,7 @@ Dagens datum: ${new Date().toISOString().split('T')[0]}`;
 export async function classifyIntent(
   message: string,
   templateNames: string[],
-  apiKey: string
+  aiConfig: AIProviderConfig
 ): Promise<IntentClassification> {
   const userPrompt = `Tillgängliga mallar (format: Mallnamn [Kategori] – Beskrivning (nyckelord)):
 ${templateNames.join('\n')}
@@ -50,69 +51,55 @@ ${templateNames.join('\n')}
 Meddelande: "${message}"`;
 
   try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
-        messages: [
-          { role: 'system', content: INTENT_SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.1,
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'classify_intent',
-              description: 'Classify user intent and extract data',
-              parameters: {
+    const tools = [
+      {
+        type: 'function',
+        function: {
+          name: 'classify_intent',
+          description: 'Classify user intent and extract data',
+          parameters: {
+            type: 'object',
+            properties: {
+              intent: {
+                type: 'string',
+                enum: ['book_expense', 'book_sale', 'book_payment', 'opening_balance', 'confirm_booking', 'ask_question', 'view_report', 'analyze_image', 'vat_report', 'period_reconciliation', 'year_end', 'account_balance', 'unknown']
+              },
+              extracted_data: {
                 type: 'object',
                 properties: {
-                  intent: {
-                    type: 'string',
-                    enum: ['book_expense', 'book_sale', 'book_payment', 'opening_balance', 'confirm_booking', 'ask_question', 'view_report', 'analyze_image', 'vat_report', 'period_reconciliation', 'year_end', 'account_balance', 'unknown']
-                  },
-                  extracted_data: {
-                    type: 'object',
-                    properties: {
-                      amount: { type: 'number' },
-                      date: { type: 'string' },
-                      description: { type: 'string' },
-                      vendor: { type: 'string' },
-                      vat_rate: { type: 'number' },
-                      reference: { type: 'string' },
-                      payment_method: { type: 'string' }
-                    }
-                  },
-                  matched_template_hint: { type: 'string' },
-                  confidence: { type: 'number' },
-                  clarification_needed: { type: 'string' }
-                },
-                required: ['intent', 'extracted_data', 'confidence'],
-                additionalProperties: false
-              }
-            }
+                  amount: { type: 'number' },
+                  date: { type: 'string' },
+                  description: { type: 'string' },
+                  vendor: { type: 'string' },
+                  vat_rate: { type: 'number' },
+                  reference: { type: 'string' },
+                  payment_method: { type: 'string' }
+                }
+              },
+              matched_template_hint: { type: 'string' },
+              confidence: { type: 'number' },
+              clarification_needed: { type: 'string' }
+            },
+            required: ['intent', 'extracted_data', 'confidence'],
+            additionalProperties: false
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'classify_intent' } }
-      }),
+        }
+      }
+    ];
+
+    const data = await aiComplete(aiConfig, {
+      messages: [
+        { role: 'system', content: INTENT_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.1,
+      tools,
+      tool_choice: { type: 'function', function: { name: 'classify_intent' } }
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('Intent classifier error:', response.status, errText);
-      throw new Error(`AI Gateway error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
-    if (toolCall) {
-      const parsed = JSON.parse(toolCall.function.arguments);
+    const toolCalls = getToolCalls(data);
+    if (toolCalls.length > 0) {
+      const parsed = JSON.parse(toolCalls[0].function.arguments);
       return {
         intent: parsed.intent || 'unknown',
         extracted_data: parsed.extracted_data || {},
