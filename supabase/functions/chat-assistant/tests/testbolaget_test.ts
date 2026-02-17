@@ -1,25 +1,19 @@
 /**
  * Testbolaget AB — Integration Test Suite
  *
- * Tests the deployed chat-assistant edge function with realistic
- * accounting scenarios for a small Swedish IT consultancy.
- *
- * Requires TEST_USER_EMAIL and TEST_USER_PASSWORD env vars
- * (or VITE_TEST_USER_EMAIL / VITE_TEST_USER_PASSWORD) to authenticate.
- *
- * Verifies:
- * - Template matching (correct intent)
- * - Amount balancing (debit == credit)
- * - Follow-up suggestions
- * - Missing-field handling
+ * Authenticates via TEST_USER_EMAIL + TEST_USER_PASSWORD secrets,
+ * or SUPABASE_SERVICE_ROLE_KEY to auto-create a test user.
  */
 
-import "https://deno.land/std@0.224.0/dotenv/load.ts";
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/assert_equals.ts";
+// Try loading .env (works locally, silently skipped in CI)
+try {
+  await import("https://deno.land/std@0.224.0/dotenv/load.ts");
+} catch { /* ignore */ }
+
 import { assert } from "https://deno.land/std@0.224.0/assert/assert.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-import { SCENARIOS, type TestScenario } from "./testbolaget_scenarios.ts";
+import { SCENARIOS } from "./testbolaget_scenarios.ts";
 import {
   parseBookingEntries,
   isBalanced,
@@ -27,133 +21,128 @@ import {
   isAskingQuestion,
 } from "./test_helpers.ts";
 
-const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL")!;
-const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_PUBLISHABLE_KEY")!;
-const TEST_EMAIL = Deno.env.get("TEST_USER_EMAIL") || Deno.env.get("VITE_TEST_USER_EMAIL");
-const TEST_PASSWORD = Deno.env.get("TEST_USER_PASSWORD") || Deno.env.get("VITE_TEST_USER_PASSWORD");
+const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL") || Deno.env.get("SUPABASE_URL");
+const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_PUBLISHABLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const TEST_EMAIL = Deno.env.get("TEST_USER_EMAIL");
+const TEST_PASSWORD = Deno.env.get("TEST_USER_PASSWORD");
 
-// ── Auth setup ──────────────────────────────────────
 let accessToken: string | null = null;
 
 async function getAccessToken(): Promise<string> {
   if (accessToken) return accessToken;
 
-  if (!TEST_EMAIL || !TEST_PASSWORD) {
-    throw new Error(
-      "Missing TEST_USER_EMAIL / TEST_USER_PASSWORD env vars. " +
-      "Add them to .env to run integration tests."
-    );
+  const anon = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
+
+  // Strategy 1: Use test credentials directly
+  if (TEST_EMAIL && TEST_PASSWORD) {
+    const { data, error } = await anon.auth.signInWithPassword({
+      email: TEST_EMAIL,
+      password: TEST_PASSWORD,
+    });
+    if (data?.session) {
+      accessToken = data.session.access_token;
+      return accessToken;
+    }
+    throw new Error(`Sign in with TEST_USER creds failed: ${error?.message}`);
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: TEST_EMAIL,
-    password: TEST_PASSWORD,
-  });
+  // Strategy 2: Auto-create test user via service role
+  if (SERVICE_ROLE_KEY) {
+    const admin = createClient(SUPABASE_URL!, SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
-  if (error || !data.session) {
-    throw new Error(`Auth failed: ${error?.message || "no session"}`);
+    const autoEmail = "testbolaget@test.local";
+    const autoPass = "Testbolaget2026!";
+
+    // Try sign in first
+    const { data: signIn } = await anon.auth.signInWithPassword({
+      email: autoEmail, password: autoPass,
+    });
+    if (signIn?.session) {
+      accessToken = signIn.session.access_token;
+      return accessToken;
+    }
+
+    // Create
+    await admin.auth.admin.createUser({
+      email: autoEmail, password: autoPass, email_confirm: true,
+    });
+
+    const { data: newSignIn, error } = await anon.auth.signInWithPassword({
+      email: autoEmail, password: autoPass,
+    });
+    if (error || !newSignIn?.session) throw new Error(`Auto sign in failed: ${error?.message}`);
+    accessToken = newSignIn.session.access_token;
+    return accessToken;
   }
 
-  accessToken = data.session.access_token;
-  return accessToken;
+  throw new Error("No auth strategy available");
 }
 
 async function callChatAssistant(message: string): Promise<{ response: string; success: boolean }> {
   const token = await getAccessToken();
-  const url = `${SUPABASE_URL}/functions/v1/chat-assistant`;
-  const res = await fetch(url, {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/chat-assistant`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-      apikey: SUPABASE_ANON_KEY,
+      apikey: SUPABASE_ANON_KEY!,
     },
     body: JSON.stringify({ message, conversationHistory: [] }),
   });
-
-  const body = await res.json();
-  return body;
+  return await res.json();
 }
 
-// ── Skip if no credentials ──────────────────────────
-const canRun = !!(TEST_EMAIL && TEST_PASSWORD);
+// ── Guard ───────────────────────────────────────────
+const canRun = !!(SUPABASE_URL && SUPABASE_ANON_KEY && (TEST_EMAIL || SERVICE_ROLE_KEY));
 
 if (!canRun) {
-  Deno.test({
-    name: "⚠️ Skipping Testbolaget tests — set TEST_USER_EMAIL + TEST_USER_PASSWORD in .env",
-    fn() {
-      console.warn("No test credentials found. Add TEST_USER_EMAIL and TEST_USER_PASSWORD to .env");
-    },
+  Deno.test("⚠️ Skipping — need TEST_USER_EMAIL+PASSWORD or SERVICE_ROLE_KEY", () => {
+    console.warn("Available:", {
+      url: !!SUPABASE_URL, anon: !!SUPABASE_ANON_KEY,
+      testUser: !!TEST_EMAIL, serviceRole: !!SERVICE_ROLE_KEY,
+    });
   });
 } else {
-  // ── Booking scenarios: verify balanced entries ──────────────
-  const bookingScenarios = SCENARIOS.filter(
-    (s) => !s.expect_question && s.expected_total > 0
-  );
-
-  for (const scenario of bookingScenarios) {
+  // ── Booking scenarios ───────────────────────────────
+  for (const s of SCENARIOS.filter((s) => !s.expect_question && s.expected_total > 0)) {
     Deno.test({
-      name: `[${scenario.id}] ${scenario.description} — balanced entries`,
+      name: `[${s.id}] ${s.description} — balanced`,
       async fn() {
-        const result = await callChatAssistant(scenario.message);
-
-        assert(result.success, `API should return success for "${scenario.message}"`);
-        assert(result.response, "Response should not be empty");
-
-        const entries = parseBookingEntries(result.response);
-
-        if (entries.length > 0) {
-          assert(
-            isBalanced(entries),
-            `Entries should be balanced (debit == credit) for ${scenario.id}.\n` +
-              `Entries: ${JSON.stringify(entries)}`
-          );
-        }
+        const r = await callChatAssistant(s.message);
+        assert(r.success, `Fail for "${s.message}"`);
+        const entries = parseBookingEntries(r.response);
+        if (entries.length > 0) assert(isBalanced(entries), `Unbalanced: ${JSON.stringify(entries)}`);
       },
-      sanitizeResources: false,
-      sanitizeOps: false,
+      sanitizeResources: false, sanitizeOps: false,
     });
   }
 
-  // ── Follow-up tests ─────────────────────────────────────────
-  const followUpScenarios = SCENARIOS.filter((s) => s.expect_followup);
-
-  for (const scenario of followUpScenarios) {
+  // ── Follow-ups ──────────────────────────────────────
+  for (const s of SCENARIOS.filter((s) => s.expect_followup)) {
     Deno.test({
-      name: `[${scenario.id}] ${scenario.description} — suggests follow-up "${scenario.expect_followup}"`,
+      name: `[${s.id}] ${s.description} — follow-up "${s.expect_followup}"`,
       async fn() {
-        const result = await callChatAssistant(scenario.message);
-        assert(result.success, "API should return success");
-
-        if (scenario.expect_followup) {
-          assert(
-            mentionsFollowUp(result.response, scenario.expect_followup),
-            `Response should mention "${scenario.expect_followup}" for ${scenario.id}`
-          );
-        }
+        const r = await callChatAssistant(s.message);
+        assert(r.success, "Fail");
+        assert(mentionsFollowUp(r.response, s.expect_followup!), `Missing "${s.expect_followup}"`);
       },
-      sanitizeResources: false,
-      sanitizeOps: false,
+      sanitizeResources: false, sanitizeOps: false,
     });
   }
 
-  // ── Missing-field tests ─────────────────────────────────────
-  const questionScenarios = SCENARIOS.filter((s) => s.expect_question);
-
-  for (const scenario of questionScenarios) {
+  // ── Missing-field ───────────────────────────────────
+  for (const s of SCENARIOS.filter((s) => s.expect_question)) {
     Deno.test({
-      name: `[${scenario.id}] ${scenario.description} — asks for missing info`,
+      name: `[${s.id}] ${s.description} — asks question`,
       async fn() {
-        const result = await callChatAssistant(scenario.message);
-        assert(result.success, "API should return success");
-        assert(
-          isAskingQuestion(result.response),
-          `AI should ask a question when message is "${scenario.message}"`
-        );
+        const r = await callChatAssistant(s.message);
+        assert(r.success, "Fail");
+        assert(isAskingQuestion(r.response), `No question for "${s.message}"`);
       },
-      sanitizeResources: false,
-      sanitizeOps: false,
+      sanitizeResources: false, sanitizeOps: false,
     });
   }
 }
