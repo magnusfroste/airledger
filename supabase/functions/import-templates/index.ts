@@ -250,7 +250,7 @@ serve(async (req) => {
         }
       } catch (err) {
         console.error(`[IMPORT-TEMPLATES] Exception importing template "${template.template_name}":`, err);
-        warnings.push(`Failed to import template "${template.template_name}": ${err.message}`);
+        warnings.push(`Failed to import template "${template.template_name}": ${(err as Error).message}`);
       }
     }
 
@@ -270,7 +270,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in import-templates function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

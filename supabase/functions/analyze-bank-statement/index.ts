@@ -24,9 +24,6 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('No authorization header');
 
-    // Load AI provider config
-    const aiConfig = await getAIConfig(serviceSupabase);
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -49,6 +46,9 @@ serve(async (req) => {
 
     // Service client for privileged operations
     const serviceSupabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+    // Load AI provider config
+    const aiConfig = await getAIConfig(serviceSupabase);
 
     // Quota check
     const quota = await checkAndUpdateQuota(userId, serviceSupabase, true);
@@ -98,7 +98,7 @@ serve(async (req) => {
     try {
       analysis = JSON.parse(cleaned);
     } catch (parseError) {
-      console.error('JSON parse error:', parseError.message);
+      console.error('JSON parse error:', (parseError as Error).message);
       console.error('Raw content (first 500 chars):', rawContent.substring(0, 500));
       throw new Error('Kunde inte tolka AI-svaret. Försök igen.');
     }
@@ -130,7 +130,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in analyze-bank-statement:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'An unexpected error occurred', success: false }),
+      JSON.stringify({ error: (error as Error).message || 'An unexpected error occurred', success: false }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

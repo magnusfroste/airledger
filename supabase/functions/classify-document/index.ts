@@ -78,7 +78,7 @@ Reply ONLY with the JSON, no other text.`
   } catch (error) {
     console.error('Classification error:', error);
     return new Response(
-      JSON.stringify({ success: false, type: 'unknown', confidence: 0, error: error.message }),
+      JSON.stringify({ success: false, type: 'unknown', confidence: 0, error: (error as Error).message }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

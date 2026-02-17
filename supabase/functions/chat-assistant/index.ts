@@ -124,7 +124,7 @@ serve(async (req) => {
       result = await routeToAgent(agentCtx);
     } catch (err) {
       agentSuccess = false;
-      agentError = err.message || 'Unknown error';
+      agentError = (err as Error).message || 'Unknown error';
       throw err;
     } finally {
       const elapsed = Math.round(performance.now() - startTime);
@@ -166,7 +166,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('[Orchestrator] Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Ett oväntat fel uppstod', success: false }),
+      JSON.stringify({ error: (error as Error).message || 'Ett oväntat fel uppstod', success: false }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
