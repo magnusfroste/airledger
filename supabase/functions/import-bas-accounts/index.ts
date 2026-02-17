@@ -88,7 +88,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Import error:', error)
     return new Response(
-      JSON.stringify({ error: error.message, success: false }),
+      JSON.stringify({ error: (error as Error).message, success: false }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

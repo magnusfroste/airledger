@@ -85,7 +85,7 @@ serve(async (req) => {
             const account = accountMap.get(entry.account_code);
             
             // Check normal balance vs entry type
-            if (account.normal_balance) {
+            if (account?.normal_balance) {
               const expectedType = account.normal_balance.toLowerCase();
               if (expectedType !== entry.type) {
                 warnings.push(`Account ${entry.account_code} has normal balance '${account.normal_balance}' but entry is '${entry.type}'`);
@@ -100,8 +100,8 @@ serve(async (req) => {
         }
 
         // Check debit/credit balance
-        const debits = template.template_entries.filter(e => e.type === 'debit').length;
-        const credits = template.template_entries.filter(e => e.type === 'credit').length;
+        const debits = template.template_entries.filter((e: any) => e.type === 'debit').length;
+        const credits = template.template_entries.filter((e: any) => e.type === 'credit').length;
         
         if (debits !== credits) {
           warnings.push(`Unbalanced entries: ${debits} debits, ${credits} credits`);
@@ -185,7 +185,7 @@ Respond in Swedish and be concise.`;
 
   } catch (error) {
     console.error('Error in validate-templates function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

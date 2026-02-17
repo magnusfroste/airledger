@@ -306,7 +306,7 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'An unexpected error occurred',
+        error: (error as Error).message || 'An unexpected error occurred',
         success: false 
       }),
       {

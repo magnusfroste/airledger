@@ -1,101 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { getAIConfig, aiComplete, getContent } from '../_shared/ai-client.ts'
-
-// Quota helper functions inlined
-const TIER_LIMITS: Record<string, { ai_analyses: number; storage_mb: number }> = {
-  free: { ai_analyses: 50, storage_mb: 500 },
-  premium: { ai_analyses: 500, storage_mb: 5000 },
-  professional: { ai_analyses: -1, storage_mb: 50000 } // -1 means unlimited
-};
-
-async function checkAndUpdateQuota(
-  userId: string, 
-  supabase: any,
-  incrementAiAnalyses: boolean = false
-): Promise<{ allowed: boolean; subscription_tier: string; usage: any }> {
-  try {
-    // Get current month-year
-    const now = new Date();
-    const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-    // Get user subscription
-    const { data: subscriber } = await supabase
-      .from('subscribers')
-      .select('subscription_tier')
-      .eq('user_id', userId)
-      .single();
-
-    const subscriptionTier = subscriber?.subscription_tier || 'free';
-    const limits = TIER_LIMITS[subscriptionTier];
-
-    // Get or create usage record
-    const { data: usage, error: usageError } = await supabase
-      .from('usage_tracking')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('month_year', monthYear)
-      .single();
-
-    let currentUsage = usage;
-    if (!currentUsage) {
-      // Create new usage record
-      const { data: newUsage, error: createError } = await supabase
-        .from('usage_tracking')
-        .insert({
-          user_id: userId,
-          month_year: monthYear,
-          ai_analyses_used: 0,
-          storage_used_mb: 0
-        })
-        .select()
-        .single();
-      
-      if (createError) {
-        console.error('Error creating usage record:', createError);
-        return { allowed: false, subscription_tier: subscriptionTier, usage: null };
-      }
-      currentUsage = newUsage;
-    }
-
-    // Check if AI analyses are within quota
-    const currentAiAnalyses = currentUsage.ai_analyses_used || 0;
-    const aiAnalysesAllowed = limits.ai_analyses === -1 || currentAiAnalyses < limits.ai_analyses;
-
-    if (!aiAnalysesAllowed && incrementAiAnalyses) {
-      return { allowed: false, subscription_tier: subscriptionTier, usage: currentUsage };
-    }
-
-    // If incrementing, update the usage
-    if (incrementAiAnalyses && aiAnalysesAllowed) {
-      const { error: updateError } = await supabase
-        .from('usage_tracking')
-        .update({ 
-          ai_analyses_used: currentAiAnalyses + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentUsage.id);
-
-      if (updateError) {
-        console.error('Error updating usage:', updateError);
-        return { allowed: false, subscription_tier: subscriptionTier, usage: currentUsage };
-      }
-      
-      // Update current usage for return
-      currentUsage.ai_analyses_used = currentAiAnalyses + 1;
-    }
-
-    return { 
-      allowed: aiAnalysesAllowed, 
-      subscription_tier: subscriptionTier, 
-      usage: currentUsage 
-    };
-
-  } catch (error) {
-    console.error('Error in quota check:', error);
-    return { allowed: false, subscription_tier: 'free', usage: null };
-  }
-}
+import { checkAndUpdateQuota } from '../_shared/quota.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -103,7 +9,6 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -118,7 +23,6 @@ serve(async (req) => {
       throw new Error('Image data is required')
     }
 
-    // Get the Authorization header
     const authHeader = req.headers.get('Authorization')
     console.log('Auth header present:', !!authHeader)
     
@@ -126,10 +30,41 @@ serve(async (req) => {
       throw new Error('No authorization header')
     }
 
-    // Load AI config
-    const aiConfig = await getAIConfig(serviceSupabase);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
-    console.log('Calling AI Vision API via provider:', aiConfig.provider);
+    // Auth client
+    const supabase = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
+
+    let userId: string
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      const token = authHeader.replace('Bearer ', '')
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      userId = payload.sub
+      if (!userId) throw new Error('Authentication failed')
+    } else {
+      userId = user.id
+    }
+
+    // Service client for privileged operations
+    const serviceSupabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+
+    // Quota check
+    const quota = await checkAndUpdateQuota(userId, serviceSupabase, true)
+    if (!quota.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'AI-analyskvoter överskridna', success: false, subscription_tier: quota.subscription_tier, usage: quota.usage }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Load AI config
+    const aiConfig = await getAIConfig(serviceSupabase)
+    console.log('Calling AI Vision API via provider:', aiConfig.provider)
 
     const systemContent = `You are a Swedish bookkeeping assistant. Analyze the receipt/invoice image and extract key information to propose bookkeeping transactions.
 
@@ -185,7 +120,7 @@ IMPORTANT: Always extract VAT information from Swedish receipts/invoices:
 - If no VAT visible, assume 25% and calculate backwards from total
 
 Use Swedish accounting plan (BAS 2024) account codes.
-Ensure entries balance (total debits = total credits)!`;
+Ensure entries balance (total debits = total credits)!`
 
     // Call AI via abstraction layer
     const aiResult = await aiComplete(aiConfig, {
@@ -202,11 +137,11 @@ Ensure entries balance (total debits = total credits)!`;
       ],
       max_tokens: 1000,
       temperature: 0.1,
-    });
+    })
 
-    console.log('AI API call successful');
-    const analysisText = getContent(aiResult);
-    console.log('Analysis result length:', analysisText?.length || 0);
+    console.log('AI API call successful')
+    const analysisText = getContent(aiResult)
+    console.log('Analysis result length:', analysisText?.length || 0)
 
     let analysis
     try {
@@ -249,7 +184,6 @@ Ensure entries balance (total debits = total credits)!`;
 
     console.log('=== ANALYZE RECEIPT FUNCTION COMPLETED SUCCESSFULLY ===')
 
-    // Return analysis for user confirmation - don't save yet
     return new Response(
       JSON.stringify({
         success: true,
@@ -264,12 +198,12 @@ Ensure entries balance (total debits = total credits)!`;
   } catch (error) {
     console.error('=== ERROR IN ANALYZE RECEIPT FUNCTION ===')
     console.error('Error details:', error)
-    console.error('Error message:', error.message)
-    console.error('Error stack:', error.stack)
+    console.error('Error message:', (error as Error).message)
+    console.error('Error stack:', (error as Error).stack)
     
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'An unexpected error occurred',
+        error: (error as Error).message || 'An unexpected error occurred',
         success: false 
       }),
       {

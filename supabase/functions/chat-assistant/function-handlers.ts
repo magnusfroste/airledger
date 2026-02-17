@@ -50,7 +50,7 @@ export async function handleFunctionCall(
     } catch (parseError) {
       console.error('Error parsing function arguments:', parseError);
       response += `\n\n❌ Ett fel uppstod när jag försökte tolka kontoinformationen.`;
-      callResult = { success: false, error: parseError.message };
+      callResult = { success: false, error: (parseError as Error).message };
     }
   } else if (functionName === 'save_general_transaction') {
     try {
@@ -88,7 +88,7 @@ export async function handleFunctionCall(
     } catch (parseError) {
       console.error('Error parsing general transaction arguments:', parseError);
       response += `\n\n❌ Ett fel uppstod när jag försökte tolka transaktionsinformationen.`;
-      callResult = { success: false, error: parseError.message };
+      callResult = { success: false, error: (parseError as Error).message };
     }
   } else if (functionName === 'use_transaction_template') {
     try {
@@ -125,7 +125,7 @@ export async function handleFunctionCall(
     } catch (parseError) {
       console.error('Error parsing template arguments:', parseError);
       response += `\n\n❌ Ett fel uppstod när jag försökte tolka mallinformationen.`;
-      callResult = { success: false, error: parseError.message };
+      callResult = { success: false, error: (parseError as Error).message };
     }
   } else if (functionName === 'calculate_vat_report') {
     try {
@@ -178,7 +178,7 @@ export async function handleFunctionCall(
     } catch (err) {
       console.error('VAT report error:', err);
       response += `\n\n❌ Ett fel uppstod vid momsberäkning.`;
-      callResult = { success: false, error: err.message };
+      callResult = { success: false, error: (err as Error).message };
     }
   } else if (functionName === 'calculate_account_balance') {
     try {
@@ -239,7 +239,7 @@ export async function handleFunctionCall(
     } catch (err) {
       console.error('Account balance error:', err);
       response += `\n\n❌ Ett fel uppstod vid saldoberäkning.`;
-      callResult = { success: false, error: err.message };
+      callResult = { success: false, error: (err as Error).message };
     }
   } else if (functionName === 'get_year_end_checklist') {
     try {
@@ -323,7 +323,7 @@ export async function handleFunctionCall(
     } catch (err) {
       console.error('Year-end checklist error:', err);
       response += `\n\n❌ Ett fel uppstod vid hämtning av bokslutsdata.`;
-      callResult = { success: false, error: err.message };
+      callResult = { success: false, error: (err as Error).message };
     }
   } else if (functionName === 'generate_year_end_summary') {
     try {
@@ -435,7 +435,7 @@ export async function handleFunctionCall(
     } catch (err) {
       console.error('Year-end summary error:', err);
       response += `\n\n❌ Ett fel uppstod vid generering av bokslutssammanfattning.`;
-      callResult = { success: false, error: err.message };
+      callResult = { success: false, error: (err as Error).message };
     }
   }
 

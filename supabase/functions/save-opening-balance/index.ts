@@ -104,7 +104,7 @@ serve(async (req) => {
     console.error('Error in save-opening-balance function:', error)
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'An unexpected error occurred',
+        error: (error as Error).message || 'An unexpected error occurred',
         success: false 
       }),
       {
