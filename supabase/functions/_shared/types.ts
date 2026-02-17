@@ -10,6 +10,20 @@ export interface AccountBalance {
   normal_balance: string; // 'debit' | 'credit'
 }
 
+export interface VendorPattern {
+  vendor: string;
+  template_name: string;
+  avg_amount: number;
+  count: number;
+  last_date: string;
+}
+
+export interface TemplatePreference {
+  template_name: string;
+  usage_count: number;
+  last_used: string;
+}
+
 export interface UserData {
   userId: string;
   userName: string;
@@ -22,6 +36,8 @@ export interface UserData {
   profile?: any;
   vatSummary?: VatSummary;
   accountBalances?: AccountBalance[];
+  vendorPatterns?: VendorPattern[];
+  templatePreferences?: TemplatePreference[];
 }
 
 export interface VatSummary {
