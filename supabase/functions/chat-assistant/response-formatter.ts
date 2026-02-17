@@ -164,6 +164,31 @@ function formatKr(amount: number): string {
 
 function calculateEntryAmount(entry: any, baseAmount: number): number {
   if (entry.vat_calculation) {
+    // Handle exclude_vat: calculate net from gross (baseAmount / 1.25 for 25% VAT)
+    if (entry.vat_calculation === 'exclude_vat') {
+      return Math.round(baseAmount / 1.25 * 100) / 100;
+    }
+    if (entry.vat_calculation === 'exclude_vat_12') {
+      return Math.round(baseAmount / 1.12 * 100) / 100;
+    }
+    if (entry.vat_calculation === 'exclude_vat_6') {
+      return Math.round(baseAmount / 1.06 * 100) / 100;
+    }
+    // Handle vat_only: calculate VAT amount (baseAmount - net)
+    if (entry.vat_calculation === 'vat_only') {
+      return Math.round((baseAmount - baseAmount / 1.25) * 100) / 100;
+    }
+    if (entry.vat_calculation === 'vat_only_12') {
+      return Math.round((baseAmount - baseAmount / 1.12) * 100) / 100;
+    }
+    if (entry.vat_calculation === 'vat_only_6') {
+      return Math.round((baseAmount - baseAmount / 1.06) * 100) / 100;
+    }
+    // Handle total_amount: return unchanged
+    if (entry.vat_calculation === 'total_amount') {
+      return baseAmount;
+    }
+    // Legacy: extract rate from string like "vat_25" or "moms_25"
     const vatMatch = entry.vat_calculation.match(/(\d+)/);
     if (vatMatch) {
       const vatRate = parseInt(vatMatch[1]) / 100;
