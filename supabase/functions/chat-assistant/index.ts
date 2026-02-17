@@ -14,6 +14,7 @@ import { handleFunctionCall } from './function-handlers.ts';
 import { SYSTEM_PROMPT, getSystemPrompt } from './system-prompt.ts';
 import { FUNCTION_DEFINITIONS } from './function-definitions.ts';
 import { checkAndUpdateQuota, TIER_LIMITS } from '../_shared/quota.ts';
+import { getAIConfig, aiComplete, getContent, getToolCalls, AIProviderConfig, AIProviderError } from '../_shared/ai-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,9 +32,6 @@ serve(async (req) => {
 
     console.log('Intent Router: message received');
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableApiKey) throw new Error('LOVABLE_API_KEY not configured');
-
     const authHeader = req.headers.get('Authorization');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -47,6 +45,9 @@ serve(async (req) => {
     const serviceSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
       auth: { persistSession: false },
     });
+
+    // Load AI provider config from system_settings
+    const aiConfig = await getAIConfig(serviceSupabase);
 
     // Quota check
     const quotaCheck = await checkAndUpdateQuota(userId, serviceSupabase, true);
@@ -77,7 +78,7 @@ serve(async (req) => {
 
     // === INTENT CLASSIFICATION (lightweight AI call) ===
     console.log('Classifying intent...');
-    const intent = await classifyIntent(message, templateNames, lovableApiKey);
+    const intent = await classifyIntent(message, templateNames, aiConfig);
     console.log('Intent:', intent.intent, 'confidence:', intent.confidence);
 
     // === PRE-ROUTING: Check if we're in a year-end guided flow ===
@@ -100,7 +101,7 @@ serve(async (req) => {
     if (isYearEndContext && !message.match(/^(boka |bokför |köpt |betala |faktura )/i)) {
       console.log('Year-end context detected — routing to full AI for guided flow');
       const fullContext = buildBookkeepingContext(userData);
-      const aiResp = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+      const aiResp = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
       return new Response(
         JSON.stringify({
           success: true,
@@ -217,7 +218,7 @@ serve(async (req) => {
           // No template match — use full AI call with function calling
           console.log('No template match — falling back to freeform AI booking');
           const fullContext = buildBookkeepingContext(userData);
-          aiResponse = await handleFreeformBooking(message, conversationHistory, fullContext, lovableApiKey, supabase, userId, livePrompt);
+          aiResponse = await handleFreeformBooking(message, conversationHistory, fullContext, aiConfig, supabase, userId, livePrompt);
         }
         break;
       }
@@ -231,7 +232,7 @@ serve(async (req) => {
           if (lastAiMessage && (lastAiMessage.content.includes('årsbokslut') || lastAiMessage.content.includes('Checklista') || lastAiMessage.content.includes('bokslutet steg'))) {
             console.log('Confirm in year-end context — routing to full AI for guided flow');
             const fullContext = buildBookkeepingContext(userData);
-            aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+            aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
             break;
           }
 
@@ -273,7 +274,7 @@ serve(async (req) => {
                   console.log('Confirming freeform booking...');
                   const fullContext = buildBookkeepingContext(userData);
                   const freeformResult = await executeFreeformBooking(
-                    lastUserBooking.content, conversationHistory, fullContext, lovableApiKey, supabase, userId, livePrompt
+                    lastUserBooking.content, conversationHistory, fullContext, aiConfig, supabase, userId, livePrompt
                   );
                   aiResponse = freeformResult || '✅ Transaktionen är bokförd!';
                 } else {
@@ -285,7 +286,7 @@ serve(async (req) => {
                   (msg: ConversationMessage) => msg.sender === 'user' && msg.content !== message
                 );
                 if (lastUserBooking) {
-                  const originalIntent = await classifyIntent(lastUserBooking.content, templateNames, lovableApiKey);
+                  const originalIntent = await classifyIntent(lastUserBooking.content, templateNames, aiConfig);
                   if (originalIntent.matched_template_hint && originalIntent.extracted_data.amount) {
                     const sessionId = `${userId}_${Date.now()}`;
                     const args = {
@@ -336,7 +337,7 @@ serve(async (req) => {
       case 'unknown': {
         // Full AI call with complete context (fallback to rich conversation)
         const fullContext = buildBookkeepingContext(userData);
-        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
         break;
       }
 
@@ -353,7 +354,7 @@ serve(async (req) => {
         aiResponse = await handleFunctionCall('calculate_vat_report', { periodStart, periodEnd }, supabase, sessionId);
         if (!aiResponse) {
           const fullContext = buildBookkeepingContext(userData);
-          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
         }
         break;
       }
@@ -366,7 +367,7 @@ serve(async (req) => {
         } else {
           // Let AI ask which account
           const fullContext = buildBookkeepingContext(userData);
-          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
         }
         break;
       }
@@ -381,7 +382,7 @@ serve(async (req) => {
           }, supabase, sessionId);
         } else {
           const fullContext = buildBookkeepingContext(userData);
-          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
         }
         break;
       }
@@ -410,7 +411,7 @@ serve(async (req) => {
 
       default: {
         const fullContext = buildBookkeepingContext(userData);
-        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, lovableApiKey, livePrompt);
+        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
       }
     }
 
@@ -444,7 +445,7 @@ async function executeFreeformBooking(
   originalMessage: string,
   conversationHistory: ConversationMessage[] | undefined,
   context: string,
-  apiKey: string,
+  aiConfig: AIProviderConfig,
   supabase: any,
   userId: string,
   systemPrompt: string = SYSTEM_PROMPT
@@ -461,37 +462,29 @@ async function executeFreeformBooking(
   }
 
   try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
-        messages,
-        max_tokens: 1500,
-        temperature: 0.1,
-        tools: FUNCTION_DEFINITIONS,
-        tool_choice: { type: 'function', function: { name: 'save_general_transaction' } },
-      }),
+    const data = await aiComplete(aiConfig, {
+      messages,
+      max_tokens: 1500,
+      temperature: 0.1,
+      tools: FUNCTION_DEFINITIONS,
+      tool_choice: { type: 'function', function: { name: 'save_general_transaction' } },
     });
 
-    if (!response.ok) {
-      console.error('Execute freeform error:', response.status);
-      return '❌ Kunde inte genomföra bokföringen. Försök igen.';
-    }
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-
-    if (toolCall?.function?.name === 'save_general_transaction') {
-      const fnArgs = JSON.parse(toolCall.function.arguments || '{}');
+    const toolCalls = getToolCalls(data);
+    if (toolCalls.length > 0 && toolCalls[0].function?.name === 'save_general_transaction') {
+      const fnArgs = JSON.parse(toolCalls[0].function.arguments || '{}');
       console.log('Executing freeform transaction:', fnArgs);
       const sessionId = `${userId}_${Date.now()}`;
       return await handleFunctionCall('save_general_transaction', fnArgs, supabase, sessionId);
     }
 
-    return data.choices?.[0]?.message?.content || '❌ Kunde inte skapa transaktionen.';
+    return getContent(data) || '❌ Kunde inte skapa transaktionen.';
   } catch (error) {
     console.error('Execute freeform failed:', error);
+    if (error instanceof AIProviderError) {
+      if (error.status === 429) return '⚠️ AI-tjänsten är tillfälligt överbelastad. Försök igen om en stund.';
+      if (error.status === 402) return '⚠️ AI-krediter slut. Kontakta support.';
+    }
     return '❌ Ett fel uppstod vid bokföringen. Försök igen.';
   }
 }
@@ -503,29 +496,25 @@ async function handleFullAICall(
   message: string,
   conversationHistory: ConversationMessage[] | undefined,
   context: string,
-  apiKey: string,
+  aiConfig: AIProviderConfig,
   systemPrompt: string = SYSTEM_PROMPT
 ): Promise<string> {
   const messages = buildMessages(message, conversationHistory, context, systemPrompt);
 
   try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'google/gemini-3-flash-preview', messages, max_tokens: 1000, temperature: 0.3 }),
+    const data = await aiComplete(aiConfig, {
+      messages,
+      max_tokens: 1000,
+      temperature: 0.3,
     });
 
-    if (!response.ok) {
-      if (response.status === 429) return '⚠️ AI-tjänsten är tillfälligt överbelastad. Försök igen om en stund.';
-      if (response.status === 402) return '⚠️ AI-krediter slut. Kontakta support.';
-      console.error('Full AI call error:', response.status, await response.text());
-      return 'Jag kunde tyvärr inte svara just nu. Försök igen.';
-    }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || 'Jag förstod inte riktigt. Kan du omformulera?';
+    return getContent(data) || 'Jag förstod inte riktigt. Kan du omformulera?';
   } catch (error) {
     console.error('Full AI call failed:', error);
+    if (error instanceof AIProviderError) {
+      if (error.status === 429) return '⚠️ AI-tjänsten är tillfälligt överbelastad. Försök igen om en stund.';
+      if (error.status === 402) return '⚠️ AI-krediter slut. Kontakta support.';
+    }
     return 'Ett fel uppstod. Försök igen.';
   }
 }
@@ -538,7 +527,7 @@ async function handleFreeformBooking(
   message: string,
   conversationHistory: ConversationMessage[] | undefined,
   context: string,
-  apiKey: string,
+  aiConfig: AIProviderConfig,
   supabase: any,
   userId: string,
   systemPrompt: string = SYSTEM_PROMPT
@@ -566,39 +555,26 @@ Formatera förslaget tydligt med kontonummer, kontonamn och belopp.`;
   messages.push({ role: 'user', content: message });
 
   try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
-        messages,
-        max_tokens: 1500,
-        temperature: 0.2,
-        tools: FUNCTION_DEFINITIONS,
-        tool_choice: 'auto',
-      }),
+    const data = await aiComplete(aiConfig, {
+      messages,
+      max_tokens: 1500,
+      temperature: 0.2,
+      tools: FUNCTION_DEFINITIONS,
+      tool_choice: 'auto',
     });
 
-    if (!response.ok) {
-      console.error('Freeform booking AI call error:', response.status, await response.text());
-      return 'Jag kunde tyvärr inte skapa bokföringsförslaget just nu. Försök igen.';
-    }
-
-    const data = await response.json();
     const choice = data.choices?.[0];
-
     if (!choice) return 'Jag kunde inte skapa ett bokföringsförslag. Försök igen.';
 
-    // Check if AI wants to call a function
-    if (choice.message?.tool_calls?.length > 0) {
-      const toolCall = choice.message.tool_calls[0];
+    const toolCalls = getToolCalls(data);
+    if (toolCalls.length > 0) {
+      const toolCall = toolCalls[0];
       const fnName = toolCall.function?.name;
       const fnArgs = JSON.parse(toolCall.function?.arguments || '{}');
 
       console.log('Freeform AI chose function:', fnName, fnArgs);
 
       if (fnName === 'save_general_transaction') {
-        // Format a proposal for the user to confirm
         const entries = fnArgs.entries || [];
         let proposal = `📋 **Bokföringsförslag (utan mall):**\n\n`;
         proposal += `**${fnArgs.description}**\n`;
@@ -614,18 +590,13 @@ Formatera förslaget tydligt med kontonummer, kontonamn och belopp.`;
         }
 
         proposal += `\nSvara **"ja"** för att bokföra.`;
-
-        // Store the pending transaction in conversation context
-        // The confirm_booking handler will pick it up
         return proposal;
       } else {
-        // Other function — delegate
         const sessionId = `${userId}_${Date.now()}`;
         return await handleFunctionCall(fnName, fnArgs, supabase, sessionId);
       }
     }
 
-    // No function call — return the text response
     return choice.message?.content || 'Jag kunde inte skapa ett bokföringsförslag.';
   } catch (error) {
     console.error('Freeform booking failed:', error);

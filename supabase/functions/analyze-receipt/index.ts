@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import OpenAI from 'https://esm.sh/openai@4.20.1'
+import { getAIConfig, aiComplete, getContent } from '../_shared/ai-client.ts'
 
 // Quota helper functions inlined
 const TIER_LIMITS: Record<string, { ai_analyses: number; storage_mb: number }> = {
@@ -126,90 +126,12 @@ serve(async (req) => {
       throw new Error('No authorization header')
     }
 
-    // Check OpenAI API key
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
-    console.log('OpenAI API key present:', !!openaiApiKey)
-    
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured')
-    }
+    // Load AI config
+    const aiConfig = await getAIConfig(serviceSupabase);
 
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
-    
-    console.log('Creating Supabase client...')
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: authHeader,
-        },
-      },
-    })
+    console.log('Calling AI Vision API via provider:', aiConfig.provider);
 
-    // Try to get user - if this fails, extract user ID from JWT
-    let userId: string
-    console.log('Attempting authentication...')
-    
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      if (userError || !user) {
-        console.warn('getUser failed, extracting from JWT:', userError?.message)
-        // Extract user ID from JWT token
-        const token = authHeader.replace('Bearer ', '')
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        userId = payload.sub
-        if (!userId) {
-          throw new Error('Could not extract user ID from token')
-        }
-        console.log('Extracted user ID from JWT:', userId)
-      } else {
-        userId = user.id
-        console.log('Got user ID from getUser:', userId)
-      }
-    } catch (jwtError) {
-      console.error('Authentication completely failed:', jwtError)
-      throw new Error('Authentication failed')
-    }
-
-    // Check quota and increment usage - use service role for database operations
-    console.log('Checking AI analysis quota for user:', userId)
-    const serviceSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-      auth: { persistSession: false }
-    });
-    const quotaCheck = await checkAndUpdateQuota(userId, serviceSupabase, true);
-    if (!quotaCheck.allowed) {
-      console.log('Quota exceeded for user:', userId, 'tier:', quotaCheck.subscription_tier);
-      return new Response(
-        JSON.stringify({ 
-          error: 'AI-analyskvoter överskridna för denna månad',
-          subscription_tier: quotaCheck.subscription_tier,
-          usage: quotaCheck.usage,
-          success: false
-        }),
-        {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-    console.log('Quota check passed, proceeding with analysis')
-
-    // Initialize OpenAI
-    console.log('Initializing OpenAI...')
-    const openai = new OpenAI({
-      apiKey: openaiApiKey,
-    })
-
-    console.log('Calling OpenAI Vision API...')
-
-    // Analyze receipt with OpenAI Vision
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: `You are a Swedish bookkeeping assistant. Analyze the receipt/invoice image and extract key information to propose bookkeeping transactions.
+    const systemContent = `You are a Swedish bookkeeping assistant. Analyze the receipt/invoice image and extract key information to propose bookkeeping transactions.
 
 IMPORTANT: Try to determine if this is a RECEIPT (already paid) or INVOICE (unpaid) by looking for visual clues:
 - RECEIPTS often show: "BETALT", "TACK FÖR KÖPET", transaction time, card payment confirmation
@@ -262,74 +184,45 @@ IMPORTANT: Always extract VAT information from Swedish receipts/invoices:
 - Use account 2641 for "Ingående moms" (input VAT)
 - If no VAT visible, assume 25% and calculate backwards from total
 
-Use Swedish accounting plan (BAS 2024) account codes:
-- 1000-1999: Tillgångar (Assets)
-- 2000-2999: Skulder och eget kapital (Liabilities & Equity)
-- 3000-3999: Intäkter (Revenue)
-- 4000-4999: Kostnader (Expenses)
-- 6000-6999: Rörelsekostnader (Operating expenses)
-- 7000-7999: Finansiella poster (Financial items)
+Use Swedish accounting plan (BAS 2024) account codes.
+Ensure entries balance (total debits = total credits)!`;
 
-Common expense accounts:
-- 6000: Kontorsmaterial
-- 6110: Kontorsteknik
-- 6212: Telefon
-- 6310: Representation
-- 6420: Hyra
-- 6540: IT-tjänster
-- 6570: Övriga tjänster
-
-For expenses, typically:
-- Debit: Expense account (6xxx)
-- Credit: Cash/Bank account (1xxx) or Accounts Payable (2640)
-
-Ensure entries balance (total debits = total credits)!`
-        },
+    // Call AI via abstraction layer
+    const aiResult = await aiComplete(aiConfig, {
+      model: aiConfig.visionModel,
+      messages: [
+        { role: 'system', content: systemContent },
         {
-          role: "user",
+          role: 'user',
           content: [
-            {
-              type: "text",
-              text: "Analyze this Swedish receipt and propose bookkeeping entries:"
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/jpeg;base64,${imageBase64}`
-              }
-            }
+            { type: 'text', text: 'Analyze this Swedish receipt and propose bookkeeping entries:' },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
           ]
         }
       ],
       max_tokens: 1000,
-      temperature: 0.1
-    })
+      temperature: 0.1,
+    });
 
-    console.log('OpenAI API call successful')
-    const analysisText = response.choices[0].message.content
-    console.log('Analysis result length:', analysisText?.length || 0)
-    console.log('RAW OpenAI response:', analysisText)
+    console.log('AI API call successful');
+    const analysisText = getContent(aiResult);
+    console.log('Analysis result length:', analysisText?.length || 0);
 
     let analysis
     try {
-      // Clean the response - sometimes OpenAI adds markdown formatting
       let cleanedText = analysisText || '{}'
       
-      // Remove markdown code blocks if present
       if (cleanedText.includes('```json')) {
         cleanedText = cleanedText.replace(/```json\s*/, '').replace(/\s*```$/, '')
       } else if (cleanedText.includes('```')) {
         cleanedText = cleanedText.replace(/```\s*/, '').replace(/\s*```$/, '')
       }
       
-      console.log('Cleaned text for parsing:', cleanedText)
       analysis = JSON.parse(cleanedText)
-      console.log('Parsed analysis:', JSON.stringify(analysis, null, 2))
     } catch (parseError) {
-      console.error('Failed to parse OpenAI response:', parseError)
+      console.error('Failed to parse AI response:', parseError)
       console.error('Raw response:', analysisText)
-      console.error('Cleaned response:', cleanedText)
-      throw new Error('Failed to parse receipt analysis - OpenAI returned invalid JSON')
+      throw new Error('Failed to parse receipt analysis - AI returned invalid JSON')
     }
 
     // Validate required fields
