@@ -6,15 +6,11 @@ import { authenticateUser } from './auth.ts';
 import { fetchUserData } from './data-fetcher.ts';
 import { buildLightContext, buildBookkeepingContext } from './context-builder.ts';
 import { classifyIntent } from './intent-classifier.ts';
-import { matchTemplate } from './template-matcher.ts';
-import { formatBookingProposal, formatClarificationRequest, formatConfirmation, formatMissingDataPrompt, formatFollowUpSuggestion } from './response-formatter.ts';
-import { analyzeRequiredFields, calculateTemplateAmounts } from './field-analyzer.ts';
-import { buildFinancialSnapshot } from './context-builder.ts';
-import { handleFunctionCall } from './function-handlers.ts';
-import { SYSTEM_PROMPT, getSystemPrompt } from './system-prompt.ts';
-import { FUNCTION_DEFINITIONS } from './function-definitions.ts';
+import { getSystemPrompt } from './system-prompt.ts';
 import { checkAndUpdateQuota, TIER_LIMITS } from '../_shared/quota.ts';
-import { getAIConfig, aiComplete, getContent, getToolCalls, AIProviderConfig, AIProviderError } from '../_shared/ai-client.ts';
+import { getAIConfig } from '../_shared/ai-client.ts';
+import { routeToAgent } from './agents/registry.ts';
+import { AgentContext } from './agents/types.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,7 +26,7 @@ serve(async (req) => {
     const { message, conversationHistory } = await req.json();
     if (!message) throw new Error('Message is required');
 
-    console.log('Intent Router: message received');
+    console.log('[Orchestrator] Message received');
 
     const authHeader = req.headers.get('Authorization');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -46,17 +42,17 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    // Load AI provider config from system_settings
-    const aiConfig = await getAIConfig(serviceSupabase);
+    // Load AI config and quota in parallel
+    const [aiConfig, quotaCheck] = await Promise.all([
+      getAIConfig(serviceSupabase),
+      checkAndUpdateQuota(userId, serviceSupabase, true),
+    ]);
 
-    // Quota check
-    const quotaCheck = await checkAndUpdateQuota(userId, serviceSupabase, true);
     if (!quotaCheck.allowed) {
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1, 1);
       const resetDate = nextMonth.toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' });
       const limitCount = TIER_LIMITS[quotaCheck.subscription_tier]?.ai_analyses || 50;
-
       return new Response(
         JSON.stringify({
           success: false,
@@ -69,65 +65,32 @@ serve(async (req) => {
       );
     }
 
-    // Fetch user data and live system prompt in parallel
+    // Fetch user data and system prompt in parallel
     const [userData, livePrompt] = await Promise.all([
       fetchUserData(userId, supabase),
       getSystemPrompt(serviceSupabase),
     ]);
+
     const templateNames = buildLightContext(userData);
 
-    // === INTENT CLASSIFICATION (lightweight AI call) ===
-    console.log('Classifying intent...');
+    // === INTENT CLASSIFICATION ===
+    console.log('[Orchestrator] Classifying intent...');
     const intent = await classifyIntent(message, templateNames, aiConfig);
-    console.log('Intent:', intent.intent, 'confidence:', intent.confidence);
+    console.log(`[Orchestrator] Intent: ${intent.intent}, confidence: ${intent.confidence}`);
 
-    // === PRE-ROUTING: Check if we're in a year-end guided flow ===
-    // If the last AI message is about årsbokslut, route ALL replies to full AI for continuity
-    const isYearEndContext = (() => {
-      if (!conversationHistory?.length) return false;
-      const lastAiMsg = [...conversationHistory].reverse().find(
-        (msg: ConversationMessage) => msg.sender === 'ai'
-      );
-      if (!lastAiMsg) return false;
-      return lastAiMsg.content.includes('årsbokslut') || 
-             lastAiMsg.content.includes('Checklista') || 
-             lastAiMsg.content.includes('bokslutet steg') ||
-             lastAiMsg.content.includes('Avskrivningar') ||
-             lastAiMsg.content.includes('Periodiseringar') ||
-             lastAiMsg.content.includes('Skatteavsättning') ||
-             lastAiMsg.content.includes('Bokslutssammanfattning');
-    })();
-
+    // === CONTEXT DETECTION: Year-end guided flow ===
+    const isYearEndContext = detectYearEndContext(conversationHistory);
     if (isYearEndContext && !message.match(/^(boka |bokför |köpt |betala |faktura )/i)) {
-      console.log('Year-end context detected — routing to full AI for guided flow');
-      const fullContext = buildBookkeepingContext(userData);
-      const aiResp = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
-      return new Response(
-        JSON.stringify({
-          success: true,
-          response: aiResp,
-          intent: 'year_end',
-          confidence: intent.confidence,
-          context_used: true,
-          quota_info: {
-            subscription_tier: quotaCheck.subscription_tier,
-            usage: quotaCheck.usage,
-          },
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.log('[Orchestrator] Year-end context → reporting agent');
+      intent.intent = 'year_end';
     }
 
-    // === PRE-ROUTING: Check if user is answering a field collection question ===
-    // Only resume field collection if:
-    // 1. There IS an active field context in the last AI message
-    // 2. The intent classifier did NOT already find a specific template match
-    // 3. The message looks like a simple answer (not a full new booking request)
+    // === CONTEXT DETECTION: Field collection ===
     const activeFieldContext = extractFieldContext(conversationHistory);
     if (activeFieldContext && !intent.matched_template_hint) {
       const isSimpleAnswer = message.trim().split(/\s+/).length <= 5 || parseSimpleAmount(message) !== null;
       if (isSimpleAnswer) {
-        console.log('Resuming field collection for template:', activeFieldContext);
+        console.log('[Orchestrator] Resuming field collection:', activeFieldContext);
         if (!['book_expense', 'book_sale', 'book_payment', 'confirm_booking'].includes(intent.intent)) {
           intent.intent = 'book_expense';
         }
@@ -136,291 +99,30 @@ serve(async (req) => {
         if (parsedAmount !== null) {
           intent.extracted_data.amount = parsedAmount;
         }
-      } else {
-        console.log('Ignoring old field context — new booking request detected');
       }
     }
 
-    let aiResponse = '';
+    // === ROUTE TO AGENT ===
+    const agentCtx: AgentContext = {
+      message,
+      conversationHistory,
+      intent,
+      userData,
+      aiConfig,
+      supabase,
+      userId,
+      systemPrompt: livePrompt,
+    };
 
-    // === ROUTING ===
-    switch (intent.intent) {
-      case 'book_expense':
-      case 'book_sale':
-      case 'book_payment': {
-        // Early check: if no data at all, ask the user what to book
-        const d = intent.extracted_data;
-        const hasEnoughData = d.amount || d.vendor || d.description;
-
-        if (!hasEnoughData) {
-          // Check if user is answering a field question from conversation history
-          const fieldContext = extractFieldContext(conversationHistory);
-          if (!fieldContext) {
-            aiResponse = formatMissingDataPrompt(intent.intent);
-            break;
-          }
-          // If field context found, fall through to template matching below
-        }
-
-        // Check if previous AI message was asking about a specific template
-        // Only use this fallback if intent classifier didn't already find a template
-        if (!intent.matched_template_hint && conversationHistory?.length) {
-          const lastAiMsg = [...conversationHistory].reverse().find(
-            (msg: ConversationMessage) => msg.sender === 'ai'
-          );
-          if (lastAiMsg) {
-            const fieldMarker = lastAiMsg.content.match(/<!-- field:(\w+) template:(.+?) -->/);
-            if (fieldMarker) {
-              console.log('Resuming field collection for template:', fieldMarker[2]);
-              intent.matched_template_hint = fieldMarker[2];
-            } else {
-              const templateMatch = lastAiMsg.content.match(/Jag hittade mallen \*\*(.+?)\*\*/);
-              if (templateMatch) {
-                console.log('Resuming template from context:', templateMatch[1]);
-                intent.matched_template_hint = templateMatch[1];
-              }
-            }
-          }
-        }
-
-        // Deterministic template matching
-        const match = await matchTemplate(intent, supabase, userId);
-
-        if (intent.clarification_needed && !intent.extracted_data.amount) {
-          aiResponse = formatClarificationRequest(intent.clarification_needed);
-        } else if (match) {
-          // === NEW: Template-driven field analysis ===
-          const requiredFields = match.template.required_fields as any[] | null;
-          const fieldResult = analyzeRequiredFields(
-            requiredFields,
-            intent.extracted_data,
-            conversationHistory,
-            match.template.template_name,
-            message
-          );
-
-          if (!fieldResult.complete) {
-            // Ask for next missing field
-            aiResponse = `❓ ${fieldResult.nextQuestion}`;
-          } else {
-            // All fields collected — calculate amounts and show proposal
-            const calculatedAmounts = calculateTemplateAmounts(
-              match.template.template_entries || [],
-              requiredFields,
-              fieldResult.fieldValues
-            );
-            const date = (fieldResult.fieldValues.date as string) || intent.extracted_data.date || new Date().toISOString().split('T')[0];
-            const desc = intent.extracted_data.description || intent.extracted_data.vendor || match.template.template_name;
-            const totalAmount = calculatedAmounts.reduce((sum, a) => sum + a, 0) / 2; // debit=credit, so total is half
-            aiResponse = formatBookingProposal(match, totalAmount, date, desc, calculatedAmounts);
-          }
-        } else {
-          // No template match — use full AI call with function calling
-          console.log('No template match — falling back to freeform AI booking');
-          const fullContext = buildBookkeepingContext(userData);
-          aiResponse = await handleFreeformBooking(message, conversationHistory, fullContext, aiConfig, supabase, userId, livePrompt);
-        }
-        break;
-      }
-
-      case 'confirm_booking': {
-        if (conversationHistory?.length) {
-          // Check if the last AI message was a year-end checklist or guide — route to full AI
-          const lastAiMessage = [...(conversationHistory || [])].reverse().find(
-            (msg: ConversationMessage) => msg.sender === 'ai'
-          );
-          if (lastAiMessage && (lastAiMessage.content.includes('årsbokslut') || lastAiMessage.content.includes('Checklista') || lastAiMessage.content.includes('bokslutet steg'))) {
-            console.log('Confirm in year-end context — routing to full AI for guided flow');
-            const fullContext = buildBookkeepingContext(userData);
-            aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
-            break;
-          }
-
-          // Find the last booking proposal in conversation
-          const lastProposal = [...(conversationHistory || [])].reverse().find(
-            (msg: ConversationMessage) => msg.sender === 'ai' && msg.content.includes('Bokföringsförslag')
-          );
-
-          if (lastProposal) {
-            // Try to parse entries from the markdown table in the proposal
-            const parsedEntries = parseProposalEntries(lastProposal.content);
-            const parsedDate = lastProposal.content.match(/\*\*Datum:\*\*\s*(\d{4}-\d{2}-\d{2})/)?.[1] || new Date().toISOString().split('T')[0];
-            const parsedDesc = lastProposal.content.match(/\*\*Beskrivning:\*\*\s*(.+)/)?.[1] || 'Bokförd transaktion';
-
-            if (parsedEntries.length > 0) {
-              // Use save-general-transaction directly
-              console.log('Confirming template booking with parsed entries:', parsedEntries.length);
-              const sessionId = `${userId}_${Date.now()}`;
-              aiResponse = await handleFunctionCall('save_general_transaction', {
-                description: parsedDesc,
-                entries: parsedEntries,
-                transactionDate: parsedDate,
-              }, supabase, sessionId);
-              if (!aiResponse) aiResponse = '✅ Transaktionen är bokförd!';
-
-              // Check for follow-up suggestion
-              const templateNameMatch = lastProposal.content.match(/tolkar det som \*\*(.+?)\*\*/);
-              if (templateNameMatch) {
-                aiResponse += await getFollowUpSuggestion(templateNameMatch[1], supabase, userData);
-              }
-            } else {
-              // Fallback: check for freeform proposal
-              const isFreeform = lastProposal.content.includes('utan mall');
-              if (isFreeform) {
-                const lastUserBooking = [...(conversationHistory || [])].reverse().find(
-                  (msg: ConversationMessage) => msg.sender === 'user' && msg.content !== message
-                );
-                if (lastUserBooking) {
-                  console.log('Confirming freeform booking...');
-                  const fullContext = buildBookkeepingContext(userData);
-                  const freeformResult = await executeFreeformBooking(
-                    lastUserBooking.content, conversationHistory, fullContext, aiConfig, supabase, userId, livePrompt
-                  );
-                  aiResponse = freeformResult || '✅ Transaktionen är bokförd!';
-                } else {
-                  aiResponse = 'Jag kunde inte hitta den tidigare transaktionen. Kan du upprepa vad du vill bokföra?';
-                }
-              } else {
-                // Legacy template-based confirmation
-                const lastUserBooking = [...(conversationHistory || [])].reverse().find(
-                  (msg: ConversationMessage) => msg.sender === 'user' && msg.content !== message
-                );
-                if (lastUserBooking) {
-                  const originalIntent = await classifyIntent(lastUserBooking.content, templateNames, aiConfig);
-                  if (originalIntent.matched_template_hint && originalIntent.extracted_data.amount) {
-                    const sessionId = `${userId}_${Date.now()}`;
-                    const args = {
-                      templateName: originalIntent.matched_template_hint,
-                      amount: originalIntent.extracted_data.amount,
-                      description: originalIntent.extracted_data.description || originalIntent.extracted_data.vendor || '',
-                      transactionDate: originalIntent.extracted_data.date || new Date().toISOString().split('T')[0],
-                      referenceNumber: originalIntent.extracted_data.reference || undefined,
-                    };
-                    aiResponse = await handleFunctionCall('use_transaction_template', args, supabase, sessionId);
-                    if (!aiResponse) aiResponse = '✅ Transaktionen är bokförd!';
-                    aiResponse += await getFollowUpSuggestion(originalIntent.matched_template_hint, supabase, userData);
-                  } else {
-                    aiResponse = 'Jag kunde inte hitta den tidigare transaktionen. Kan du upprepa vad du vill bokföra?';
-                  }
-                } else {
-                  aiResponse = 'Jag hittar ingen tidigare transaktion att bekräfta. Vad vill du bokföra?';
-                }
-              }
-            }
-          } else {
-            aiResponse = 'Det finns ingen pågående bokning att bekräfta. Beskriv vad du vill bokföra.';
-          }
-        } else {
-          aiResponse = 'Det finns ingen pågående bokning att bekräfta. Beskriv vad du vill bokföra.';
-        }
-        break;
-      }
-
-      case 'opening_balance': {
-        // Extract and present opening balance info
-        if (intent.extracted_data.amount) {
-          const sessionId = `${userId}_${Date.now()}`;
-          const args = {
-            accountCode: intent.extracted_data.reference || '1930',
-            accountName: intent.extracted_data.description || 'Checkkonto/Bankkonto',
-            amount: intent.extracted_data.amount,
-          };
-          aiResponse = await handleFunctionCall('save_opening_balance', args, supabase, sessionId);
-        } else {
-          aiResponse = formatClarificationRequest('Vilket konto och belopp vill du registrera som ingående balans?');
-        }
-        break;
-      }
-
-      case 'ask_question':
-      case 'view_report':
-      case 'unknown': {
-        // Full AI call with complete context (fallback to rich conversation)
-        const fullContext = buildBookkeepingContext(userData);
-        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
-        break;
-      }
-
-      case 'vat_report': {
-        // Determine quarter from extracted data or current quarter
-        const now = new Date();
-        const q = Math.floor(now.getMonth() / 3);
-        const year = now.getFullYear();
-        const periodStart = intent.extracted_data.date || `${year}-${String(q * 3 + 1).padStart(2, '0')}-01`;
-        const qEnd = new Date(year, q * 3 + 3, 0);
-        const periodEnd = qEnd.toISOString().split('T')[0];
-        
-        const sessionId = `${userId}_${Date.now()}`;
-        aiResponse = await handleFunctionCall('calculate_vat_report', { periodStart, periodEnd }, supabase, sessionId);
-        if (!aiResponse) {
-          const fullContext = buildBookkeepingContext(userData);
-          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
-        }
-        break;
-      }
-
-      case 'account_balance': {
-        const accountCode = intent.extracted_data.reference || '';
-        if (accountCode) {
-          const sessionId = `${userId}_${Date.now()}`;
-          aiResponse = await handleFunctionCall('calculate_account_balance', { accountCode }, supabase, sessionId);
-        } else {
-          // Let AI ask which account
-          const fullContext = buildBookkeepingContext(userData);
-          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
-        }
-        break;
-      }
-
-      case 'period_reconciliation': {
-        const accountCode = intent.extracted_data.reference || '';
-        if (accountCode) {
-          const sessionId = `${userId}_${Date.now()}`;
-          aiResponse = await handleFunctionCall('calculate_account_balance', { 
-            accountCode,
-            periodStart: intent.extracted_data.date || undefined,
-          }, supabase, sessionId);
-        } else {
-          const fullContext = buildBookkeepingContext(userData);
-          aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
-        }
-        break;
-      }
-
-      case 'year_end': {
-        // Extract year: FIRST check message text for explicit year, then extracted_data, then default
-        const yearMatch = message.match(/\b(20\d{2})\b/);
-        let year: number;
-        if (yearMatch) {
-          year = parseInt(yearMatch[1]);
-        } else if (intent.extracted_data.date) {
-          year = parseInt(intent.extracted_data.date.substring(0, 4));
-        } else {
-          year = new Date().getFullYear() - (new Date().getMonth() < 3 ? 1 : 0);
-        }
-        console.log('Year-end: extracted year =', year, 'from message:', message, 'yearMatch:', yearMatch?.[1], 'extracted_data.date:', intent.extracted_data.date);
-        const sessionId = `${userId}_${Date.now()}`;
-        aiResponse = await handleFunctionCall('get_year_end_checklist', { fiscalYear: year }, supabase, sessionId);
-        break;
-      }
-
-      case 'analyze_image': {
-        aiResponse = '📸 Skicka bilden så analyserar jag den åt dig!';
-        break;
-      }
-
-      default: {
-        const fullContext = buildBookkeepingContext(userData);
-        aiResponse = await handleFullAICall(message, conversationHistory, fullContext, aiConfig, livePrompt);
-      }
-    }
+    const result = await routeToAgent(agentCtx);
 
     return new Response(
       JSON.stringify({
         success: true,
-        response: aiResponse,
+        response: result.response,
         intent: intent.intent,
         confidence: intent.confidence,
+        action_taken: result.action_taken,
         context_used: true,
         quota_info: {
           subscription_tier: quotaCheck.subscription_tier,
@@ -430,7 +132,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Intent Router error:', error);
+    console.error('[Orchestrator] Error:', error);
     return new Response(
       JSON.stringify({ error: error.message || 'Ett oväntat fel uppstod', success: false }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -438,285 +140,38 @@ serve(async (req) => {
   }
 });
 
-/**
- * Execute a freeform booking after user confirmation.
- */
-async function executeFreeformBooking(
-  originalMessage: string,
-  conversationHistory: ConversationMessage[] | undefined,
-  context: string,
-  aiConfig: AIProviderConfig,
-  supabase: any,
-  userId: string,
-  systemPrompt: string = SYSTEM_PROMPT
-): Promise<string> {
-  const freeformPrompt = `${systemPrompt}\n\nBOKFÖRINGSKONTEXT:\n${context}\n\nVIKTIGT: Användaren har BEKRÄFTAT att denna transaktion ska bokföras. Använd funktionen save_general_transaction med korrekta BAS-konton. Se till att debet = kredit.`;
+// --- Orchestrator helpers ---
 
-  const messages: Array<{ role: string; content: string }> = [
-    { role: 'system', content: freeformPrompt },
-  ];
-  if (conversationHistory?.length) {
-    for (const msg of conversationHistory) {
-      messages.push({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.content });
-    }
-  }
-
-  try {
-    const data = await aiComplete(aiConfig, {
-      messages,
-      max_tokens: 1500,
-      temperature: 0.1,
-      tools: FUNCTION_DEFINITIONS,
-      tool_choice: { type: 'function', function: { name: 'save_general_transaction' } },
-    });
-
-    const toolCalls = getToolCalls(data);
-    if (toolCalls.length > 0 && toolCalls[0].function?.name === 'save_general_transaction') {
-      const fnArgs = JSON.parse(toolCalls[0].function.arguments || '{}');
-      console.log('Executing freeform transaction:', fnArgs);
-      const sessionId = `${userId}_${Date.now()}`;
-      return await handleFunctionCall('save_general_transaction', fnArgs, supabase, sessionId);
-    }
-
-    return getContent(data) || '❌ Kunde inte skapa transaktionen.';
-  } catch (error) {
-    console.error('Execute freeform failed:', error);
-    if (error instanceof AIProviderError) {
-      if (error.status === 429) return '⚠️ AI-tjänsten är tillfälligt överbelastad. Försök igen om en stund.';
-      if (error.status === 402) return '⚠️ AI-krediter slut. Kontakta support.';
-    }
-    return '❌ Ett fel uppstod vid bokföringen. Försök igen.';
-  }
-}
-
-/**
- * Full AI call for questions, reports, and unknown intents.
- */
-async function handleFullAICall(
-  message: string,
-  conversationHistory: ConversationMessage[] | undefined,
-  context: string,
-  aiConfig: AIProviderConfig,
-  systemPrompt: string = SYSTEM_PROMPT
-): Promise<string> {
-  const messages = buildMessages(message, conversationHistory, context, systemPrompt);
-
-  try {
-    const data = await aiComplete(aiConfig, {
-      messages,
-      max_tokens: 1000,
-      temperature: 0.3,
-    });
-
-    return getContent(data) || 'Jag förstod inte riktigt. Kan du omformulera?';
-  } catch (error) {
-    console.error('Full AI call failed:', error);
-    if (error instanceof AIProviderError) {
-      if (error.status === 429) return '⚠️ AI-tjänsten är tillfälligt överbelastad. Försök igen om en stund.';
-      if (error.status === 402) return '⚠️ AI-krediter slut. Kontakta support.';
-    }
-    return 'Ett fel uppstod. Försök igen.';
-  }
-}
-
-/**
- * Freeform booking: AI call with function calling to create transactions without templates.
- * Used when no template matches the user's booking intent.
- */
-async function handleFreeformBooking(
-  message: string,
-  conversationHistory: ConversationMessage[] | undefined,
-  context: string,
-  aiConfig: AIProviderConfig,
-  supabase: any,
-  userId: string,
-  systemPrompt: string = SYSTEM_PROMPT
-): Promise<string> {
-  const freeformPrompt = `${systemPrompt}
-
-BOKFÖRINGSKONTEXT:
-${context}
-
-VIKTIGT: Användaren vill bokföra en transaktion och det finns ingen passande mall.
-Du MÅSTE använda funktionen save_general_transaction för att skapa bokföringsposterna.
-Välj rätt konton från BAS-kontoplanen ovan. Se till att debet = kredit.
-Visa alltid posterna för användaren och be om bekräftelse FÖRST.
-Formatera förslaget tydligt med kontonummer, kontonamn och belopp.`;
-
-  const messages: Array<{ role: string; content: string }> = [
-    { role: 'system', content: freeformPrompt },
-  ];
-
-  if (conversationHistory?.length) {
-    for (const msg of conversationHistory) {
-      messages.push({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.content });
-    }
-  }
-  messages.push({ role: 'user', content: message });
-
-  try {
-    const data = await aiComplete(aiConfig, {
-      messages,
-      max_tokens: 1500,
-      temperature: 0.2,
-      tools: FUNCTION_DEFINITIONS,
-      tool_choice: 'auto',
-    });
-
-    const choice = data.choices?.[0];
-    if (!choice) return 'Jag kunde inte skapa ett bokföringsförslag. Försök igen.';
-
-    const toolCalls = getToolCalls(data);
-    if (toolCalls.length > 0) {
-      const toolCall = toolCalls[0];
-      const fnName = toolCall.function?.name;
-      const fnArgs = JSON.parse(toolCall.function?.arguments || '{}');
-
-      console.log('Freeform AI chose function:', fnName, fnArgs);
-
-      if (fnName === 'save_general_transaction') {
-        const entries = fnArgs.entries || [];
-        let proposal = `📋 **Bokföringsförslag (utan mall):**\n\n`;
-        proposal += `**${fnArgs.description}**\n`;
-        proposal += `Datum: ${fnArgs.transactionDate || new Date().toISOString().split('T')[0]}\n\n`;
-
-        for (const entry of entries) {
-          if (entry.debitAmount > 0) {
-            proposal += `• Debet: ${entry.accountCode} ${entry.accountName} — ${entry.debitAmount} kr\n`;
-          }
-          if (entry.creditAmount > 0) {
-            proposal += `• Kredit: ${entry.accountCode} ${entry.accountName} — ${entry.creditAmount} kr\n`;
-          }
-        }
-
-        proposal += `\nSvara **"ja"** för att bokföra.`;
-        return proposal;
-      } else {
-        const sessionId = `${userId}_${Date.now()}`;
-        return await handleFunctionCall(fnName, fnArgs, supabase, sessionId);
-      }
-    }
-
-    return choice.message?.content || 'Jag kunde inte skapa ett bokföringsförslag.';
-  } catch (error) {
-    console.error('Freeform booking failed:', error);
-    return 'Ett fel uppstod vid bokföringsförslaget. Försök igen.';
-  }
-}
-
-function buildMessages(message: string, conversationHistory: ConversationMessage[] | undefined, context: string, systemPrompt: string = SYSTEM_PROMPT) {
-  const messages: Array<{ role: string; content: string }> = [
-    { role: 'system', content: `${systemPrompt}\n\nBOKFÖRINGSKONTEXT:\n${context}` },
-  ];
-  if (conversationHistory?.length) {
-    for (const msg of conversationHistory) {
-      messages.push({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.content });
-    }
-  }
-  messages.push({ role: 'user', content: message });
-  return messages;
-}
-
-/**
- * Extract field context from conversation history when user is answering a field question.
- * Returns the template name if found, null otherwise.
- */
-function extractFieldContext(conversationHistory: ConversationMessage[] | undefined): string | null {
-  if (!conversationHistory?.length) return null;
-
-  // Only check the LAST AI message for active field collection
+function detectYearEndContext(conversationHistory: ConversationMessage[] | undefined): boolean {
+  if (!conversationHistory?.length) return false;
   const lastAiMsg = [...conversationHistory].reverse().find(
     (msg: ConversationMessage) => msg.sender === 'ai'
   );
+  if (!lastAiMsg) return false;
+  return lastAiMsg.content.includes('årsbokslut') ||
+    lastAiMsg.content.includes('Checklista') ||
+    lastAiMsg.content.includes('bokslutet steg') ||
+    lastAiMsg.content.includes('Avskrivningar') ||
+    lastAiMsg.content.includes('Periodiseringar') ||
+    lastAiMsg.content.includes('Skatteavsättning') ||
+    lastAiMsg.content.includes('Bokslutssammanfattning');
+}
 
+function extractFieldContext(conversationHistory: ConversationMessage[] | undefined): string | null {
+  if (!conversationHistory?.length) return null;
+  const lastAiMsg = [...conversationHistory].reverse().find(
+    (msg: ConversationMessage) => msg.sender === 'ai'
+  );
   if (lastAiMsg && lastAiMsg.content.includes('<!-- field:')) {
     const match = lastAiMsg.content.match(/<!-- field:\w+ template:(.+?) -->/);
     return match ? match[1] : null;
   }
-
   return null;
 }
 
-/**
- * Look up follow-up templates for a just-booked template and format suggestions.
- */
-async function getFollowUpSuggestion(
-  templateName: string,
-  supabase: any,
-  userData: any
-): Promise<string> {
-  try {
-    // Fetch the booked template to check for follow_up_templates
-    const { data: bookedTemplate } = await supabase
-      .from('airledger_transaction_templates')
-      .select('follow_up_templates')
-      .eq('template_name', templateName)
-      .single();
-
-    if (!bookedTemplate?.follow_up_templates?.length) return '';
-
-    // Fetch the follow-up template details
-    const followUpName = bookedTemplate.follow_up_templates[0];
-    const { data: followUp } = await supabase
-      .from('airledger_transaction_templates')
-      .select('template_name, description, template_entries')
-      .eq('template_name', followUpName)
-      .single();
-
-    if (!followUp) return '';
-
-    return formatFollowUpSuggestion(followUp, userData?.accountBalances);
-  } catch (err) {
-    console.error('Follow-up suggestion error:', err);
-    return '';
-  }
-}
-
-/**
- * Parse a simple amount from user text like "0", "14700", "14 700 kr"
- */
 function parseSimpleAmount(text: string): number | null {
   const cleaned = text.replace(/\s/g, '').replace(/kr$/i, '').replace(/SEK$/i, '').trim();
   const match = cleaned.match(/^-?[\d]+([.,]\d+)?$/);
-  if (match) {
-    return parseFloat(cleaned.replace(',', '.'));
-  }
+  if (match) return parseFloat(cleaned.replace(',', '.'));
   return null;
-}
-
-/**
- * Parse booking proposal entries from a markdown table in AI response.
- * Expects format: | 1930 Företagskonto | 14 700 kr |  |
- */
-function parseProposalEntries(proposalContent: string): Array<{
-  accountCode: string;
-  accountName: string;
-  debitAmount: number;
-  creditAmount: number;
-}> {
-  const entries: Array<{ accountCode: string; accountName: string; debitAmount: number; creditAmount: number }> = [];
-
-  // Match table rows: | account_code account_name | debit | credit |
-  const tableRows = proposalContent.match(/\|\s*(\d{4})\s+(.+?)\s*\|\s*([\d\s]*(?:kr)?)\s*\|\s*([\d\s]*(?:kr)?)\s*\|/g);
-  if (!tableRows) return entries;
-
-  for (const row of tableRows) {
-    const match = row.match(/\|\s*(\d{4})\s+(.+?)\s*\|\s*([\d\s,\.]*(?:kr)?)\s*\|\s*([\d\s,\.]*(?:kr)?)\s*\|/);
-    if (!match) continue;
-
-    const accountCode = match[1];
-    const accountName = match[2].trim();
-    const debitStr = match[3].replace(/\s/g, '').replace(/kr$/i, '').replace(',', '.').trim();
-    const creditStr = match[4].replace(/\s/g, '').replace(/kr$/i, '').replace(',', '.').trim();
-
-    const debit = debitStr ? parseFloat(debitStr) || 0 : 0;
-    const credit = creditStr ? parseFloat(creditStr) || 0 : 0;
-
-    // Skip rows where both are 0
-    if (debit === 0 && credit === 0) continue;
-
-    entries.push({ accountCode, accountName, debitAmount: debit, creditAmount: credit });
-  }
-
-  return entries;
 }
