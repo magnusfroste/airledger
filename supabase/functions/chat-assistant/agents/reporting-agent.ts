@@ -1,5 +1,6 @@
 import { Agent, AgentContext, AgentResult } from './types.ts';
 import { REPORTING_PROMPT } from './prompts/reporting.ts';
+import { getAgentPrompt } from './prompts/loader.ts';
 import { ConversationMessage } from '../../_shared/types.ts';
 import { handleFunctionCall } from '../function-handlers.ts';
 import { buildBookkeepingContext } from '../context-builder.ts';
@@ -37,7 +38,7 @@ export class ReportingAgent implements Agent {
     let response = await handleFunctionCall('calculate_vat_report', { periodStart, periodEnd }, supabase, sessionId);
     if (!response) {
       const fullContext = buildBookkeepingContext(userData);
-      response = await this.handleFullAICall(message, conversationHistory, fullContext, aiConfig, systemPrompt);
+      response = await this.handleFullAICall(message, conversationHistory, fullContext, aiConfig, systemPrompt, supabase);
     }
     return { response, action_taken: 'answered' };
   }
@@ -51,7 +52,7 @@ export class ReportingAgent implements Agent {
       return { response, action_taken: 'answered' };
     }
     const fullContext = buildBookkeepingContext(userData);
-    const response = await this.handleFullAICall(message, conversationHistory, fullContext, aiConfig, systemPrompt);
+    const response = await this.handleFullAICall(message, conversationHistory, fullContext, aiConfig, systemPrompt, supabase);
     return { response, action_taken: 'clarified' };
   }
 
@@ -67,7 +68,7 @@ export class ReportingAgent implements Agent {
       return { response, action_taken: 'answered' };
     }
     const fullContext = buildBookkeepingContext(userData);
-    const response = await this.handleFullAICall(message, conversationHistory, fullContext, aiConfig, systemPrompt);
+    const response = await this.handleFullAICall(message, conversationHistory, fullContext, aiConfig, systemPrompt, supabase);
     return { response, action_taken: 'clarified' };
   }
 
@@ -90,16 +91,17 @@ export class ReportingAgent implements Agent {
 
   private async handleGenericReport(ctx: AgentContext): Promise<AgentResult> {
     const fullContext = buildBookkeepingContext(ctx.userData);
-    const response = await this.handleFullAICall(ctx.message, ctx.conversationHistory, fullContext, ctx.aiConfig, ctx.systemPrompt);
+    const response = await this.handleFullAICall(ctx.message, ctx.conversationHistory, fullContext, ctx.aiConfig, ctx.systemPrompt, ctx.supabase);
     return { response, action_taken: 'answered' };
   }
 
   private async handleFullAICall(
     message: string, conversationHistory: ConversationMessage[] | undefined,
-    context: string, aiConfig: any, systemPrompt: string
+    context: string, aiConfig: any, systemPrompt: string, supabase?: any
   ): Promise<string> {
+    const dynamicPrompt = supabase ? await getAgentPrompt('reporting', supabase, REPORTING_PROMPT) : REPORTING_PROMPT;
     const messages: Array<{ role: string; content: string }> = [
-      { role: 'system', content: `${REPORTING_PROMPT}\n\nBOKFÖRINGSKONTEXT:\n${context}` },
+      { role: 'system', content: `${dynamicPrompt}\n\nBOKFÖRINGSKONTEXT:\n${context}` },
     ];
     if (conversationHistory?.length) {
       for (const msg of conversationHistory) {

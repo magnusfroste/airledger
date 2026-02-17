@@ -1,5 +1,6 @@
 import { Agent, AgentContext, AgentResult } from './types.ts';
 import { BOOKING_PROMPT } from './prompts/booking.ts';
+import { getAgentPrompt } from './prompts/loader.ts';
 import { ConversationMessage } from '../../_shared/types.ts';
 import { matchTemplate } from '../template-matcher.ts';
 import { analyzeRequiredFields, calculateTemplateAmounts } from '../field-analyzer.ts';
@@ -241,7 +242,8 @@ export class BookingAgent implements Agent {
     message: string, conversationHistory: ConversationMessage[] | undefined,
     context: string, aiConfig: any, supabase: any, userId: string, systemPrompt: string
   ): Promise<string> {
-    const freeformPrompt = `${BOOKING_PROMPT}\n\nBOKFÖRINGSKONTEXT:\n${context}\n\nVIKTIGT: Ingen passande mall finns. Använd save_general_transaction. Visa posterna och be om bekräftelse FÖRST.`;
+    const dynamicPrompt = await getAgentPrompt('booking', supabase, BOOKING_PROMPT);
+    const freeformPrompt = `${dynamicPrompt}\n\nBOKFÖRINGSKONTEXT:\n${context}\n\nVIKTIGT: Ingen passande mall finns. Använd save_general_transaction. Visa posterna och be om bekräftelse FÖRST.`;
     const messages: Array<{ role: string; content: string }> = [{ role: 'system', content: freeformPrompt }];
     if (conversationHistory?.length) {
       for (const msg of conversationHistory) {
@@ -279,7 +281,8 @@ export class BookingAgent implements Agent {
     originalMessage: string, conversationHistory: ConversationMessage[] | undefined,
     context: string, aiConfig: any, supabase: any, userId: string, systemPrompt: string
   ): Promise<string> {
-    const prompt = `${BOOKING_PROMPT}\n\nBOKFÖRINGSKONTEXT:\n${context}\n\nVIKTIGT: Användaren har BEKRÄFTAT. Använd save_general_transaction. Debet = Kredit.`;
+    const dynamicPrompt2 = await getAgentPrompt('booking', supabase, BOOKING_PROMPT);
+    const prompt = `${dynamicPrompt2}\n\nBOKFÖRINGSKONTEXT:\n${context}\n\nVIKTIGT: Användaren har BEKRÄFTAT. Använd save_general_transaction. Debet = Kredit.`;
     const messages: Array<{ role: string; content: string }> = [{ role: 'system', content: prompt }];
     if (conversationHistory?.length) {
       for (const msg of conversationHistory) {

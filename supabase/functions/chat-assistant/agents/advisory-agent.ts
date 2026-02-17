@@ -1,5 +1,6 @@
 import { Agent, AgentContext, AgentResult } from './types.ts';
 import { ADVISORY_PROMPT } from './prompts/advisory.ts';
+import { getAgentPrompt } from './prompts/loader.ts';
 import { ConversationMessage } from '../../_shared/types.ts';
 import { buildBookkeepingContext } from '../context-builder.ts';
 import { aiComplete, getContent, AIProviderError } from '../../_shared/ai-client.ts';
@@ -17,9 +18,10 @@ export class AdvisoryAgent implements Agent {
       return { response: '📸 Skicka bilden så analyserar jag den åt dig!', action_taken: 'clarified' };
     }
 
+    const dynamicPrompt = await getAgentPrompt('advisory', supabase, ADVISORY_PROMPT);
     const fullContext = buildBookkeepingContext(userData);
     const messages: Array<{ role: string; content: string }> = [
-      { role: 'system', content: `${ADVISORY_PROMPT}\n\nBOKFÖRINGSKONTEXT:\n${fullContext}` },
+      { role: 'system', content: `${dynamicPrompt}\n\nBOKFÖRINGSKONTEXT:\n${fullContext}` },
     ];
     if (conversationHistory?.length) {
       for (const msg of conversationHistory) {

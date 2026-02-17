@@ -1,4 +1,4 @@
-import { Agent, AgentContext, AgentResult } from './types.ts';
+import { Agent, AgentContext, AgentResult, ConsultQuery, ConsultResult } from './types.ts';
 import { IntentType } from '../../_shared/types.ts';
 import { BookingAgent } from './booking-agent.ts';
 import { ReportingAgent } from './reporting-agent.ts';
@@ -35,10 +35,43 @@ export function getAgentForIntent(intent: IntentType): Agent {
 }
 
 /**
- * Execute the appropriate agent for a given context.
+ * Create a consult function that allows agents to query each other.
+ * Max depth of 2 to prevent infinite recursion.
+ */
+function createConsultFn(
+  parentCtx: AgentContext,
+  depth: number = 0
+): (agentName: string, query: ConsultQuery) => Promise<ConsultResult> {
+  return async (agentName: string, query: ConsultQuery): Promise<ConsultResult> => {
+    if (depth >= 2) {
+      return { answer: 'Max konsultationsdjup nått.', confidence: 0, source_agent: agentName };
+    }
+    const agent = agents[agentName];
+    if (!agent) {
+      return { answer: `Agent "${agentName}" finns inte.`, confidence: 0, source_agent: agentName };
+    }
+    console.log(`[Consult] ${parentCtx.intent.intent} → ${agentName}: "${query.question}"`);
+    const miniCtx: AgentContext = {
+      ...parentCtx,
+      message: query.question,
+      conversationHistory: [],
+      intent: { ...parentCtx.intent, intent: 'ask_question' },
+      consult: createConsultFn(parentCtx, depth + 1),
+    };
+    const result = await agent.execute(miniCtx);
+    return { answer: result.response, confidence: 1, source_agent: agentName };
+  };
+}
+
+/**
+ * Execute the appropriate agent for a given context, with consult support.
  */
 export async function routeToAgent(ctx: AgentContext): Promise<AgentResult> {
   const agent = getAgentForIntent(ctx.intent.intent);
   console.log(`[Router] ${ctx.intent.intent} → ${agent.name}`);
+
+  // Inject consult capability
+  ctx.consult = createConsultFn(ctx, 0);
+
   return agent.execute(ctx);
 }

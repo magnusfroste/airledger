@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminRole } from '@/hooks/useAdminRole';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, FileText, List, Users, MessageSquare, AlertTriangle, Plug, Search } from 'lucide-react';
+import { Shield, FileText, List, Users, MessageSquare, AlertTriangle, Plug, Search, Bot } from 'lucide-react';
 import AdminTemplates from '@/components/admin/AdminTemplates';
 import AdminAccounts from '@/components/admin/AdminAccounts';
 import AdminUsers from '@/components/admin/AdminUsers';
@@ -10,6 +10,7 @@ import AdminPrompt from '@/components/admin/AdminPrompt';
 import AdminWarningRules from '@/components/admin/AdminWarningRules';
 import AdminIntegrations from '@/components/admin/AdminIntegrations';
 import AdminSEO from '@/components/admin/AdminSEO';
+import AdminAgents from '@/components/admin/AdminAgents';
 
 const Admin = () => {
   const { isAdmin, loading } = useAdminRole();
@@ -39,7 +40,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="templates" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="templates" className="flex items-center gap-1.5 text-xs sm:text-sm">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Mallar</span>
@@ -55,6 +56,10 @@ const Admin = () => {
           <TabsTrigger value="users" className="flex items-center gap-1.5 text-xs sm:text-sm">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Användare</span>
+          </TabsTrigger>
+          <TabsTrigger value="agents" className="flex items-center gap-1.5 text-xs sm:text-sm">
+            <Bot className="h-4 w-4" />
+            <span className="hidden sm:inline">Agenter</span>
           </TabsTrigger>
           <TabsTrigger value="prompt" className="flex items-center gap-1.5 text-xs sm:text-sm">
             <MessageSquare className="h-4 w-4" />
@@ -81,6 +86,9 @@ const Admin = () => {
         </TabsContent>
         <TabsContent value="users">
           <AdminUsers />
+        </TabsContent>
+        <TabsContent value="agents">
+          <AdminAgents />
         </TabsContent>
         <TabsContent value="prompt">
           <AdminPrompt />

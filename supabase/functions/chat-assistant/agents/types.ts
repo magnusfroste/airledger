@@ -13,6 +13,23 @@ export interface AgentResult {
 }
 
 /**
+ * Query for agent-to-agent consultation.
+ */
+export interface ConsultQuery {
+  question: string;
+  context?: Record<string, any>;
+}
+
+/**
+ * Result from an agent consultation.
+ */
+export interface ConsultResult {
+  answer: string;
+  confidence: number;
+  source_agent: string;
+}
+
+/**
  * Context passed to every agent by the orchestrator.
  */
 export interface AgentContext {
@@ -24,6 +41,7 @@ export interface AgentContext {
   supabase: any;
   userId: string;
   systemPrompt: string;
+  consult?: (agentName: string, query: ConsultQuery) => Promise<ConsultResult>;
 }
 
 /**

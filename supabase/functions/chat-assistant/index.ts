@@ -4,13 +4,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { ConversationMessage } from './types.ts';
 import { authenticateUser } from './auth.ts';
 import { fetchUserData } from './data-fetcher.ts';
-import { buildLightContext, buildBookkeepingContext } from './context-builder.ts';
+import { buildLightContext } from './context-builder.ts';
 import { classifyIntent } from './intent-classifier.ts';
 import { getSystemPrompt } from './system-prompt.ts';
 import { checkAndUpdateQuota, TIER_LIMITS } from '../_shared/quota.ts';
 import { getAIConfig } from '../_shared/ai-client.ts';
 import { routeToAgent } from './agents/registry.ts';
 import { AgentContext } from './agents/types.ts';
+import { logAgentExecution } from './agents/logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -102,7 +103,7 @@ serve(async (req) => {
       }
     }
 
-    // === ROUTE TO AGENT ===
+    // === ROUTE TO AGENT (with timing) ===
     const agentCtx: AgentContext = {
       message,
       conversationHistory,
@@ -114,7 +115,38 @@ serve(async (req) => {
       systemPrompt: livePrompt,
     };
 
-    const result = await routeToAgent(agentCtx);
+    const startTime = performance.now();
+    let result;
+    let agentSuccess = true;
+    let agentError: string | undefined;
+
+    try {
+      result = await routeToAgent(agentCtx);
+    } catch (err) {
+      agentSuccess = false;
+      agentError = err.message || 'Unknown error';
+      throw err;
+    } finally {
+      const elapsed = Math.round(performance.now() - startTime);
+      const agentName = intent.intent.startsWith('book_') || intent.intent === 'confirm_booking' || intent.intent === 'opening_balance'
+        ? 'booking'
+        : ['vat_report', 'account_balance', 'period_reconciliation', 'year_end', 'view_report'].includes(intent.intent)
+          ? 'reporting'
+          : 'advisory';
+
+      // Log asynchronously — don't block response
+      logAgentExecution(serviceSupabase, {
+        userId,
+        agentName,
+        intent: intent.intent,
+        executionTimeMs: elapsed,
+        actionTaken: result?.action_taken,
+        success: agentSuccess,
+        errorMessage: agentError,
+      }).catch(console.error);
+
+      console.log(`[Orchestrator] ${agentName} completed in ${elapsed}ms`);
+    }
 
     return new Response(
       JSON.stringify({
