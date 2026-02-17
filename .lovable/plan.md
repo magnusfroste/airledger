@@ -1,362 +1,187 @@
 
-# Air 2.0 — Steg 2: Agent Intelligence & Observability
+# AirLedger AI -- Fullstandig Systemanalys och Vagkarta
 
-## Översikt
+## 1. Nuvarande Arkitektur (Inventering)
 
-Steg 2 bygger vidare på agent-separationen med fyra kapabiliteter:
+### 1.1 Backend: Agent-Orkestrator-Modell
 
-1. **Agent-to-Agent konsultation** — agenter kan fråga varandra
-2. **Admin-UI för agent-prompter** — redigera prompter per agent i /admin
-3. **Per-agent loggning & prestandamätning** — synlighet per agent
-4. **Dynamisk agent-registrering** — lägg till agenter utan kodändringar
+```text
+Anvandare
+   |
+   v
+[chat-assistant/index.ts] -- Orkestrator
+   |
+   +-- classifyIntent() --> AI-baserad intent-klassificering
+   |
+   +-- routeToAgent() --> Agent Registry
+   |       |
+   |       +-- BookingAgent   (book_expense, book_sale, book_payment, confirm_booking, opening_balance)
+   |       +-- ReportingAgent (vat_report, account_balance, period_reconciliation, year_end, view_report)
+   |       +-- AdvisoryAgent  (ask_question, analyze_image, unknown)
+   |       +-- DynamicAgent   (admin-konfigurerade via agent_config-tabell)
+   |
+   +-- logAgentExecution() --> agent_logs (asynkront)
+```
+
+### 1.2 Dataflode vid Bokning
+
+```text
+Anvandardinput
+   |
+   v
+Intent Classifier (AI + Function Calling)
+   |
+   v
+Template Matcher (4 steg: exakt -> kategori -> nyckelord -> beloppoverride)
+   |
+   +-- Mall hittad --> Field Analyzer --> Proposal --> Bekraftelse --> use-transaction-template (edge fn)
+   |
+   +-- Ingen mall --> Freeform AI --> save-general-transaction (edge fn)
+```
+
+### 1.3 Kontextlager (vad AI:n "vet")
+
+| Kontextkalla | Data | Injiceras var |
+|---|---|---|
+| Profil | Foretagsnamn, bransch | buildBookkeepingContext |
+| Mallar (103 st, 22 kategorier) | Namn, poster, nyckelord | buildLightContext + buildBookkeepingContext |
+| Senaste transaktioner (20 st) | Datum, beskrivning, belopp | buildBookkeepingContext |
+| BAS-kontoplan (1222 konton) | Koder, namn, typ, normalbalans | buildBookkeepingContext |
+| Ingaende balanser | Konto, belopp, typ | buildBookkeepingContext |
+| Momsammanfattning | Utg/Ing/Netto for kvartalet | buildBookkeepingContext |
+| Kontosaldon (Financial Snapshot) | IB + debet - kredit per konto | buildFinancialSnapshot |
+| Leverantorsmonster (NY) | Vendor -> mall, snittbelopp, frekvens | buildBookkeepingContext |
+| Mallpreferenser (NY) | Mest anvanda mallar | buildBookkeepingContext |
+
+### 1.4 Valideringsmekanismer (befintliga)
+
+| Kontroll | Plats | Typ |
+|---|---|---|
+| Debet = Kredit | save-general-transaction | Hard (blockerar) |
+| Kontokod existerar i BAS | save-general-transaction | Hard (blockerar) |
+| Dubblettskydd (5 min) | save-general-transaction | Hard (returnerar befintlig) |
+| Negativa belopp | save-general-transaction | Hard (blockerar) |
+| Beloppbaserade overrides | template-matcher (prisbasbelopp) | Auto-switch mall |
+| DB-drivna varningsregler | template-matcher (warning_rules) | Soft (visas i forslag) |
+| In-memory deduplicering | deduplication.ts | Per edge function-anrop |
+
+### 1.5 Frontend-struktur
+
+| Sida | Funktion |
+|---|---|
+| / (LandingPage) | Landning, demo-chatt |
+| /chat | Huvudgranssnitt -- AI-konversation |
+| /transactions | Transaktionslista |
+| /templates | Mallhantering |
+| /reports | Resultatrakning |
+| /balance-sheet | Balansrakning |
+| /general-ledger | Huvudbok |
+| /opening-balances | Ingaende balanser |
+| /settings | Installningar + profil |
+| /subscription | Prenumerationshantering |
+| /admin | Admin (AI-provider, prompter, agenter, mallar, varningsregler, SEO, anvandare) |
+
+### 1.6 Edge Functions (14 st)
+
+| Funktion | Syfte |
+|---|---|
+| chat-assistant | Orkestrator + agenter |
+| analyze-receipt | Kvittoanalys (vision) |
+| analyze-bank-statement | Bankutdragstolkning (vision) |
+| classify-document | Dokumentklassificering |
+| save-transaction | Enkel transaktion |
+| save-general-transaction | Komplex transaktion (fria poster) |
+| use-transaction-template | Mallbaserad transaktion |
+| save-opening-balance | Ingaende balanser |
+| import-bas-accounts | Kontoplansimport |
+| check-subscription | Prenumerationskontroll |
+| create-checkout / customer-portal | Stripe-integration |
+| export-templates / import-templates / validate-templates | Mallhantering |
+| voice-to-text | Rostigenkanning |
+| get-seo-settings | SEO-metadata |
 
 ---
 
-## 2.1 Agent-to-Agent konsultation
+## 2. Identifierade Gap och Prioriteringar
 
-### Problem
-BookingAgent behöver ibland veta momsregler (ReportingAgent-domän) eller ge pedagogiska förklaringar (AdvisoryAgent-domän). Idag finns ingen mekanism för detta.
+### GAP 1: Mallbiblioteket ar underutnyttjat (HOGSTA PRIORITET)
 
-### Design
+**Problem:** 103 mallar finns, men bara 1 har `required_fields` och bara 1 har `follow_up_templates`. Det innebar att:
+- 102 mallar behandlar allt som ett enda belopp -- trots att manga transaktioner har flera datapunkter (t.ex. forsaljning av inventarier kraver bade anskaffningsvarde och forsaljningspris)
+- Foljdtransaktioner (t.ex. "betala moms efter momsrapport") ar nastan helt oaktiverade
 
-```text
-BookingAgent.execute()
-  → "Är detta momsfritt?"
-  → ctx.consult('advisory', { question: "Är begagnad utrustning momsfri?" })
-  → AdvisoryAgent svarar med kort text
-  → BookingAgent använder svaret i sin mallmatchning
-```
+**Atgard:** Systematiskt berika nyckelmallar med `required_fields` och `follow_up_templates`. Detta gor AI:n smartare utan att andra en enda rad kod -- det ar ren data.
 
-### Implementation
+**Specifika mallar att berika:**
+- Forsaljning med moms-mallar (behoer required_fields for att skilja netto/brutto)
+- Lonetransaktioner (bruttolo, skatt, arbetsgivaravgifter)
+- Boksluts-mallar (follow_up_templates: avskrivning -> periodisering -> skatteavsattning)
+- Skattetransaktioner (follow_up_templates mellan F-skatt, slutlig skatt, skattekonto)
 
-**Fil: `agents/types.ts` — Utöka AgentContext**
-```typescript
-interface AgentContext {
-  // ... befintliga fält
-  consult: (agentName: string, query: ConsultQuery) => Promise<ConsultResult>;
-}
+### GAP 2: Konversationshistoriken skickas men lagras fragmenterat
 
-interface ConsultQuery {
-  question: string;
-  context?: Record<string, any>;
-}
+**Problem:** Chatten sparar meddelanden i `airledger_messages` med `conversation_id`, men:
+- Bara de 20 senaste transaktionerna injiceras i kontexten
+- AI:n har ingen "minne" av vad den gjort -- om en session avbryts och aterupptas, tappar den traden
+- Konversationshistoriken skickas fran frontend, inte fran databasen
 
-interface ConsultResult {
-  answer: string;
-  confidence: number;
-  source_agent: string;
-}
-```
+**Atgard:** Forbattra kontextbyggaren att inkludera en kort sammanfattning av senaste konversationens bokningsaktivitet ("Du har bokfort 3 transaktioner idag: hyra 8000kr, el 1200kr, telefon 450kr").
 
-**Fil: `agents/registry.ts` — Implementera consult**
-```typescript
-async function createConsultFn(
-  agents: Record<string, Agent>,
-  parentCtx: AgentContext,
-  depth: number = 0
-): (agentName: string, query: ConsultQuery) => Promise<ConsultResult> {
-  return async (agentName, query) => {
-    if (depth >= 2) throw new Error('Max consult depth reached');
-    const agent = agents[agentName];
-    // Skapa en mini-kontext med frågan, utan full historik
-    const miniCtx = { ...parentCtx, message: query.question, conversationHistory: [] };
-    const result = await agent.execute(miniCtx);
-    return { answer: result.response, confidence: 1, source_agent: agentName };
-  };
-}
-```
+### GAP 3: Token-effektivitet -- hela kontoplanen skickas
 
-### Användningsfall
-- BookingAgent → AdvisoryAgent: "Är köp av begagnad bil momsfritt?"
-- ReportingAgent → BookingAgent: "Finns det en mall för skatteavsättning?"
-- BookingAgent → ReportingAgent: "Vad är aktuellt saldo på konto 2650?"
+**Problem:** `buildBookkeepingContext` skickar alla 1222 BAS-konton till AI:n. Det ar ca 6000+ tokens som nistan aldrig behovs. AI:n anvander mallar for kontering, inte ra kontokoder.
 
-### Begränsningar
-- Max 2 nivåer djup (ingen rekursion)
-- Konsultationer räknas mot AI-kvoten
-- Loggning av varje konsultation för spårbarhet
+**Atgard:** Skicka bara konton som faktiskt forekommit i anvandarens transaktioner + konton i aktiva mallar. Sparar ca 80% av kontokontexten.
+
+### GAP 4: Freeform-bokning ar en svag punkt
+
+**Problem:** Nar ingen mall matchar, skickar booking-agent hela kontexten till AI:n och later den "skriva" poster fritt. Detta ar den enda vagen dar AI-hallucinationer kan leda till felaktiga kontokoder. Valideringen i `save-general-transaction` fangar ogiltiga koder, men inte "rimliga men fel" koder.
+
+**Atgard:** Nar freeform-bokning sker, logga att ingen mall matchade och flagga det i admin-panelen sa att en administrator kan skapa ratt mall. Over tid minskar freeform-fallen till nara noll.
+
+### GAP 5: Saknar proaktivitet
+
+**Problem:** Air reagerar bara -- den tar aldrig initiativ. En autonom assistent borde kunna saga "Du har 3 obetalda leverantorsfakturor som forfollar inom 7 dagar" nar anvandaren oppnar chatten.
+
+**Atgard:** Lagg till en "startup check" i orkestratorn som analyserar anvandardata vid sessionstart och genererar proaktiva forslag.
 
 ---
 
-## 2.2 Admin-UI för agent-prompter
+## 3. Prioriterad Vagkarta
 
-### Problem
-Idag redigeras system-prompten globalt i /admin. Med tre agenter behöver man kunna redigera prompten per agent.
+### Fas 1: Data-enrichment (ingen kodandring kravs)
+- Berika 15-20 nyckelmallar med `required_fields`
+- Lagg till `follow_up_templates` for boksluts- och skattekedjan
+- Lagg till fler nyckelord pa mallar med laga traff
 
-### Design
+### Fas 2: Optimera kontexten (sma kodandringar, stor effekt)
+- Filtrera BAS-kontoplanen till bara relevanta konton
+- Lagg till sessionssammanfattning ("du har bokfort X idag")
+- Logga freeform-fall for mallutveckling
 
-**DB: `system_settings`** — Nya nycklar:
-```text
-agent_prompt_booking    → Booking-agentens system-prompt
-agent_prompt_reporting  → Reporting-agentens system-prompt
-agent_prompt_advisory   → Advisory-agentens system-prompt
-```
+### Fas 3: Proaktiv assistent
+- Startup-analys: forfallna fakturor, momsfrist, onormala saldon
+- Snabbforslag baserat pa leverantorsmonster
 
-**Admin-UI: Ny tab "AI-agenter" i /admin**
-```text
-┌─────────────────────────────────┐
-│  AI-agenter                     │
-│                                 │
-│  [Booking] [Reporting] [Advisory]│
-│                                 │
-│  ┌─────────────────────────────┐│
-│  │ System-prompt              ││
-│  │                            ││
-│  │ [Textarea med prompt]      ││
-│  │                            ││
-│  │ [Spara]  [Återställ]      ││
-│  └─────────────────────────────┘│
-│                                 │
-│  Status: Aktiv ✅               │
-│  Senast uppdaterad: 2026-02-17  │
-│  Antal anrop idag: 42           │
-└─────────────────────────────────┘
-```
-
-### Implementation
-
-**Fil: `src/components/admin/AdminAgents.tsx`**
-- Tabs per agent (booking, reporting, advisory)
-- Textarea för att redigera prompt
-- Spara till `system_settings` med nyckel `agent_prompt_{name}`
-- Visa standard-prompt som placeholder
-- Återställ-knapp som rensar DB-värdet (använder hardcoded default)
-
-**Fil: `agents/prompts/*.ts` — Dynamisk laddning**
-```typescript
-export async function getAgentPrompt(
-  agentName: string,
-  supabase: any
-): Promise<string> {
-  const key = `agent_prompt_${agentName}`;
-  const { data } = await supabase
-    .from('system_settings')
-    .select('value')
-    .eq('key', key)
-    .single();
-  if (data?.value) return data.value;
-  // Fallback till hardcoded prompt
-  return DEFAULT_PROMPTS[agentName];
-}
-```
-
-### Ändrade filer
-- `src/pages/Admin.tsx` — Lägg till "Agenter"-tab
-- `src/components/admin/AdminAgents.tsx` — Ny komponent
-- `agents/booking-agent.ts` — Hämta prompt från DB
-- `agents/reporting-agent.ts` — Hämta prompt från DB
-- `agents/advisory-agent.ts` — Hämta prompt från DB
+### Fas 4: Multi-step planner (bokslut)
+- Bryt ner "gor mitt bokslut" till automatiska delsteg
+- Human-in-the-loop bekraftelse per steg
+- Follow-up-chains for hela bokslutscykeln
 
 ---
 
-## 2.3 Per-agent loggning & prestandamätning
+## 4. Teknisk Sammanfattning
 
-### Problem
-Utan loggning per agent vet vi inte vilken agent som tar tid, vilka som failar, eller hur ofta de används.
+| Dimension | Status | Mognad |
+|---|---|---|
+| Agentarkitektur (orkestrator + specialister) | Komplett | Hog |
+| Mallbibliotek (103 mallar, 22 kategorier) | Strukturellt komplett, data ej berikad | Medel |
+| Intent-klassificering (AI + function calling) | Fungerar bra | Hog |
+| Kontextmedvetenhet (financial snapshot, leverantorsmonster) | Nyligen forbattrad | Medel |
+| Validering (debet=kredit, kontokoder, dubbletter) | Robust pa edge function-niva | Hog |
+| Observabilitet (agent_logs, admin dashboard) | Grundlaggande | Medel |
+| Proaktivitet | Saknas helt | Lag |
+| Token-effektivitet | Ineffektiv (hela kontoplanen) | Lag |
+| Freeform-fallback | Funktionell men okontrollerad | Lag |
 
-### Design
-
-**DB: Ny tabell `agent_logs`**
-```sql
-CREATE TABLE public.agent_logs (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL,
-  agent_name TEXT NOT NULL,
-  intent TEXT NOT NULL,
-  execution_time_ms INTEGER NOT NULL,
-  action_taken TEXT,
-  success BOOLEAN DEFAULT true,
-  error_message TEXT,
-  consulted_agents TEXT[],
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Index för snabb filtrering
-CREATE INDEX idx_agent_logs_agent ON agent_logs(agent_name);
-CREATE INDEX idx_agent_logs_created ON agent_logs(created_at DESC);
-
--- RLS: Bara admin kan läsa
-ALTER TABLE agent_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Admin can read agent logs"
-  ON agent_logs FOR SELECT
-  USING (public.has_role(auth.uid(), 'admin'));
-
--- Service role skriver (edge function)
-CREATE POLICY "Service can insert agent logs"
-  ON agent_logs FOR INSERT
-  WITH CHECK (true);
-```
-
-**Fil: `agents/logger.ts`**
-```typescript
-export async function logAgentExecution(
-  supabase: any,
-  log: {
-    userId: string;
-    agentName: string;
-    intent: string;
-    executionTimeMs: number;
-    actionTaken?: string;
-    success: boolean;
-    errorMessage?: string;
-    consultedAgents?: string[];
-  }
-): Promise<void> {
-  await supabase.from('agent_logs').insert({
-    user_id: log.userId,
-    agent_name: log.agentName,
-    intent: log.intent,
-    execution_time_ms: log.executionTimeMs,
-    action_taken: log.actionTaken,
-    success: log.success,
-    error_message: log.errorMessage,
-    consulted_agents: log.consultedAgents,
-  });
-}
-```
-
-**Orchestrator-integration (index.ts)**
-```typescript
-const start = performance.now();
-const result = await routeToAgent(agentCtx);
-const elapsed = Math.round(performance.now() - start);
-
-// Logga asynkront (vänta inte)
-logAgentExecution(serviceSupabase, {
-  userId, agentName: agent.name, intent: intent.intent,
-  executionTimeMs: elapsed, actionTaken: result.action_taken,
-  success: true
-}).catch(console.error);
-```
-
-**Admin-UI: Dashboard i "AI-agenter"-tabben**
-```text
-┌──────────────────────────────────┐
-│  Agent-statistik (senaste 7d)    │
-│                                  │
-│  Booking:   142 anrop  avg 850ms │
-│  Reporting:  38 anrop  avg 620ms │
-│  Advisory:   67 anrop  avg 430ms │
-│                                  │
-│  Felrate: 2.1%                   │
-│  Konsultationer: 12              │
-└──────────────────────────────────┘
-```
-
----
-
-## 2.4 Dynamisk agent-registrering
-
-### Problem
-Idag är agenter hårdkodade i registry.ts. Att lägga till en ny agent kräver kodändring.
-
-### Design
-
-**DB: Ny tabell `agent_config`**
-```sql
-CREATE TABLE public.agent_config (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  agent_name TEXT UNIQUE NOT NULL,
-  display_name TEXT NOT NULL,
-  description TEXT,
-  system_prompt TEXT NOT NULL,
-  triggers TEXT[] NOT NULL,        -- intent-typer som routar hit
-  tools TEXT[],                    -- tillåtna function names
-  is_active BOOLEAN DEFAULT true,
-  priority INTEGER DEFAULT 0,     -- vid overlap, högre prio vinner
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE agent_config ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Admin can manage agent config"
-  ON agent_config FOR ALL
-  USING (public.has_role(auth.uid(), 'admin'));
-```
-
-**Registry 2.0: Dynamisk laddning**
-```typescript
-export async function loadAgentRegistry(supabase: any): Promise<void> {
-  const { data: configs } = await supabase
-    .from('agent_config')
-    .select('*')
-    .eq('is_active', true)
-    .order('priority', { ascending: false });
-
-  // Bygg intent → agent mapping från DB
-  for (const config of configs || []) {
-    for (const trigger of config.triggers) {
-      INTENT_TO_AGENT[trigger] = config.agent_name;
-    }
-    // Registrera en DynamicAgent med config.system_prompt
-    agents[config.agent_name] = new DynamicAgent(config);
-  }
-}
-```
-
-**DynamicAgent** — generisk agent som drivs av DB-config:
-```typescript
-class DynamicAgent implements Agent {
-  constructor(private config: AgentConfig) {}
-  name = this.config.agent_name;
-
-  async execute(ctx: AgentContext): Promise<AgentResult> {
-    // Filtrera tools baserat på config.tools
-    const allowedTools = FUNCTION_DEFINITIONS.filter(
-      t => this.config.tools?.includes(t.function.name)
-    );
-    // Anropa AI med config.system_prompt + kontext
-    const data = await aiComplete(ctx.aiConfig, {
-      messages: [
-        { role: 'system', content: this.config.system_prompt + '\n\n' + buildContext(ctx) },
-        ...buildHistory(ctx),
-        { role: 'user', content: ctx.message }
-      ],
-      tools: allowedTools.length > 0 ? allowedTools : undefined,
-      tool_choice: allowedTools.length > 0 ? 'auto' : undefined,
-    });
-    // ... hantera tool calls och returnera AgentResult
-  }
-}
-```
-
-### Framtida agenter (exempel)
-- **ComplianceAgent** — Varnar för regelbrott, kontrollerar aging, föreslår korrigeringsverifikationer
-- **ImportAgent** — Hanterar CSV/Excel-import, SIE-filer, bankutdrag
-- **OnboardingAgent** — Guidad setup för nya användare (kontoplan, IB, första bokföring)
-
----
-
-## Implementationsordning
-
-```text
-Steg 2a: Per-agent loggning (lågt risk, hög synlighet)
-  - Skapa agent_logs tabell
-  - Implementera logger.ts
-  - Integrera i orchestrator
-  - Visa i admin UI
-
-Steg 2b: Admin-UI för prompter (lågt risk, hög användbarhet)
-  - Lägg till agent_prompt_* nycklar i system_settings
-  - Skapa AdminAgents.tsx
-  - Dynamisk prompt-laddning i agenter
-
-Steg 2c: Agent-to-Agent konsultation (medium risk)
-  - Utöka AgentContext med consult()
-  - Implementera i registry
-  - Testa med booking → advisory use case
-
-Steg 2d: Dynamisk agent-registrering (hög risk, hög belöning)
-  - Skapa agent_config tabell
-  - Implementera DynamicAgent
-  - Migrera befintliga agenter till DB-config
-  - Admin-UI för att skapa/redigera agenter
-```
-
-## Sammanfattning
-
-Steg 2 transformerar Air från ett statiskt agent-system till en dynamisk plattform:
-- **Konsultation** gör agenter smartare genom samarbete
-- **Admin-prompter** ger kontroll utan kodändringar
-- **Loggning** ger synlighet och möjlighet att optimera
-- **Dynamisk registrering** gör det möjligt att lägga till nya agenter utan deploy
+**Slutsats:** Den storsta forbattringen av Air:s formaga uppnas genom att berika befintliga mallar med `required_fields` och `follow_up_templates` -- det ar ren dataforandring som omedelbart gor AI:n smartare, utan att rora en rad kod. Fas 2 (kontextoptimering) ar nast viktigast for bade kvalitet och kostnad.
