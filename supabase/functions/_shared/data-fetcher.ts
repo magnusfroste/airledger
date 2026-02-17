@@ -1,4 +1,4 @@
-import { UserData, VatSummary, AccountBalance } from './types.ts';
+import { UserData, VatSummary, AccountBalance, VendorPattern, TemplatePreference } from './types.ts';
 
 function getCurrentQuarter(): { start: string; end: string; label: string } {
   const now = new Date();
@@ -112,6 +112,95 @@ async function fetchAccountBalances(userId: string, supabase: any): Promise<Acco
   }
 }
 
+/**
+ * Extract vendor patterns: which vendor → which template, average amount, frequency.
+ * Derived from transaction descriptions + template_usage join.
+ */
+async function fetchVendorPatterns(userId: string, supabase: any): Promise<VendorPattern[]> {
+  try {
+    const { data: usage } = await supabase
+      .from('airledger_template_usage')
+      .select('template_name, used_at, airledger_transactions!inner(description, total_amount, transaction_date)')
+      .eq('user_id', userId)
+      .order('used_at', { ascending: false })
+      .limit(200);
+
+    if (!usage || usage.length === 0) return [];
+
+    // Group by normalized vendor (first word of description) + template
+    const vendorMap: Record<string, { amounts: number[]; template: string; lastDate: string }> = {};
+    for (const u of usage) {
+      const tx = u.airledger_transactions;
+      if (!tx?.description) continue;
+      // Use first meaningful part of description as vendor key
+      const vendor = tx.description.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
+      const key = `${vendor}::${u.template_name}`;
+      if (!vendorMap[key]) {
+        vendorMap[key] = { amounts: [], template: u.template_name, lastDate: tx.transaction_date };
+      }
+      vendorMap[key].amounts.push(Number(tx.total_amount) || 0);
+      if (tx.transaction_date > vendorMap[key].lastDate) {
+        vendorMap[key].lastDate = tx.transaction_date;
+      }
+    }
+
+    const patterns: VendorPattern[] = [];
+    for (const [key, data] of Object.entries(vendorMap)) {
+      if (data.amounts.length < 2) continue; // Only patterns with 2+ occurrences
+      const vendor = key.split('::')[0];
+      const avg = data.amounts.reduce((s, v) => s + v, 0) / data.amounts.length;
+      patterns.push({
+        vendor,
+        template_name: data.template,
+        avg_amount: Math.round(avg),
+        count: data.amounts.length,
+        last_date: data.lastDate,
+      });
+    }
+
+    patterns.sort((a, b) => b.count - a.count);
+    return patterns.slice(0, 15); // Top 15 patterns
+  } catch (err) {
+    console.error('fetchVendorPatterns error:', err);
+    return [];
+  }
+}
+
+/**
+ * Extract template preferences: most used templates for this user.
+ */
+async function fetchTemplatePreferences(userId: string, supabase: any): Promise<TemplatePreference[]> {
+  try {
+    const { data: usage } = await supabase
+      .from('airledger_template_usage')
+      .select('template_name, used_at')
+      .eq('user_id', userId)
+      .order('used_at', { ascending: false })
+      .limit(500);
+
+    if (!usage || usage.length === 0) return [];
+
+    const countMap: Record<string, { count: number; lastUsed: string }> = {};
+    for (const u of usage) {
+      if (!countMap[u.template_name]) {
+        countMap[u.template_name] = { count: 0, lastUsed: u.used_at };
+      }
+      countMap[u.template_name].count++;
+      if (u.used_at > countMap[u.template_name].lastUsed) {
+        countMap[u.template_name].lastUsed = u.used_at;
+      }
+    }
+
+    return Object.entries(countMap)
+      .map(([name, data]) => ({ template_name: name, usage_count: data.count, last_used: data.lastUsed }))
+      .sort((a, b) => b.usage_count - a.usage_count)
+      .slice(0, 10);
+  } catch (err) {
+    console.error('fetchTemplatePreferences error:', err);
+    return [];
+  }
+}
+
 export async function fetchUserData(userId: string, supabase: any): Promise<UserData> {
   console.log('Fetching user data for:', userId);
 
@@ -124,6 +213,8 @@ export async function fetchUserData(userId: string, supabase: any): Promise<User
     templatesResult,
     vatSummary,
     accountBalances,
+    vendorPatterns,
+    templatePreferences,
   ] = await Promise.all([
     supabase
       .from('airledger_transactions')
@@ -154,6 +245,8 @@ export async function fetchUserData(userId: string, supabase: any): Promise<User
       .order('usage_count', { ascending: false }),
     fetchVatSummary(userId, supabase),
     fetchAccountBalances(userId, supabase),
+    fetchVendorPatterns(userId, supabase),
+    fetchTemplatePreferences(userId, supabase),
   ]);
 
   if (transResult.error) console.error('Error fetching transactions:', transResult.error);
@@ -168,6 +261,8 @@ export async function fetchUserData(userId: string, supabase: any): Promise<User
     transactions: transResult.data?.length || 0,
     templates: templatesResult.data?.length || 0,
     accountBalances: accountBalances.length,
+    vendorPatterns: vendorPatterns.length,
+    templatePreferences: templatePreferences.length,
   });
 
   return {
@@ -180,5 +275,7 @@ export async function fetchUserData(userId: string, supabase: any): Promise<User
     templates: templatesResult.data || [],
     vatSummary,
     accountBalances,
+    vendorPatterns,
+    templatePreferences,
   };
 }

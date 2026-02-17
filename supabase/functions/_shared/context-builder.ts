@@ -85,6 +85,22 @@ export function buildBookkeepingContext(userData: UserData): string {
     context += `Netto att ${direction}: ${Math.abs(v.netVat).toLocaleString('sv-SE')} kr\n`;
   }
 
+  // Vendor patterns — learned from transaction history
+  if (userData.vendorPatterns && userData.vendorPatterns.length > 0) {
+    context += `\nLEVERANTÖRSMÖNSTER (baserat på historik):\n`;
+    userData.vendorPatterns.forEach((vp: any) => {
+      context += `- "${vp.vendor}" → mall "${vp.template_name}", snittbelopp ${vp.avg_amount.toLocaleString('sv-SE')} kr (${vp.count} ggr)\n`;
+    });
+  }
+
+  // Template preferences — most used templates
+  if (userData.templatePreferences && userData.templatePreferences.length > 0) {
+    context += `\nMALLPREFERENSER (mest använda):\n`;
+    userData.templatePreferences.slice(0, 5).forEach((tp: any) => {
+      context += `- ${tp.template_name}: ${tp.usage_count} ggr\n`;
+    });
+  }
+
   // Include financial snapshot if available
   const snapshot = buildFinancialSnapshot(userData);
   if (snapshot) {

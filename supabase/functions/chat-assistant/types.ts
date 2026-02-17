@@ -2,6 +2,8 @@
 export {
   type ConversationMessage,
   type AccountBalance,
+  type VendorPattern,
+  type TemplatePreference,
   type UserData,
   type VatSummary,
   type FunctionCallArgs,
