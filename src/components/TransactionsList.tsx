@@ -277,18 +277,21 @@ const TransactionsList = () => {
 
   const parseCSVForPreview = async (csvText: string) => {
     const lines = csvText.trim().split('\n');
-    const headers = lines[0].toLowerCase().split(',').map((h) => h.trim().replace(/"/g, ''));
+    
+    // Auto-detect delimiter: tab or comma
+    const firstLine = lines[0];
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+    
+    const headers = firstLine.toLowerCase().split(delimiter).map((h) => h.trim().replace(/"/g, ''));
 
     // Validate headers
-    const expectedHeaders = ['transaction_date', 'description', 'reference_number', 'transaction_type', 'account_code', 'account_name', 'debit_amount', 'credit_amount', 'entry_description'];
     const requiredHeaders = ['transaction_date', 'description', 'transaction_type', 'account_code', 'account_name'];
-
     const hasRequiredHeaders = requiredHeaders.every((header) => headers.includes(header));
 
     if (!hasRequiredHeaders) {
       toast({
-        title: "Fel CSV-format",
-        description: `CSV-filen måste innehålla minst kolumnerna: ${requiredHeaders.join(', ')}`,
+        title: "Fel format",
+        description: `Datan måste innehålla minst kolumnerna: ${requiredHeaders.join(', ')}`,
         variant: "destructive",
       });
       return;
@@ -303,29 +306,33 @@ const TransactionsList = () => {
     const validAccountCodes = new Set(accountsData?.map((acc) => acc.account_code) || []);
 
     const preview: any[] = [];
-    const errors: string[] = [];
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
-      // Simple CSV parsing (handles quoted fields)
-      const values: string[] = [];
-      let currentValue = '';
-      let inQuotes = false;
-
-      for (let j = 0; j < line.length; j++) {
-        const char = line[j];
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          values.push(currentValue.trim());
-          currentValue = '';
-        } else {
-          currentValue += char;
+      // Parse line based on detected delimiter
+      let values: string[];
+      if (delimiter === '\t') {
+        values = line.split('\t').map(v => v.trim().replace(/"/g, ''));
+      } else {
+        // CSV parsing with quoted field support
+        values = [];
+        let currentValue = '';
+        let inQuotes = false;
+        for (let j = 0; j < line.length; j++) {
+          const char = line[j];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            values.push(currentValue.trim());
+            currentValue = '';
+          } else {
+            currentValue += char;
+          }
         }
+        values.push(currentValue.trim());
       }
-      values.push(currentValue.trim());
 
       const row = {
         transaction_date: values[headers.indexOf('transaction_date')] || '',
@@ -629,7 +636,7 @@ const TransactionsList = () => {
                         />
                         <div className="flex items-center justify-between">
                           <p className="text-xs text-muted-foreground">
-                            Kopiera från Google Sheets, Excel eller textfil
+                            Stöder CSV och tab-separerad data (kopiera direkt från Excel/Google Sheets)
                           </p>
                           <Button
                             size="sm"

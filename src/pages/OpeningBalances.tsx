@@ -312,7 +312,12 @@ const OpeningBalances = () => {
 
   const parseCSVForPreview = async (csvText: string) => {
     const lines = csvText.trim().split('\n');
-    const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+    
+    // Auto-detect delimiter: tab or comma
+    const firstLine = lines[0];
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+    
+    const headers = firstLine.toLowerCase().split(delimiter).map(h => h.trim().replace(/"/g, ''));
     
     // Validate headers
     const expectedHeaders = ['account_code', 'account_name', 'opening_balance', 'balance_type'];
@@ -320,8 +325,8 @@ const OpeningBalances = () => {
     
     if (!hasValidHeaders) {
       toast({
-        title: "Fel CSV-format",
-        description: "CSV-filen måste innehålla kolumnerna: account_code, account_name, opening_balance, balance_type",
+        title: "Fel format",
+        description: "Datan måste innehålla kolumnerna: account_code, account_name, opening_balance, balance_type",
         variant: "destructive",
       });
       return;
@@ -342,7 +347,13 @@ const OpeningBalances = () => {
       const line = lines[i].trim();
       if (!line) continue;
       
-      const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      // Parse line based on detected delimiter
+      let values: string[];
+      if (delimiter === '\t') {
+        values = line.split('\t').map(v => v.trim().replace(/"/g, ''));
+      } else {
+        values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      }
       const row = {
         account_code: values[headers.indexOf('account_code')],
         account_name: values[headers.indexOf('account_name')],
@@ -552,7 +563,7 @@ const OpeningBalances = () => {
                         />
                         <div className="flex items-center justify-between">
                           <p className="text-xs text-muted-foreground">
-                            Kopiera från Google Sheets, Excel eller textfil
+                            Stöder CSV och tab-separerad data (kopiera direkt från Excel/Google Sheets)
                           </p>
                           <Button
                             size="sm"
