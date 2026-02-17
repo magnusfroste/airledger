@@ -291,5 +291,14 @@ function calculateLegacyEntryAmount(entry: any, baseAmount: number): number {
     return Math.round(baseAmount * (1 + vatRate) * 100) / 100;
   }
 
+  // Use template entry ratios as multipliers (e.g. 0.8 = 80%, 1.0 = 100%)
+  const debitRatio = parseFloat(entry.debit_amount) || 0;
+  const creditRatio = parseFloat(entry.credit_amount) || 0;
+  const ratio = debitRatio > 0 ? debitRatio : creditRatio;
+
+  if (ratio > 0 && ratio !== 1) {
+    return Math.round(baseAmount * ratio * 100) / 100;
+  }
+
   return baseAmount;
 }
