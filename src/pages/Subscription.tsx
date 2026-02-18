@@ -9,9 +9,9 @@ export default function Subscription() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         <div>
-          <h1 className="text-2xl font-bold mb-2">Prenumeration</h1>
+          <h1 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2">Prenumeration</h1>
           <p className="text-muted-foreground">Hantera din prenumeration och se användningsstatistik</p>
         </div>
         
@@ -32,9 +32,9 @@ export default function Subscription() {
 
   if (error) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         <div>
-          <h1 className="text-2xl font-bold mb-2">Prenumeration</h1>
+          <h1 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2">Prenumeration</h1>
           <p className="text-muted-foreground">Hantera din prenumeration och se användningsstatistik</p>
         </div>
         
@@ -52,9 +52,9 @@ export default function Subscription() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold mb-2">Prenumeration</h1>
+        <h1 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2">Prenumeration</h1>
         <p className="text-muted-foreground">Hantera din prenumeration och se användningsstatistik</p>
       </div>
       

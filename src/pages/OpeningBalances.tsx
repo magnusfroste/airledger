@@ -461,7 +461,7 @@ const OpeningBalances = () => {
 
   if (loading) {
     return (
-      <div className="container px-6 py-6 max-w-6xl mx-auto">
+      <div className="container px-3 py-3 sm:px-6 sm:py-6 max-w-6xl mx-auto">
         <div className="animate-fade-in space-y-6">
           <div className="h-6 sm:h-8 bg-muted rounded animate-pulse" />
           <div className="grid gap-6">

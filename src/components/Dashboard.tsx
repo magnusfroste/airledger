@@ -263,16 +263,16 @@ const Dashboard = () => {
       <DashboardHeader greeting={greeting} userName={userName} />
 
       {/* Main Content with Tabs */}
-      <div className="max-w-6xl mx-auto pb-20 sm:pb-6 px-[10px] py-[10px]">
+      <div className="max-w-6xl mx-auto pb-20 sm:pb-6 px-2 py-2 sm:px-[10px] sm:py-[10px]">
         {/* Quota Warning */}
         {subscription && (
-          <div className="mb-6">
+          <div className="mb-3 sm:mb-6">
             <QuotaWarning subscriptionTier={subscription.subscription_tier} usage={usage || undefined} />
           </div>
         )}
 
         <Tabs defaultValue="month" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
+          <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-8">
             <TabsTrigger value="month" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               Denna månad
@@ -284,12 +284,12 @@ const Dashboard = () => {
           </TabsList>
 
           {/* Monthly View */}
-          <TabsContent value="month" className="space-y-8">
+          <TabsContent value="month" className="space-y-4 sm:space-y-8">
             <StatsCards stats={stats} formatCurrency={formatCurrency} />
           </TabsContent>
 
           {/* Yearly View */}
-          <TabsContent value="year" className="space-y-8">
+          <TabsContent value="year" className="space-y-4 sm:space-y-8">
             <YearlyStatsCards yearlyStats={yearlyStats} formatCurrency={formatCurrency} />
             <ChartsSection monthlyBreakdown={yearlyStats.monthlyBreakdown} formatCurrency={formatCurrency} />
           </TabsContent>

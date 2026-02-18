@@ -135,7 +135,7 @@ const Settings = () => {
 
   if (loading || preferencesLoading) {
     return (
-      <div className="container px-6 py-6 max-w-4xl mx-auto">
+      <div className="container px-3 py-3 sm:px-6 sm:py-6 max-w-4xl mx-auto">
         <div className="animate-fade-in space-y-6">
           <div className="h-8 bg-muted rounded animate-pulse" />
           <div className="grid gap-6">
@@ -149,19 +149,19 @@ const Settings = () => {
   }
 
   return (
-    <div className="container px-6 py-6 max-w-4xl mx-auto animate-fade-in">
+    <div className="container px-3 py-3 sm:px-6 sm:py-6 max-w-4xl mx-auto animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-8">
-        <SettingsIcon className="h-8 w-8 text-primary" />
+      <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-8">
+        <SettingsIcon className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Inställningar</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Inställningar</h1>
           <p className="text-muted-foreground mt-1">
             Hantera ditt konto och dina preferenser
           </p>
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Profile Settings */}
         <Card>
           <CardHeader>

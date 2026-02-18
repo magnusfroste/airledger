@@ -292,10 +292,10 @@ const GeneralLedger = () => {
     return new Date(dateString).toLocaleDateString('sv-SE');
   };
   if (loading) {
-    return <div className="container mx-auto px-6 py-8">
-        <div className="flex items-center gap-3 mb-8">
-          <BookOpen className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Huvudbok</h1>
+    return <div className="container mx-auto px-3 py-3 sm:px-6 sm:py-8">
+        <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-8">
+          <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+          <h1 className="text-2xl sm:text-3xl font-bold">Huvudbok</h1>
         </div>
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
@@ -303,10 +303,10 @@ const GeneralLedger = () => {
         </div>
       </div>;
   }
-  return <div className="container mx-auto py-8 px-0">
-      <div className="flex items-center gap-3 mb-8">
-        <BookOpen className="h-8 w-8 text-primary" />
-        <h1 className="text-3xl font-bold">Huvudbok</h1>
+  return <div className="container mx-auto py-3 sm:py-8 px-3 sm:px-0">
+      <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-8">
+        <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+        <h1 className="text-2xl sm:text-3xl font-bold">Huvudbok</h1>
       </div>
 
       {/* Filters */}
