@@ -453,6 +453,7 @@ export type Database = {
       profiles: {
         Row: {
           accounting_experience: string | null
+          company_type: string
           created_at: string
           email: string | null
           fiscal_year_start: number
@@ -466,6 +467,7 @@ export type Database = {
         }
         Insert: {
           accounting_experience?: string | null
+          company_type?: string
           created_at?: string
           email?: string | null
           fiscal_year_start?: number
@@ -479,6 +481,7 @@ export type Database = {
         }
         Update: {
           accounting_experience?: string | null
+          company_type?: string
           created_at?: string
           email?: string | null
           fiscal_year_start?: number
