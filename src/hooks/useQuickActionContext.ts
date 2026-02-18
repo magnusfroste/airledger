@@ -15,14 +15,25 @@ interface QuickActionContext {
   hasOpeningBalances: boolean;
   topTemplates: { name: string; count: number }[];
   activeTriggers: ActiveTrigger[];
+  fiscalYearStart: number;
   isLoading: boolean;
 }
 
-function getNextOccurrence(month: number, day: number): Date {
+function getNextOccurrence(month: number, day: number, fiscalYearStart: number): Date {
   const now = new Date();
   const thisYear = now.getFullYear();
-  let next = new Date(thisYear, month - 1, day);
-  if (next <= now) next = new Date(thisYear + 1, month - 1, day);
+
+  // For triggers tied to fiscal year deadlines, adjust month relative to fiscal year start
+  // e.g. "Årsredovisning" for fiscal year starting Jul means deadline shifts accordingly
+  let adjustedMonth = month;
+  if (fiscalYearStart !== 1) {
+    // Shift: e.g. fiscal start=7, trigger month=2 (feb) → stays feb but for the fiscal year ending Jun
+    // No shift needed for the month itself — the trigger dates are absolute calendar dates
+    // But we keep this hook point for future per-trigger fiscal adjustments
+  }
+
+  let next = new Date(thisYear, adjustedMonth - 1, day);
+  if (next <= now) next = new Date(thisYear + 1, adjustedMonth - 1, day);
   return next;
 }
 
@@ -33,10 +44,11 @@ function daysUntil(d: Date): number {
 export function useQuickActionContext(): QuickActionContext {
   const { user } = useAuth();
   const [data, setData] = useState<QuickActionContext>({
-    transactionCount: -1, // -1 = not loaded
+    transactionCount: -1,
     hasOpeningBalances: false,
     topTemplates: [],
     activeTriggers: [],
+    fiscalYearStart: 1,
     isLoading: true,
   });
 
@@ -46,7 +58,7 @@ export function useQuickActionContext(): QuickActionContext {
     const load = async () => {
       try {
         // Parallel queries
-        const [txRes, ibRes, tmplRes, trigRes] = await Promise.all([
+        const [txRes, ibRes, tmplRes, trigRes, profileRes] = await Promise.all([
           supabase
             .from('airledger_transactions')
             .select('id', { count: 'exact', head: true })
@@ -65,7 +77,14 @@ export function useQuickActionContext(): QuickActionContext {
             .from('air_triggers' as any)
             .select('*')
             .eq('is_active', true),
+          supabase
+            .from('profiles')
+            .select('fiscal_year_start')
+            .eq('id', user.id)
+            .single(),
         ]);
+
+        const fiscalYearStart = (profileRes.data as any)?.fiscal_year_start ?? 1;
 
         // Count top templates
         const templateCounts: Record<string, number> = {};
@@ -81,7 +100,7 @@ export function useQuickActionContext(): QuickActionContext {
         const now = new Date();
         const activeTriggers: ActiveTrigger[] = [];
         ((trigRes.data || []) as any[]).forEach((t) => {
-          const next = getNextOccurrence(t.month, t.day);
+          const next = getNextOccurrence(t.month, t.day, fiscalYearStart);
           const days = daysUntil(next);
           if (days <= t.days_before) {
             activeTriggers.push({
@@ -100,6 +119,7 @@ export function useQuickActionContext(): QuickActionContext {
           hasOpeningBalances: (ibRes.count ?? 0) > 0,
           topTemplates,
           activeTriggers,
+          fiscalYearStart,
           isLoading: false,
         });
       } catch (e) {
