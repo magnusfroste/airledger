@@ -1,153 +1,92 @@
 
 
-# Live Demo: "Testbolaget AB -- Ett helt bokforingsår"
+# Admin Triggers -- dynamisk hantering av deadlines och paminningar
 
 ## Oversikt
 
-Skapa ett dubbelanvandnings-system:
-1. **Backend-testsvit** (Deno) -- for kvalitetssakring, kor tyst, ger pass/fail
-2. **Frontend demo-mode** -- spelar upp scenarierna i det riktiga chattgranssnittet sa besokare (och teamet) ser Air bokfora i realtid
+Istallet for att hardkoda svenska skattedatum skapar vi en ny **Admin Triggers**-flik i adminpanelen. Varje trigger ar en databasrad som beskriver **vad** som ska handa, **nar** det ska handa, och **vilken knapp** som visas i chatten. Systemet fungerar som en enkel cron-liknande motor -- men drivet av data i databasen, inte av kod.
 
-Bada delar anvander samma scenariodata.
+Fas 1 (denna plan) fokuserar pa CRUD i admin + att ChatQuickActions laser triggersen. Fas 2 (framtida) kan lagga till en riktig cron-edge-function som skickar notiser/push.
 
----
+## Datamodell
 
-## Arkitektur
+Ny tabell `air_triggers`:
 
-```text
-testbolaget_scenarios.ts (delad data)
-       |
-       +---> Deno-tester (backend, verifierar korrekthet)
-       |
-       +---> DemoRunner (frontend, visuell uppspelning i chatten)
-```
+| Kolumn | Typ | Beskrivning |
+|--------|-----|-------------|
+| id | uuid PK | |
+| name | text | T.ex. "Momsdeklaration Q1" |
+| description | text | Forklaringstext |
+| trigger_type | text | `recurring_yearly` / `recurring_quarterly` / `one_time` |
+| month | int | Manad (1-12) for arlig, startmanad for kvartalsvis |
+| day | int | Dag i manaden |
+| days_before | int | Visa knappen X dagar fore deadline (default 14) |
+| quick_action_label | text | Knapptext, t.ex. "Momsrapport Q1" |
+| quick_action_message | text | Meddelandet som skickas till chatten |
+| is_active | boolean | Pa/av |
+| priority | int | Hogre = visas forst |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
 
-## Del 1: Scenariodata (delad)
+Forpopuleras med svenska standarddatum (momsdeklarationer, inkomstdeklaration, arsredovisning) men allt ar redigerbart.
 
-**Ny fil:** `src/data/testbolaget-scenarios.ts`
+## Admin-granssnitt
 
-En array med ~35 scenarier, grupperade per kvartal:
+Ny flik **Triggers** i adminpanelen med ikon `Clock` (lucide). Visar:
 
-```text
-interface DemoScenario {
-  id: string
-  quarter: string          // "Q1", "Q2", "Q3", "Q4"
-  month: number
-  message: string          // Meddelandet som skickas till Air
-  description: string      // Kort forklaring for publiken ("Hyra for kontoret")
-  expected_template: string // For backend-test: forvantad mall
-  expected_total: number   // For backend-test: forvantad totalsumma
-}
-```
+1. **Lista** over alla triggers med toggle for aktiv/inaktiv
+2. **Lagg till / redigera** -- formular med alla falt
+3. **Forhandsvisning** -- "Nasta gang denna trigger visas: [datum]"
+4. **Ta bort** med bekraftelse
 
-Scenarierna inkluderar:
-- Q1: Hyra, forsaljning, kontorsmaterial, lon, F-skatt, kundbetalning
-- Q2: Momsredovisning, laptop, tjansteresa, hotell
-- Q3: Forsakring, friskvard, representation
-- Q4: Bokslut -- avskrivning, upplupna kostnader, periodiseringsfond, skatteavsattning
-- Kantfall: utan belopp, dubbletter, kreditfaktura
+## ChatQuickActions-koppling
 
----
+`useQuickActionContext`-hooken hamtar aktiva triggers fran `air_triggers` och beraknar vilka som ar "varma" (inom `days_before` fran nasta forekomst). Dessa injiceras i prioritetsordningen fran det tidigare forslaget, pa plats 3 (DEADLINE-DRIVEN), men nu databas-drivet.
 
-## Del 2: Frontend Demo Runner
+## Tekniska forandringar
 
-### Ny komponent: `DemoRunner.tsx`
+### 1. Databasmigration
+- Skapa tabellen `air_triggers`
+- RLS: Lasbar for alla autentiserade, skrivbar for admin (via `has_role`)
+- Seed-data: 6 triggers (4 kvartalsmoms + inkomstdeklaration + arsredovisning)
 
-En kontrollpanel som injiceras i ChatInterface nar demo-mode ar aktivt:
+### 2. Ny komponent: `src/components/admin/AdminTriggers.tsx`
+- CRUD-lista med inline-toggle for `is_active`
+- Dialog for lagg till / redigera
+- Berakning av "nasta forekomst" for forhandsvisning
+- Foljder samma monster som `AdminWarningRules` / `AdminAgents`
 
-**Funktionalitet:**
-- **Play/Pause-knapp** -- startar/pausar uppspelningen
-- **Hastighetsvaljare** -- "Snabb" (2s), "Normal" (4s), "Steg-for-steg" (manuellt)
-- **Kvartalshopp** -- hoppa direkt till Q1/Q2/Q3/Q4
-- **Framstegsindikaor** -- "Scenario 7 av 35 -- Q1 Mars"
-- **Resultatsammanfattning** -- efter varje kvartal visas en liten sammanfattning
+### 3. Uppdatera: `src/pages/Admin.tsx`
+- Lagg till 10:e flik "Triggers" med `Clock`-ikon
+- Uppdatera grid fran `grid-cols-9` till `grid-cols-10`
 
-### Flode:
+### 4. Ny hook: `src/hooks/useQuickActionContext.ts`
+- Hamtar transaktionsantal, IB-antal, topp-mallar **och** aktiva triggers
+- Beraknar vilka triggers som ar "varma" (inom deadline-fonster)
+- Returnerar `{ transactionCount, hasOpeningBalances, topTemplates, activeTriggers, isLoading }`
 
-1. Anvandaren aktiverar demo-mode (via URL-parameter `?demo=testbolaget` eller en knapp)
-2. DemoRunner visar en introduktionsruta: "Testbolaget AB -- IT-konsult, omsattning 1,2 MSEK"
-3. For varje scenario:
-   a. Visar en liten etikett: "Q1 Januari -- Kontorshyra"
-   b. Skickar meddelandet till den riktiga `chat-assistant` edge function
-   c. Renderar svaret i chatten (precis som vanligt)
-   d. Vantar 3-4 sekunder (konfigurerbart)
-   e. Gar vidare till nasta scenario
-4. Mellan kvartalen visas en sammanfattning: "Q1 klart -- 8 transaktioner bokforda, 127 500 kr omsattning"
-5. Efter Q4 visas slutsammanfattning med arsbokslut
+### 5. Uppdatera: `src/components/chat/ChatQuickActions.tsx`
+- Tar emot `activeTriggers` via props
+- Infogar deadline-knappar pa prioritet 3 i vattenfallet
+- `prominent: true` om deadline ar inom 7 dagar
 
-### Integration med ChatInterface:
+### 6. Uppdatera: `src/components/chat/InputArea.tsx` och `src/components/ChatInterface.tsx`
+- Skickar ner kontextdata till ChatQuickActions
 
-```text
-ChatInterface
-  |
-  +-- [demo-mode aktiv?]
-  |     |
-  |     +-- DemoRunner (kontrollpanel overst)
-  |     |     +-- Play/Pause, hastighet, framsteg
-  |     |
-  |     +-- MessageList (vanlig rendering av meddelanden)
-  |     +-- InputArea (doljs eller inaktiveras under demo)
-  |
-  +-- [vanlig mode]
-        +-- MessageList + InputArea (som idag)
-```
+## Seed-data (6 triggers)
 
-### Aktivering:
+| Namn | Typ | Manad | Dag | Dagar fore | Knapptext |
+|------|-----|-------|-----|------------|-----------|
+| Momsdeklaration Q4 | recurring_yearly | 1 | 12 | 14 | Momsrapport Q4 |
+| Momsdeklaration Q1 | recurring_yearly | 4 | 12 | 14 | Momsrapport Q1 |
+| Momsdeklaration Q2 | recurring_yearly | 7 | 12 | 14 | Momsrapport Q2 |
+| Momsdeklaration Q3 | recurring_yearly | 10 | 12 | 14 | Momsrapport Q3 |
+| Inkomstdeklaration | recurring_yearly | 5 | 2 | 30 | Deklaration |
+| Arsredovisning | recurring_yearly | 2 | 28 | 30 | Bokslut |
 
-- **URL-parameter:** `/chat?demo=testbolaget` -- for saljdemos
-- **Admin-knapp:** I admin-panelen, en "Kor demo"-knapp
-- **Landing page:** Ersatt (eller komplettera) nuvarande DemoChat med en "Se Air i aktion"-knapp som oppnar demo-mode
+## Framtida utbyggnad (inte i denna fas)
 
----
-
-## Del 3: Backend-testsvit (Deno)
-
-**Nya filer:**
-- `supabase/functions/chat-assistant/tests/testbolaget_scenarios.ts` -- kopia av scenariodata (Deno-kompatibel)
-- `supabase/functions/chat-assistant/tests/testbolaget_test.ts` -- testfilen
-
-### Vad testerna verifierar:
-
-For varje scenario:
-1. **Anropa edge function** med scenariots meddelande
-2. **Kontrollera intent** -- ratt intent returneras
-3. **Parsa bokforingsforslaget** ur AI-svaret
-4. **Verifiera balansering** -- summa debet === summa kredit
-5. **Verifiera totalbelopp** -- overensstammer med forvantning
-6. **Kontrollera follow-up** -- om scenario har forvantad follow-up, kontrollera att den namns
-
-### Begransningar:
-
-- Testerna kor mot den deployade edge function (integrationstester)
-- Kraver autentisering (testanvandare)
-- AI-svar ar icke-deterministiska, sa vi testar struktur och matematik, inte exakt text
-
----
-
-## Del 4: Implementationsordning
-
-### Steg 1: Scenariodata
-Skapa den delade scenario-arrayen med alla 35 scenarier.
-
-### Steg 2: DemoRunner-komponent
-Bygg den visuella demo-runnern:
-- Play/pause/hastighet
-- Kvartalsetiketter och sammanfattningar
-- Integration med ChatInterface
-
-### Steg 3: Aktiveringsmekanismer
-- URL-parameter-stod i Chat.tsx
-- Eventuell knapp pa landing page
-
-### Steg 4: Backend-tester
-Skapa Deno-testfilen som anvander samma scenarier for automatiserad verifiering.
-
----
-
-## Sekundara effekter
-
-- **Sales demo**: Visa potentiella kunder hur Air hanterar ett helt ar pa 2 minuter
-- **Regressionstest**: Om en mallandring gar sonder, syns det bade visuellt och i testerna
-- **Onboarding**: Nya anvandare kan kora demon for att forsta hur Air fungerar
-- **Dokumentation**: Scenarierna ar levande dokumentation av alla bokforingsscenarion
+- **Cron edge function**: Kor dagligen, skickar notiser/push for triggers inom deadline-fonster
+- **Per-anvandare triggers**: Anpassade paminningar baserat pa foretag (t.ex. brutet rakenskapsar)
+- **Trigger-historik**: Logga nar en trigger "triggas" och om anvandaren agerade pa den
 
