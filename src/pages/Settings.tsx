@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Settings as SettingsIcon, User, Shield, Save, Crown } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Settings as SettingsIcon, User, Shield, Save, Crown, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +18,15 @@ interface Profile {
   full_name: string | null;
   username: string | null;
   is_developer: boolean | null;
+  fiscal_year_start: number;
 }
+
+const FISCAL_YEAR_OPTIONS = [
+  { value: 1, label: "Kalenderår (jan–dec)" },
+  { value: 5, label: "Brutet: maj–apr" },
+  { value: 7, label: "Brutet: jul–jun" },
+  { value: 9, label: "Brutet: sep–aug" },
+] as const;
 
 const Settings = () => {
   const { user } = useAuth();
@@ -29,6 +38,7 @@ const Settings = () => {
   const [formData, setFormData] = useState({
     full_name: '',
     username: '',
+    fiscal_year_start: 1,
   });
 
   useEffect(() => {
@@ -55,6 +65,7 @@ const Settings = () => {
         setFormData({
           full_name: data.full_name || '',
           username: data.username || '',
+          fiscal_year_start: data.fiscal_year_start ?? 1,
         });
       } else {
         // Create profile if it doesn't exist
@@ -78,6 +89,7 @@ const Settings = () => {
         setFormData({
           full_name: createdProfile.full_name || '',
           username: createdProfile.username || '',
+          fiscal_year_start: createdProfile.fiscal_year_start ?? 1,
         });
       }
     } catch (error) {
@@ -102,6 +114,7 @@ const Settings = () => {
         .update({
           full_name: formData.full_name,
           username: formData.username,
+          fiscal_year_start: formData.fiscal_year_start,
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id);
@@ -118,6 +131,7 @@ const Settings = () => {
         ...prev,
         full_name: formData.full_name,
         username: formData.username,
+        fiscal_year_start: formData.fiscal_year_start,
       } : null);
 
     } catch (error) {
@@ -201,6 +215,34 @@ const Settings = () => {
               />
               <p className="text-xs text-muted-foreground">
                 E-postadressen kan inte ändras här. Kontakta support om du behöver ändra den.
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Räkenskapsår */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <Label htmlFor="fiscal_year">Räkenskapsår</Label>
+              </div>
+              <Select
+                value={String(formData.fiscal_year_start)}
+                onValueChange={(v) => setFormData(prev => ({ ...prev, fiscal_year_start: Number(v) }))}
+              >
+                <SelectTrigger id="fiscal_year" className="w-full sm:w-72">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FISCAL_YEAR_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={String(opt.value)}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Enskild firma måste använda kalenderår. Aktiebolag kan välja brutet räkenskapsår.
               </p>
             </div>
 

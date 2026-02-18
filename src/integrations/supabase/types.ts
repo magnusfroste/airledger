@@ -455,6 +455,7 @@ export type Database = {
           accounting_experience: string | null
           created_at: string
           email: string | null
+          fiscal_year_start: number
           full_name: string | null
           id: string
           industry: string | null
@@ -467,6 +468,7 @@ export type Database = {
           accounting_experience?: string | null
           created_at?: string
           email?: string | null
+          fiscal_year_start?: number
           full_name?: string | null
           id: string
           industry?: string | null
@@ -479,6 +481,7 @@ export type Database = {
           accounting_experience?: string | null
           created_at?: string
           email?: string | null
+          fiscal_year_start?: number
           full_name?: string | null
           id?: string
           industry?: string | null
