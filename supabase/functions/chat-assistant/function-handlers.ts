@@ -2,6 +2,26 @@
 import { FunctionCallArgs } from './types.ts';
 import { isDuplicateCall, markCallAsExecuted, getPreviousCallResult } from './deduplication.ts';
 
+/**
+ * Compute fiscal year date range.
+ * For calendar year (start=1): 2025-01-01 to 2025-12-31
+ * For broken fiscal year (start=7): 2025-07-01 to 2026-06-30
+ */
+function computeFiscalYearRange(year: number, fiscalYearStart: number): { yearStart: string; yearEnd: string } {
+  if (fiscalYearStart === 1) {
+    return { yearStart: `${year}-01-01`, yearEnd: `${year}-12-31` };
+  }
+  const startMonth = String(fiscalYearStart).padStart(2, '0');
+  const endMonth = String(fiscalYearStart - 1).padStart(2, '0');
+  const endYear = year + 1;
+  // Last day of the month before fiscal start
+  const lastDay = new Date(endYear, fiscalYearStart - 1, 0).getDate();
+  return {
+    yearStart: `${year}-${startMonth}-01`,
+    yearEnd: `${endYear}-${endMonth}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
+
 export async function handleFunctionCall(
   functionName: string, 
   args: FunctionCallArgs, 
@@ -244,8 +264,9 @@ export async function handleFunctionCall(
   } else if (functionName === 'get_year_end_checklist') {
     try {
       const year = args.fiscalYear;
-      const yearStart = `${year}-01-01`;
-      const yearEnd = `${year}-12-31`;
+      const fiscalStart = args.fiscalYearStart || 1;
+      // Compute fiscal year date range
+      const { yearStart, yearEnd } = computeFiscalYearRange(year, fiscalStart);
 
       // Count transactions for the year
       const { count: txCount } = await supabase
@@ -294,7 +315,8 @@ export async function handleFunctionCall(
 
       const check = (done: boolean) => done ? '✅' : '⬜';
 
-      response += `\n\n📋 **Checklista årsbokslut ${year}**\n\n` +
+      const periodLabel = fiscalStart === 1 ? `${year}` : `${yearStart} – ${yearEnd}`;
+      response += `\n\n📋 **Checklista årsbokslut ${periodLabel}**\n\n` +
         `${check(true)} Transaktioner bokförda (${txCount || 0} st)\n` +
         `${check(hasDepreciation)} Avskrivningar\n` +
         `${check(hasAccruals)} Periodiseringar\n` +
@@ -303,7 +325,7 @@ export async function handleFunctionCall(
         `⬜ Balansräkning granskad\n` +
         `⬜ Räkenskapsåret låst\n\n` +
         `---\n\n` +
-        `📊 **Beräknat resultat ${year}**\n\n` +
+        `📊 **Beräknat resultat ${periodLabel}**\n\n` +
         `| Post | Belopp |\n|------|--------|\n` +
         `| Intäkter (klass 3) | ${revenue.toLocaleString('sv-SE')} kr |\n` +
         `| Kostnader (klass 4–7) | -${costs.toLocaleString('sv-SE')} kr |\n` +
@@ -328,8 +350,8 @@ export async function handleFunctionCall(
   } else if (functionName === 'generate_year_end_summary') {
     try {
       const year = args.fiscalYear;
-      const yearStart = `${year}-01-01`;
-      const yearEnd = `${year}-12-31`;
+      const fiscalStart = args.fiscalYearStart || 1;
+      const { yearStart, yearEnd } = computeFiscalYearRange(year, fiscalStart);
 
       // Get opening balances
       const { data: openings } = await supabase
@@ -409,7 +431,8 @@ export async function handleFunctionCall(
         warnings.push('⚠️ Inga intäkter eller kostnader bokförda');
       }
 
-      response += `\n\n📊 **Bokslutssammanfattning ${year}**\n\n`;
+      const periodLabel = fiscalStart === 1 ? `${year}` : `${yearStart} – ${yearEnd}`;
+      response += `\n\n📊 **Bokslutssammanfattning ${periodLabel}**\n\n`;
 
       response += `### Resultaträkning\n\n| Konto | Belopp |\n|-------|--------|\n`;
       response += incomeRows.join('\n') + '\n';

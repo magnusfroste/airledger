@@ -108,6 +108,7 @@ export type Database = {
           priority: number
           quick_action_label: string
           quick_action_message: string
+          relative_to_fiscal_year: boolean
           trigger_type: string
           updated_at: string
         }
@@ -123,6 +124,7 @@ export type Database = {
           priority?: number
           quick_action_label: string
           quick_action_message: string
+          relative_to_fiscal_year?: boolean
           trigger_type?: string
           updated_at?: string
         }
@@ -138,6 +140,7 @@ export type Database = {
           priority?: number
           quick_action_label?: string
           quick_action_message?: string
+          relative_to_fiscal_year?: boolean
           trigger_type?: string
           updated_at?: string
         }

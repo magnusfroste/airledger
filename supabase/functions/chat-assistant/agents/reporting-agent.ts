@@ -83,9 +83,23 @@ export class ReportingAgent implements Agent {
     } else {
       year = new Date().getFullYear() - (new Date().getMonth() < 3 ? 1 : 0);
     }
-    console.log(`[ReportingAgent] Year-end: year=${year}`);
+
+    // Fetch user's fiscal year start
+    let fiscalYearStart = 1;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('fiscal_year_start')
+        .eq('id', userId)
+        .single();
+      fiscalYearStart = profile?.fiscal_year_start ?? 1;
+    } catch (e) {
+      console.error('[ReportingAgent] Failed to fetch fiscal_year_start:', e);
+    }
+
+    console.log(`[ReportingAgent] Year-end: year=${year}, fiscalYearStart=${fiscalYearStart}`);
     const sessionId = `${userId}_${Date.now()}`;
-    const response = await handleFunctionCall('get_year_end_checklist', { fiscalYear: year }, supabase, sessionId);
+    const response = await handleFunctionCall('get_year_end_checklist', { fiscalYear: year, fiscalYearStart }, supabase, sessionId);
     return { response, action_taken: 'guided' };
   }
 
