@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles ADD COLUMN company_type text NOT NULL DEFAULT 'enskild_firma';
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_company_type_check CHECK (company_type IN ('enskild_firma', 'aktiebolag', 'handelsbolag'));

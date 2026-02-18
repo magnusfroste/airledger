@@ -19,7 +19,14 @@ interface Profile {
   username: string | null;
   is_developer: boolean | null;
   fiscal_year_start: number;
+  company_type: string;
 }
+
+const COMPANY_TYPE_OPTIONS = [
+  { value: 'enskild_firma', label: 'Enskild firma' },
+  { value: 'aktiebolag', label: 'Aktiebolag (AB)' },
+  { value: 'handelsbolag', label: 'Handelsbolag (HB)' },
+] as const;
 
 const FISCAL_YEAR_OPTIONS = [
   { value: 1, label: "Kalenderår (jan–dec)" },
@@ -38,6 +45,7 @@ const Settings = () => {
   const [formData, setFormData] = useState({
     full_name: '',
     username: '',
+    company_type: 'enskild_firma',
     fiscal_year_start: 1,
   });
 
@@ -65,6 +73,7 @@ const Settings = () => {
         setFormData({
           full_name: data.full_name || '',
           username: data.username || '',
+          company_type: data.company_type || 'enskild_firma',
           fiscal_year_start: data.fiscal_year_start ?? 1,
         });
       } else {
@@ -89,6 +98,7 @@ const Settings = () => {
         setFormData({
           full_name: createdProfile.full_name || '',
           username: createdProfile.username || '',
+          company_type: createdProfile.company_type || 'enskild_firma',
           fiscal_year_start: createdProfile.fiscal_year_start ?? 1,
         });
       }
@@ -109,12 +119,16 @@ const Settings = () => {
 
     try {
       setSaving(true);
+      // Reset fiscal year to calendar if enskild firma
+      const fiscalYear = formData.company_type === 'enskild_firma' ? 1 : formData.fiscal_year_start;
+
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: formData.full_name,
           username: formData.username,
-          fiscal_year_start: formData.fiscal_year_start,
+          company_type: formData.company_type,
+          fiscal_year_start: fiscalYear,
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id);
@@ -131,8 +145,14 @@ const Settings = () => {
         ...prev,
         full_name: formData.full_name,
         username: formData.username,
-        fiscal_year_start: formData.fiscal_year_start,
+        company_type: formData.company_type,
+        fiscal_year_start: fiscalYear,
       } : null);
+
+      // Also update local form to reflect the forced calendar year
+      if (formData.company_type === 'enskild_firma') {
+        setFormData(prev => ({ ...prev, fiscal_year_start: 1 }));
+      }
 
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -220,30 +240,70 @@ const Settings = () => {
 
             <Separator />
 
-            {/* Räkenskapsår */}
+            {/* Bolagsform */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-muted-foreground" />
-                <Label htmlFor="fiscal_year">Räkenskapsår</Label>
+                <Label htmlFor="company_type">Bolagsform</Label>
               </div>
               <Select
-                value={String(formData.fiscal_year_start)}
-                onValueChange={(v) => setFormData(prev => ({ ...prev, fiscal_year_start: Number(v) }))}
+                value={formData.company_type}
+                onValueChange={(v) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    company_type: v,
+                    // Force calendar year for enskild firma
+                    fiscal_year_start: v === 'enskild_firma' ? 1 : prev.fiscal_year_start,
+                  }));
+                }}
               >
-                <SelectTrigger id="fiscal_year" className="w-full sm:w-72">
+                <SelectTrigger id="company_type" className="w-full sm:w-72">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {FISCAL_YEAR_OPTIONS.map(opt => (
-                    <SelectItem key={opt.value} value={String(opt.value)}>
+                  {COMPANY_TYPE_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Enskild firma måste använda kalenderår. Aktiebolag kan välja brutet räkenskapsår.
-              </p>
+            </div>
+
+            {/* Räkenskapsår */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="fiscal_year">Räkenskapsår</Label>
+              </div>
+              {formData.company_type === 'enskild_firma' ? (
+                <>
+                  <Input value="Kalenderår (jan–dec)" disabled className="bg-muted w-full sm:w-72" />
+                  <p className="text-xs text-muted-foreground">
+                    Enskild firma måste använda kalenderår.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Select
+                    value={String(formData.fiscal_year_start)}
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, fiscal_year_start: Number(v) }))}
+                  >
+                    <SelectTrigger id="fiscal_year" className="w-full sm:w-72">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FISCAL_YEAR_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={String(opt.value)}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    AB och HB kan välja brutet räkenskapsår.
+                  </p>
+                </>
+              )}
             </div>
 
             <Separator />
