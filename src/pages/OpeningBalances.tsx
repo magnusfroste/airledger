@@ -463,7 +463,7 @@ const OpeningBalances = () => {
     return (
       <div className="container px-6 py-6 max-w-6xl mx-auto">
         <div className="animate-fade-in space-y-6">
-          <div className="h-8 bg-muted rounded animate-pulse" />
+          <div className="h-6 sm:h-8 bg-muted rounded animate-pulse" />
           <div className="grid gap-6">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-48 bg-muted rounded-lg animate-pulse" />
@@ -476,11 +476,11 @@ const OpeningBalances = () => {
 
   return (
     <TooltipProvider>
-      <div className="container px-6 py-6 max-w-6xl mx-auto animate-fade-in">
+      <div className="container px-3 py-3 sm:px-6 sm:py-6 max-w-6xl mx-auto animate-fade-in">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-8">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Ingående balanser</h1>
+            <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Ingående balanser</h1>
             <p className="text-muted-foreground mt-1">
               Registrera och hantera dina startbalanser enligt BAS 2024
             </p>
@@ -793,7 +793,7 @@ const OpeningBalances = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-8">
         <Card className="hover-scale">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Totalt debet</CardTitle>
