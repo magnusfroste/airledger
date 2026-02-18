@@ -5,6 +5,7 @@ import { Send } from "lucide-react";
 import ActionButtons from "./ActionButtons";
 import PendingImages from "./PendingImages";
 import ChatQuickActions from "./ChatQuickActions";
+import { ActiveTrigger } from "@/hooks/useQuickActionContext";
 
 interface PendingImage {
   id: string;
@@ -27,6 +28,10 @@ interface InputAreaProps {
   onQuickAction?: (message: string) => void;
   hasMessages?: boolean;
   lastMessageIsBooking?: boolean;
+  transactionCount?: number;
+  hasOpeningBalances?: boolean;
+  topTemplates?: { name: string; count: number }[];
+  activeTriggers?: ActiveTrigger[];
 }
 
 const InputArea = ({
@@ -44,6 +49,10 @@ const InputArea = ({
   onQuickAction,
   hasMessages = false,
   lastMessageIsBooking = false,
+  transactionCount,
+  hasOpeningBalances,
+  topTemplates,
+  activeTriggers,
 }: InputAreaProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -69,6 +78,10 @@ const InputArea = ({
           isLoading={isLoading}
           hasMessages={hasMessages}
           lastMessageIsBooking={lastMessageIsBooking}
+          transactionCount={transactionCount}
+          hasOpeningBalances={hasOpeningBalances}
+          topTemplates={topTemplates}
+          activeTriggers={activeTriggers}
         />
       )}
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminRole } from '@/hooks/useAdminRole';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, FileText, List, Users, MessageSquare, AlertTriangle, Plug, Search, Bot, ScrollText, Play } from 'lucide-react';
+import { Shield, FileText, List, Users, MessageSquare, AlertTriangle, Plug, Search, Bot, ScrollText, Play, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AdminTemplates from '@/components/admin/AdminTemplates';
 import AdminAccounts from '@/components/admin/AdminAccounts';
@@ -13,6 +13,7 @@ import AdminIntegrations from '@/components/admin/AdminIntegrations';
 import AdminSEO from '@/components/admin/AdminSEO';
 import AdminAgents from '@/components/admin/AdminAgents';
 import AdminChatLog from '@/components/admin/AdminChatLog';
+import AdminTriggers from '@/components/admin/AdminTriggers';
 
 const Admin = () => {
   const { isAdmin, loading } = useAdminRole();
@@ -53,7 +54,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="templates" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-9">
+        <TabsList className="grid w-full grid-cols-10">
           <TabsTrigger value="templates" className="flex items-center gap-1.5 text-xs sm:text-sm">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Mallar</span>
@@ -86,6 +87,10 @@ const Admin = () => {
             <Plug className="h-4 w-4" />
             <span className="hidden sm:inline">Integrationer</span>
           </TabsTrigger>
+          <TabsTrigger value="triggers" className="flex items-center gap-1.5 text-xs sm:text-sm">
+            <Clock className="h-4 w-4" />
+            <span className="hidden sm:inline">Triggers</span>
+          </TabsTrigger>
           <TabsTrigger value="seo" className="flex items-center gap-1.5 text-xs sm:text-sm">
             <Search className="h-4 w-4" />
             <span className="hidden sm:inline">SEO/AEO</span>
@@ -115,6 +120,9 @@ const Admin = () => {
         </TabsContent>
         <TabsContent value="integrations">
           <AdminIntegrations />
+        </TabsContent>
+        <TabsContent value="triggers">
+          <AdminTriggers />
         </TabsContent>
         <TabsContent value="seo">
           <AdminSEO />
