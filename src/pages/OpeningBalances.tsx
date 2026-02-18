@@ -859,30 +859,29 @@ const OpeningBalances = () => {
               {balances.map((balance) => (
                 <div
                   key={balance.id}
-                  className="flex items-center justify-between p-4 border border-border/20 rounded-lg hover:bg-muted/30 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border border-border/20 rounded-lg hover:bg-muted/30 transition-colors gap-2 sm:gap-3"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <div className="font-medium">
-                        {balance.account_code} {balance.account_name}
-                      </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs text-muted-foreground">{balance.account_code}</span>
+                      <span className="font-medium text-sm sm:text-base truncate">{balance.account_name}</span>
                       <Badge 
                         variant={balance.balance_type === 'debit' ? 'default' : 'secondary'}
-                        className="text-xs"
+                        className="text-xs shrink-0"
                       >
                         {balance.balance_type === 'debit' ? 'Debet' : 'Kredit'}
                       </Badge>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-3">
-                    <div className={`font-semibold text-lg ${
+                  <div className="flex items-center justify-between sm:justify-end gap-3">
+                    <div className={`font-semibold text-base sm:text-lg ${
                       balance.balance_type === 'debit' ? 'text-blue-600' : 'text-green-600'
                     }`}>
                       {formatCurrency(balance.opening_balance)}
                     </div>
                     
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 shrink-0">
                       <Button
                         variant="ghost"
                         size="sm"
