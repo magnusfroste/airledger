@@ -167,6 +167,11 @@ export class BookingAgent implements Agent {
       return { response: formatClarificationRequest(intent.clarification_needed), action_taken: 'clarified' };
     }
 
+    // Very low confidence + no alternatives → ask for more info
+    if (match && match.confidence < 0.50 && candidates.length === 0) {
+      return { response: formatClarificationRequest('Kan du beskriva mer vad betalningen gäller? T.ex. hyra, inköp, tjänst...'), action_taken: 'clarified' };
+    }
+
     // Disambiguation: low confidence + alternatives → ask user
     if (match && match.confidence < 0.80 && candidates.length > 0) {
       return { response: formatDisambiguation(match, candidates), action_taken: 'clarified' };
