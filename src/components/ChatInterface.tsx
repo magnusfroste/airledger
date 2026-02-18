@@ -14,6 +14,7 @@ import { useCamera } from "@/hooks/useCamera";
 import { useReceiptAnalysis } from "@/hooks/useReceiptAnalysis";
 import { useBankStatementAnalysis } from "@/hooks/useBankStatementAnalysis";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useQuickActionContext } from "@/hooks/useQuickActionContext";
 
 const ChatInterface = () => {
   const [inputValue, setInputValue] = useState("");
@@ -31,6 +32,7 @@ const ChatInterface = () => {
   // Custom hooks
   const { conversationId, limitMessagesInConversation, handleNewChat } = useConversation();
   const { subscription, usage } = useSubscription();
+  const quickCtx = useQuickActionContext();
   
   const { 
     messages, 
@@ -416,6 +418,10 @@ const ChatInterface = () => {
           onStartCamera={startCamera}
           onQuickAction={handleActionButton}
           hasMessages={messages.length > 0}
+          transactionCount={quickCtx.transactionCount}
+          hasOpeningBalances={quickCtx.hasOpeningBalances}
+          topTemplates={quickCtx.topTemplates}
+          activeTriggers={quickCtx.activeTriggers}
           lastMessageIsBooking={
             messages.length > 0 &&
             messages[messages.length - 1]?.sender === 'ai' &&

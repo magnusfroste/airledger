@@ -95,6 +95,54 @@ export type Database = {
         }
         Relationships: []
       }
+      air_triggers: {
+        Row: {
+          created_at: string
+          day: number
+          days_before: number
+          description: string | null
+          id: string
+          is_active: boolean
+          month: number
+          name: string
+          priority: number
+          quick_action_label: string
+          quick_action_message: string
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day: number
+          days_before?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          month: number
+          name: string
+          priority?: number
+          quick_action_label: string
+          quick_action_message: string
+          trigger_type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day?: number
+          days_before?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          month?: number
+          name?: string
+          priority?: number
+          quick_action_label?: string
+          quick_action_message?: string
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       airledger_chart_of_accounts: {
         Row: {
           account_category: string
