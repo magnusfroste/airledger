@@ -19,17 +19,17 @@ interface QuickActionContext {
   isLoading: boolean;
 }
 
-function getNextOccurrence(month: number, day: number, fiscalYearStart: number): Date {
+function getNextOccurrence(month: number, day: number, fiscalYearStart: number, relativeTofiscalYear: boolean): Date {
   const now = new Date();
   const thisYear = now.getFullYear();
 
-  // For triggers tied to fiscal year deadlines, adjust month relative to fiscal year start
-  // e.g. "Årsredovisning" for fiscal year starting Jul means deadline shifts accordingly
   let adjustedMonth = month;
-  if (fiscalYearStart !== 1) {
-    // Shift: e.g. fiscal start=7, trigger month=2 (feb) → stays feb but for the fiscal year ending Jun
-    // No shift needed for the month itself — the trigger dates are absolute calendar dates
-    // But we keep this hook point for future per-trigger fiscal adjustments
+  if (relativeTofiscalYear && fiscalYearStart !== 1) {
+    // Shift trigger month by the fiscal year offset
+    // E.g. Årsredovisning is month=2 (Feb) for calendar year.
+    // For fiscal year starting Jul (7), offset = 6, so 2+6 = 8 (Aug).
+    const offset = fiscalYearStart - 1;
+    adjustedMonth = ((month - 1 + offset) % 12) + 1;
   }
 
   let next = new Date(thisYear, adjustedMonth - 1, day);
@@ -100,7 +100,7 @@ export function useQuickActionContext(): QuickActionContext {
         const now = new Date();
         const activeTriggers: ActiveTrigger[] = [];
         ((trigRes.data || []) as any[]).forEach((t) => {
-          const next = getNextOccurrence(t.month, t.day, fiscalYearStart);
+          const next = getNextOccurrence(t.month, t.day, fiscalYearStart, t.relative_to_fiscal_year ?? false);
           const days = daysUntil(next);
           if (days <= t.days_before) {
             activeTriggers.push({
