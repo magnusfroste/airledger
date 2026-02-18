@@ -215,7 +215,7 @@ const Reports = () => {
 
   if (loading) {
     return (
-      <div className="container px-6 py-6 max-w-6xl mx-auto">
+      <div className="container px-3 py-3 sm:px-6 sm:py-6 max-w-6xl mx-auto">
         <div className="animate-fade-in space-y-6">
           <div className="h-8 bg-muted rounded animate-pulse" />
           <div className="grid gap-6">
@@ -229,12 +229,12 @@ const Reports = () => {
   }
 
   return (
-    <div className="container px-6 py-6 pb-20 sm:pb-6 max-w-6xl mx-auto animate-fade-in">
+    <div className="container px-3 py-3 pb-20 sm:px-6 sm:py-6 sm:pb-6 max-w-6xl mx-auto animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Resultatrapport</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Resultatrapport</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Översikt över intäkter och kostnader • {getPeriodLabel()}
           </p>
         </div>

@@ -240,7 +240,7 @@ const BalanceSheet = () => {
       </Card>;
   };
   if (loading) {
-    return <div className="container px-6 py-6 max-w-4xl mx-auto">
+    return <div className="container px-3 py-3 sm:px-6 sm:py-6 max-w-4xl mx-auto">
         <div className="animate-fade-in space-y-6">
           <div className="h-8 bg-muted rounded animate-pulse" />
           <div className="grid gap-6">
@@ -249,12 +249,12 @@ const BalanceSheet = () => {
         </div>
       </div>;
   }
-  return <div className="container py-6 pb-20 sm:pb-6 max-w-4xl mx-auto animate-fade-in px-0">
+  return <div className="container py-3 pb-20 sm:py-6 sm:pb-6 max-w-4xl mx-auto animate-fade-in px-3 sm:px-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground flex items-center gap-3">
-            <Scale className="h-7 w-7 text-primary" />
+          <h1 className="text-xl sm:text-2xl font-semibold text-foreground flex items-center gap-2 sm:gap-3">
+            <Scale className="h-5 w-5 sm:h-7 sm:w-7 text-primary" />
             Balansrapport
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -295,7 +295,7 @@ const BalanceSheet = () => {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-8">
         <Card className="hover-scale border-blue-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Totala tillgångar</CardTitle>
@@ -334,7 +334,7 @@ const BalanceSheet = () => {
       </div>
 
       {/* Balance Sheet Sections */}
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {renderAccountSection("Tillgångar", "assets", balanceData?.assets || [], balanceData?.totalAssets || 0, <Building className="h-5 w-5 text-blue-600" />, "text-blue-600 border-blue-200")}
 
         {renderAccountSection("Skulder", "liabilities", balanceData?.liabilities || [], balanceData?.totalLiabilities || 0, <Banknote className="h-5 w-5 text-red-600" />, "text-red-600 border-red-200")}
