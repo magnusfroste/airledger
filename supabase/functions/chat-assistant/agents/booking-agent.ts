@@ -2,9 +2,9 @@ import { Agent, AgentContext, AgentResult } from './types.ts';
 import { BOOKING_PROMPT } from './prompts/booking.ts';
 import { getAgentPrompt } from './prompts/loader.ts';
 import { ConversationMessage } from '../../_shared/types.ts';
-import { matchTemplate } from '../template-matcher.ts';
+import { matchTemplateWithCandidates } from '../template-matcher.ts';
 import { analyzeRequiredFields, calculateTemplateAmounts } from '../field-analyzer.ts';
-import { formatBookingProposal, formatClarificationRequest, formatMissingDataPrompt, formatFollowUpSuggestion } from '../response-formatter.ts';
+import { formatBookingProposal, formatClarificationRequest, formatMissingDataPrompt, formatFollowUpSuggestion, formatDisambiguation } from '../response-formatter.ts';
 import { handleFunctionCall } from '../function-handlers.ts';
 import { buildBookkeepingContext } from '../context-builder.ts';
 import { classifyIntent } from '../intent-classifier.ts';
@@ -161,10 +161,15 @@ export class BookingAgent implements Agent {
       }
     }
 
-    const match = await matchTemplate(intent, supabase, userId);
+    const { match, candidates } = await matchTemplateWithCandidates(intent, supabase, userId);
 
     if (intent.clarification_needed && !intent.extracted_data.amount) {
       return { response: formatClarificationRequest(intent.clarification_needed), action_taken: 'clarified' };
+    }
+
+    // Disambiguation: low confidence + alternatives → ask user
+    if (match && match.confidence < 0.80 && candidates.length > 0) {
+      return { response: formatDisambiguation(match, candidates), action_taken: 'clarified' };
     }
 
     if (match) {

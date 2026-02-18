@@ -133,6 +133,21 @@ export function formatTemplateChoices(candidates: any[]): string {
   return response;
 }
 
+export function formatDisambiguation(
+  primaryMatch: { template: any; confidence: number },
+  alternatives: Array<{ template: any }>
+): string {
+  let response = `🤔 Jag är inte helt säker på vilken typ av transaktion det gäller.\n\nMenar du:\n\n`;
+
+  const all = [primaryMatch, ...alternatives];
+  all.forEach((c, i) => {
+    response += `**${i + 1}. ${c.template.template_name}** — ${c.template.description}\n`;
+  });
+
+  response += `\nSvara med siffra eller beskriv mer.`;
+  return response;
+}
+
 export function formatBatchProposal(rows: any[]): string {
   let response = `📊 **Bankutdrag - ${rows.length} transaktioner**\n\n`;
   response += `| # | Datum | Beskrivning | Belopp | Mall |\n`;

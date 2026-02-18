@@ -78,11 +78,25 @@ const INTENT_TO_CATEGORY: Record<string, string[]> = {
 /**
  * Match intent against template library (used by chat-assistant).
  */
+export interface MatchTemplateResult {
+  match: TemplateMatch | null;
+  candidates: TemplateMatch[];
+}
+
 export async function matchTemplate(
   intent: IntentClassification,
   supabase: any,
   userId: string
 ): Promise<TemplateMatch | null> {
+  const result = await matchTemplateWithCandidates(intent, supabase, userId);
+  return result.match;
+}
+
+export async function matchTemplateWithCandidates(
+  intent: IntentClassification,
+  supabase: any,
+  userId: string
+): Promise<MatchTemplateResult> {
   const { data: templates, error } = await supabase
     .from('airledger_transaction_templates')
     .select('*')
@@ -92,7 +106,7 @@ export async function matchTemplate(
 
   if (error || !templates?.length) {
     console.error('Template fetch error:', error);
-    return null;
+    return { match: null, candidates: [] };
   }
 
   let match: TemplateMatch | null = null;
@@ -137,7 +151,57 @@ export async function matchTemplate(
     match = await applyWarningsFromDb(match, intent.extracted_data.amount, supabase);
   }
 
-  return match;
+  // 5. Collect runner-up candidates for disambiguation
+  const candidates = collectCandidates(templates, intent, match);
+
+  return { match, candidates };
+}
+
+function collectCandidates(
+  templates: any[],
+  intent: IntentClassification,
+  primaryMatch: TemplateMatch | null
+): TemplateMatch[] {
+  const searchTerms = [
+    intent.extracted_data.description,
+    intent.extracted_data.vendor,
+  ].filter(Boolean) as string[];
+
+  const lower = searchTerms.map(s => s.toLowerCase());
+  const categories = INTENT_TO_CATEGORY[intent.intent] || [];
+  const primaryName = primaryMatch?.template?.template_name;
+
+  const scored: Array<{ template: any; score: number }> = [];
+
+  for (const t of templates) {
+    if (t.template_name === primaryName) continue;
+
+    let score = 0;
+    const keywords: string[] = t.keywords || [];
+    const allTerms = [
+      ...keywords.map((k: string) => k.toLowerCase()),
+      t.template_name.toLowerCase(),
+      t.description.toLowerCase(),
+    ];
+
+    for (const term of lower) {
+      for (const kw of allTerms) {
+        if (kw.includes(term) || term.includes(kw)) score += 2;
+      }
+    }
+
+    if (categories.some(cat => t.category.toLowerCase().includes(cat))) score += 3;
+
+    if (score > 0) scored.push({ template: t, score });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+
+  return scored.slice(0, 3).map(s => ({
+    template: s.template,
+    match_type: 'keyword' as const,
+    confidence: Math.min(0.5 + s.score * 0.05, 0.75),
+  }));
 }
 
 /**

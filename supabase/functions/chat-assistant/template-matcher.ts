@@ -1,2 +1,3 @@
 // Re-export from shared module
-export { matchTemplate, matchSingleTransaction, applyTemplateToTransaction, getTopTemplateCandidates } from '../_shared/template-matcher.ts';
+export { matchTemplate, matchTemplateWithCandidates, matchSingleTransaction, applyTemplateToTransaction, getTopTemplateCandidates } from '../_shared/template-matcher.ts';
+export type { MatchTemplateResult } from '../_shared/template-matcher.ts';
