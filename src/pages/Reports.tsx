@@ -7,6 +7,7 @@ import { Calendar, TrendingUp, TrendingDown, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { getCurrentFiscalYear, getPreviousFiscalYear, formatLocalDate, isBrokenFiscalYear } from "@/lib/fiscalYear";
 
 interface ReportData {
   revenue: Array<{
@@ -28,21 +29,25 @@ const Reports = () => {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("current-year");
+  const [fiscalYearStart, setFiscalYearStart] = useState(1);
   const { user } = useAuth();
   const { toast } = useToast();
-
-  const formatLocalDate = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
 
   const fetchReportData = async () => {
     if (!user) return;
 
     setLoading(true);
     try {
+      // Fetch fiscal year setting
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('fiscal_year_start')
+        .eq('id', user.id)
+        .single();
+      
+      const fyStart = profile?.fiscal_year_start ?? 1;
+      setFiscalYearStart(fyStart);
+
       // Determine date range based on period
       const now = new Date();
       let startDate: Date;
@@ -57,18 +62,23 @@ const Reports = () => {
           startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
           endDate = new Date(now.getFullYear(), now.getMonth(), 0);
           break;
-        case "current-year":
-          startDate = new Date(now.getFullYear(), 0, 1);
-          endDate = new Date(now.getFullYear(), 11, 31);
+        case "current-year": {
+          const fy = getCurrentFiscalYear(fyStart);
+          startDate = fy.start;
+          endDate = fy.end;
           break;
-        case "last-year":
-          const lastYear = now.getFullYear() - 1;
-          startDate = new Date(lastYear, 0, 1);
-          endDate = new Date(lastYear, 11, 31);
+        }
+        case "last-year": {
+          const fy = getPreviousFiscalYear(fyStart);
+          startDate = fy.start;
+          endDate = fy.end;
           break;
-        default:
-          startDate = new Date(now.getFullYear(), 0, 1);
-          endDate = new Date(now.getFullYear(), 11, 31);
+        }
+        default: {
+          const fyDefault = getCurrentFiscalYear(fyStart);
+          startDate = fyDefault.start;
+          endDate = fyDefault.end;
+        }
       }
 
       // Fetch all entries for the period with transaction date
@@ -203,12 +213,15 @@ const Reports = () => {
   };
 
   const getPeriodLabel = () => {
+    const fy = getCurrentFiscalYear(fiscalYearStart);
+    const prevFy = getPreviousFiscalYear(fiscalYearStart);
+    const broken = isBrokenFiscalYear(fiscalYearStart);
     switch (period) {
       case "current-month": return "Innevarande månad";
       case "last-month": return "Föregående månad";
-      case "current-year": return "Innevarande år";
-      case "last-year": return "Föregående år";
-      default: return "Innevarande år";
+      case "current-year": return broken ? `Räkenskapsår ${fy.label}` : "Innevarande år";
+      case "last-year": return broken ? `Räkenskapsår ${prevFy.label}` : "Föregående år";
+      default: return broken ? `Räkenskapsår ${fy.label}` : "Innevarande år";
     }
   };
 
@@ -247,8 +260,12 @@ const Reports = () => {
             <SelectContent>
               <SelectItem value="current-month">Innevarande månad</SelectItem>
               <SelectItem value="last-month">Föregående månad</SelectItem>
-              <SelectItem value="current-year">Innevarande år</SelectItem>
-              <SelectItem value="last-year">Föregående år</SelectItem>
+              <SelectItem value="current-year">
+                {isBrokenFiscalYear(fiscalYearStart) ? `Räkenskapsår ${getCurrentFiscalYear(fiscalYearStart).label}` : "Innevarande år"}
+              </SelectItem>
+              <SelectItem value="last-year">
+                {isBrokenFiscalYear(fiscalYearStart) ? `Föreg. räkenskapsår ${getPreviousFiscalYear(fiscalYearStart).label}` : "Föregående år"}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
