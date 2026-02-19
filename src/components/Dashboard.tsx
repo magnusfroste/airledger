@@ -12,6 +12,7 @@ import ChartsSection from "./dashboard/ChartsSection";
 import RecentTransactions from "./dashboard/RecentTransactions";
 import QuotaWarning from "./QuotaWarning";
 import { useSubscription } from "@/hooks/useSubscription";
+import { getCurrentFiscalYear, isBrokenFiscalYear } from "@/lib/fiscalYear";
 
 interface DashboardStats {
   revenue: number;
@@ -62,6 +63,7 @@ const Dashboard = () => {
 
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fiscalYearStart, setFiscalYearStart] = useState(1);
 
   const [greeting] = useState(() => {
     const hour = new Date().getHours();
@@ -80,8 +82,13 @@ const Dashboard = () => {
     try {
       setLoading(true);
 
-      // Fetch all transactions and entries in parallel
-      const [transactionsResult, entriesResult] = await Promise.all([
+      // Fetch profile, transactions and entries in parallel
+      const [profileResult, transactionsResult, entriesResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('fiscal_year_start')
+          .eq('id', user?.id ?? '')
+          .single(),
         supabase
           .from('airledger_transactions')
           .select('*')
@@ -93,6 +100,9 @@ const Dashboard = () => {
 
       if (transactionsResult.error) throw transactionsResult.error;
       if (entriesResult.error) throw entriesResult.error;
+
+      const fyStart = profileResult.data?.fiscal_year_start ?? 1;
+      setFiscalYearStart(fyStart);
 
       const transactions = transactionsResult.data || [];
       const entries = entriesResult.data || [];
@@ -110,6 +120,7 @@ const Dashboard = () => {
       // Calculate stats
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
+      const fiscalYear = getCurrentFiscalYear(fyStart);
 
       // MONTHLY DATA
       const monthlyRevenue = entries.filter(e => {
@@ -153,14 +164,15 @@ const Dashboard = () => {
         unpaidInvoices: Math.max(customerReceivables, 0)
       });
 
-      // YEARLY DATA
-      // Calculate yearly totals using same logic as Reports
+      // FISCAL YEAR DATA
+      // Helper to check if a date falls within the fiscal year
+      const isInFiscalYear = (date: Date) => date >= fiscalYear.start && date <= fiscalYear.end;
+
       const yearlyRevenue = entries.filter(e => {
         const entryDate = getEntryDate(e);
         if (!entryDate) return false;
         const accountNum = parseInt(e.account_code);
-        return accountNum >= 3000 && accountNum <= 3999 && 
-               entryDate.getFullYear() === currentYear;
+        return accountNum >= 3000 && accountNum <= 3999 && isInFiscalYear(entryDate);
       }).reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
       const yearlyExpenses = entries.filter(e => {
@@ -168,19 +180,26 @@ const Dashboard = () => {
         if (!entryDate) return false;
         const accountNum = parseInt(e.account_code);
         return ((accountNum >= 4000 && accountNum <= 4999) || (accountNum >= 6000 && accountNum <= 6999)) &&
-               entryDate.getFullYear() === currentYear;
+               isInFiscalYear(entryDate);
       }).reduce((sum, e) => sum + (e.debit_amount || 0), 0);
 
-      // Create monthly breakdown for charts using entries logic
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
-      const monthlyBreakdown = monthNames.map((month, index) => {
+      // Create monthly breakdown for charts - iterate months of the fiscal year
+      const allMonthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
+      const monthlyBreakdown: Array<{ month: string; revenue: number; expenses: number; netResult: number }> = [];
+      
+      for (let i = 0; i < 12; i++) {
+        const monthDate = new Date(fiscalYear.start);
+        monthDate.setMonth(monthDate.getMonth() + i);
+        const monthIndex = monthDate.getMonth();
+        const monthYear = monthDate.getFullYear();
+        
         const monthRevenue = entries.filter(e => {
           const entryDate = getEntryDate(e);
           if (!entryDate) return false;
           const accountNum = parseInt(e.account_code);
           return accountNum >= 3000 && accountNum <= 3999 && 
-                 entryDate.getMonth() === index && 
-                 entryDate.getFullYear() === currentYear;
+                 entryDate.getMonth() === monthIndex && 
+                 entryDate.getFullYear() === monthYear;
         }).reduce((sum, e) => sum + (e.credit_amount || 0), 0);
 
         const monthExpenses = entries.filter(e => {
@@ -188,17 +207,17 @@ const Dashboard = () => {
           if (!entryDate) return false;
           const accountNum = parseInt(e.account_code);
           return ((accountNum >= 4000 && accountNum <= 4999) || (accountNum >= 6000 && accountNum <= 6999)) &&
-                 entryDate.getMonth() === index && 
-                 entryDate.getFullYear() === currentYear;
+                 entryDate.getMonth() === monthIndex && 
+                 entryDate.getFullYear() === monthYear;
         }).reduce((sum, e) => sum + (e.debit_amount || 0), 0);
 
-        return {
-          month,
+        monthlyBreakdown.push({
+          month: allMonthNames[monthIndex],
           revenue: monthRevenue,
           expenses: monthExpenses,
           netResult: monthRevenue - monthExpenses
-        };
-      });
+        });
+      }
 
       setYearlyStats({
         revenue: yearlyRevenue,
@@ -279,7 +298,10 @@ const Dashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="year" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              Hela året {new Date().getFullYear()}
+              {isBrokenFiscalYear(fiscalYearStart) 
+                ? `Räkenskapsår ${getCurrentFiscalYear(fiscalYearStart).label}`
+                : `Hela året ${new Date().getFullYear()}`
+              }
             </TabsTrigger>
           </TabsList>
 
