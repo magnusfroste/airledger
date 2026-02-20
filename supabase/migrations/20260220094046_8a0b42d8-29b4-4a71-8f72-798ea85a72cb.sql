@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ALTER COLUMN company_type SET DEFAULT 'aktiebolag';

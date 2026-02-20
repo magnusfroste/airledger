@@ -45,7 +45,7 @@ const Settings = () => {
   const [formData, setFormData] = useState({
     full_name: '',
     username: '',
-    company_type: 'enskild_firma',
+    company_type: 'aktiebolag',
     fiscal_year_start: 1,
   });
 
@@ -73,7 +73,7 @@ const Settings = () => {
         setFormData({
           full_name: data.full_name || '',
           username: data.username || '',
-          company_type: data.company_type || 'enskild_firma',
+          company_type: data.company_type || 'aktiebolag',
           fiscal_year_start: data.fiscal_year_start ?? 1,
         });
       } else {
@@ -98,7 +98,7 @@ const Settings = () => {
         setFormData({
           full_name: createdProfile.full_name || '',
           username: createdProfile.username || '',
-          company_type: createdProfile.company_type || 'enskild_firma',
+          company_type: createdProfile.company_type || 'aktiebolag',
           fiscal_year_start: createdProfile.fiscal_year_start ?? 1,
         });
       }
