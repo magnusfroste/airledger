@@ -4,75 +4,69 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
     console.log('Save opening balance function called')
-    const { accountCode, accountName, amount } = await req.json()
+    const { accountCode, accountName, amount, userId: bodyUserId } = await req.json()
 
     if (!accountCode || !accountName || amount === undefined) {
       throw new Error('Account code, name and amount are required')
     }
 
-    // Get the Authorization header
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error('No authorization header')
-    }
-
-    // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: authHeader,
-        },
-      },
-    })
+    let userId: string | null = bodyUserId || null
 
-    // Get user ID
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      throw new Error('Authentication failed')
+    // If no userId in body, authenticate via header
+    if (!userId) {
+      const authHeader = req.headers.get('Authorization')
+      if (!authHeader) {
+        throw new Error('No authorization header and no userId provided')
+      }
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+      const authClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      })
+      const { data: { user }, error: userError } = await authClient.auth.getUser()
+      if (userError || !user) {
+        throw new Error('Authentication failed')
+      }
+      userId = user.id
     }
 
-    console.log('Saving opening balance for user:', user.id)
+    console.log('Saving opening balance for user:', userId)
+
+    // Use service role client for the actual DB operation
+    const supabase = createClient(supabaseUrl, serviceRoleKey)
 
     // Determine balance type based on account code (BAS 2024)
     const accountCodeNum = parseInt(accountCode)
     let balanceType = 'debit'
     
     if (accountCodeNum >= 1000 && accountCodeNum <= 1999) {
-      // Tillgångar (Assets) - normal balance is debit
       balanceType = amount >= 0 ? 'debit' : 'credit'
     } else if (accountCodeNum >= 2000 && accountCodeNum <= 2999) {
-      // Skulder (Liabilities) - normal balance is credit
       balanceType = amount >= 0 ? 'credit' : 'debit'
     } else if (accountCodeNum >= 3000 && accountCodeNum <= 3999) {
-      // Intäkter (Revenue) - normal balance is credit
       balanceType = amount >= 0 ? 'credit' : 'debit'
     } else if (accountCodeNum >= 4000 && accountCodeNum <= 4999 || accountCodeNum >= 6000 && accountCodeNum <= 6999) {
-      // Kostnader (Expenses) - normal balance is debit
       balanceType = amount >= 0 ? 'debit' : 'credit'
     } else {
-      // For other accounts, use debit as default
       balanceType = amount >= 0 ? 'debit' : 'credit'
     }
 
-    // Save opening balance (upsert)
     const { data, error } = await supabase
       .from('airledger_opening')
       .upsert({
-        user_id: user.id,
+        user_id: userId,
         account_code: accountCode,
         account_name: accountName,
         opening_balance: Math.abs(amount),
@@ -91,26 +85,15 @@ serve(async (req) => {
     console.log('Opening balance saved successfully')
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        opening_balance: data[0]
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      JSON.stringify({ success: true, opening_balance: data[0] }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
     console.error('Error in save-opening-balance function:', error)
     return new Response(
-      JSON.stringify({ 
-        error: (error as Error).message || 'An unexpected error occurred',
-        success: false 
-      }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      JSON.stringify({ error: (error as Error).message || 'An unexpected error occurred', success: false }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
