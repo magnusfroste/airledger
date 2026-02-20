@@ -29,21 +29,71 @@ export class BookingAgent implements Agent {
   }
 
   private async handleOpeningBalance(ctx: AgentContext): Promise<AgentResult> {
-    const { intent, supabase, userId } = ctx;
-    if (intent.extracted_data.amount) {
-      const sessionId = `${userId}_${Date.now()}`;
-      const args = {
-        accountCode: intent.extracted_data.reference || '1930',
-        accountName: intent.extracted_data.description || 'Checkkonto/Bankkonto',
-        amount: intent.extracted_data.amount,
+    const { intent, supabase, userId, conversationHistory } = ctx;
+
+    if (!intent.extracted_data.amount) {
+      return {
+        response: formatClarificationRequest('Vilket konto och belopp vill du registrera som ingående balans?'),
+        action_taken: 'clarified',
       };
-      const response = await handleFunctionCall('save_opening_balance', args, supabase, sessionId);
-      return { response, action_taken: 'booked' };
     }
-    return {
-      response: formatClarificationRequest('Vilket konto och belopp vill du registrera som ingående balans?'),
-      action_taken: 'clarified',
-    };
+
+    const accountCode = intent.extracted_data.reference || '1930';
+    const accountName = intent.extracted_data.description || 'Checkkonto/Bankkonto';
+    const amount = intent.extracted_data.amount;
+    const codeNum = parseInt(accountCode);
+
+    // Check if this is a balance sheet account that needs a counter-account
+    const needsCounterAccount = codeNum >= 2000 && codeNum <= 2999; // Equity & liabilities
+
+    // Check conversation history for previously provided counter-account info
+    if (needsCounterAccount) {
+      const lastAiMsg = conversationHistory?.length
+        ? [...conversationHistory].reverse().find((m: any) => m.sender === 'ai' && m.content.includes('<!-- ib_counter:'))
+        : null;
+
+      if (lastAiMsg) {
+        // User is answering the counter-account question — extract context
+        const marker = lastAiMsg.content.match(/<!-- ib_counter:(\d{4}):(.+?):(\d+(?:\.\d+)?):(.+?) -->/);
+        if (marker) {
+          const origCode = marker[1];
+          const origName = marker[2];
+          const origAmount = parseFloat(marker[3]);
+          const origType = marker[4];
+          const sessionId = `${userId}_${Date.now()}`;
+
+          // Save the original account (e.g. 2081 Aktiekapital)
+          await handleFunctionCall('save_opening_balance', {
+            accountCode: origCode, accountName: origName, amount: origAmount,
+          }, supabase, sessionId);
+
+          // Save the counter-account provided by user (e.g. 1930 Bank)
+          const counterCode = accountCode !== origCode ? accountCode : '1930';
+          const counterName = accountName !== origName ? accountName : 'Företagskonto/checkkonto';
+          await handleFunctionCall('save_opening_balance', {
+            accountCode: counterCode, accountName: counterName, amount: origAmount,
+          }, supabase, `${userId}_${Date.now()}`);
+
+          return {
+            response: `✅ Ingående balanser sparade:\n\n• **${origCode} ${origName}:** ${origAmount.toLocaleString('sv-SE')} kr\n• **${counterCode} ${counterName}:** ${origAmount.toLocaleString('sv-SE')} kr\n\nBalansen stämmer — debet = kredit. 👍`,
+            action_taken: 'booked',
+          };
+        }
+      }
+
+      // First time — ask for the counter-account
+      return {
+        response: `Jag registrerar **${accountCode} ${accountName}** med ${amount.toLocaleString('sv-SE')} kr.\n\nMen ingående balanser måste balansera (debet = kredit). Pengarna måste finnas någonstans — vanligtvis på **1930 Företagskonto/checkkonto**.\n\n❓ Ska jag lägga motkontot på **1930** (bank), eller vill du ange ett annat konto?\n\n<!-- ib_counter:${accountCode}:${accountName}:${amount}:credit -->`,
+        action_taken: 'clarified',
+      };
+    }
+
+    // Asset account or simple case — save directly
+    const sessionId = `${userId}_${Date.now()}`;
+    const response = await handleFunctionCall('save_opening_balance', {
+      accountCode, accountName, amount,
+    }, supabase, sessionId);
+    return { response, action_taken: 'booked' };
   }
 
   private async handleConfirmation(ctx: AgentContext): Promise<AgentResult> {
