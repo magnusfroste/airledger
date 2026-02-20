@@ -29,71 +29,49 @@ export class BookingAgent implements Agent {
   }
 
   private async handleOpeningBalance(ctx: AgentContext): Promise<AgentResult> {
-    const { intent, supabase, userId, conversationHistory } = ctx;
+    const { message, conversationHistory, userData, aiConfig, supabase, userId, systemPrompt } = ctx;
 
-    if (!intent.extracted_data.amount) {
-      return {
-        response: formatClarificationRequest('Vilket konto och belopp vill du registrera som ingående balans?'),
-        action_taken: 'clarified',
-      };
-    }
-
-    const accountCode = intent.extracted_data.reference || '1930';
-    const accountName = intent.extracted_data.description || 'Checkkonto/Bankkonto';
-    const amount = intent.extracted_data.amount;
-    const codeNum = parseInt(accountCode);
-
-    // Check if this is a balance sheet account that needs a counter-account
-    const needsCounterAccount = codeNum >= 2000 && codeNum <= 2999; // Equity & liabilities
-
-    // Check conversation history for previously provided counter-account info
-    if (needsCounterAccount) {
-      const lastAiMsg = conversationHistory?.length
-        ? [...conversationHistory].reverse().find((m: any) => m.sender === 'ai' && m.content.includes('<!-- ib_counter:'))
-        : null;
-
-      if (lastAiMsg) {
-        // User is answering the counter-account question — extract context
-        const marker = lastAiMsg.content.match(/<!-- ib_counter:(\d{4}):(.+?):(\d+(?:\.\d+)?):(.+?) -->/);
-        if (marker) {
-          const origCode = marker[1];
-          const origName = marker[2];
-          const origAmount = parseFloat(marker[3]);
-          const origType = marker[4];
-          const sessionId = `${userId}_${Date.now()}`;
-
-          // Save the original account (e.g. 2081 Aktiekapital)
-          await handleFunctionCall('save_opening_balance', {
-            accountCode: origCode, accountName: origName, amount: origAmount,
-          }, supabase, sessionId);
-
-          // Save the counter-account provided by user (e.g. 1930 Bank)
-          const counterCode = accountCode !== origCode ? accountCode : '1930';
-          const counterName = accountName !== origName ? accountName : 'Företagskonto/checkkonto';
-          await handleFunctionCall('save_opening_balance', {
-            accountCode: counterCode, accountName: counterName, amount: origAmount,
-          }, supabase, `${userId}_${Date.now()}`);
-
-          return {
-            response: `✅ Ingående balanser sparade:\n\n• **${origCode} ${origName}:** ${origAmount.toLocaleString('sv-SE')} kr\n• **${counterCode} ${counterName}:** ${origAmount.toLocaleString('sv-SE')} kr\n\nBalansen stämmer — debet = kredit. 👍`,
-            action_taken: 'booked',
-          };
-        }
+    // Delegate entirely to AI with full context — let it reason about
+    // counter-accounts, account codes, and double-entry naturally.
+    const fullContext = buildBookkeepingContext(userData);
+    const dynamicPrompt = await getAgentPrompt('booking', supabase, BOOKING_PROMPT);
+    
+    const ibPrompt = `${dynamicPrompt}\n\nBOKFÖRINGSKONTEXT:\n${fullContext}\n\nVIKTIGT: Användaren vill registrera ingående balanser. Använd save_opening_balance för varje konto. Om kontot är i klass 2 (eget kapital/skulder), föreslå ALLTID motkonto (vanligtvis 1930). Visa förslaget och be om bekräftelse innan du sparar.`;
+    
+    const messages: Array<{ role: string; content: string }> = [{ role: 'system', content: ibPrompt }];
+    if (conversationHistory?.length) {
+      for (const msg of conversationHistory) {
+        messages.push({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.content });
       }
-
-      // First time — ask for the counter-account
-      return {
-        response: `Jag registrerar **${accountCode} ${accountName}** med ${amount.toLocaleString('sv-SE')} kr.\n\nMen ingående balanser måste balansera (debet = kredit). Pengarna måste finnas någonstans — vanligtvis på **1930 Företagskonto/checkkonto**.\n\n❓ Ska jag lägga motkontot på **1930** (bank), eller vill du ange ett annat konto?\n\n<!-- ib_counter:${accountCode}:${accountName}:${amount}:credit -->`,
-        action_taken: 'clarified',
-      };
     }
+    messages.push({ role: 'user', content: message });
 
-    // Asset account or simple case — save directly
-    const sessionId = `${userId}_${Date.now()}`;
-    const response = await handleFunctionCall('save_opening_balance', {
-      accountCode, accountName, amount,
-    }, supabase, sessionId);
-    return { response, action_taken: 'booked' };
+    try {
+      const data = await aiComplete(aiConfig, { messages, max_tokens: 1500, temperature: 0.2, tools: FUNCTION_DEFINITIONS, tool_choice: 'auto' });
+      
+      // If AI wants to call functions, handle them
+      const toolCalls = getToolCalls(data);
+      if (toolCalls.length > 0) {
+        const results: string[] = [];
+        for (const tc of toolCalls) {
+          const fnName = tc.function?.name;
+          const fnArgs = JSON.parse(tc.function?.arguments || '{}');
+          const sessionId = `${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+          const result = await handleFunctionCall(fnName, fnArgs, supabase, sessionId);
+          if (result) results.push(result);
+        }
+        return { response: results.join('\n\n') || '✅ Ingående balanser sparade!', action_taken: 'booked' };
+      }
+      
+      // Otherwise return the AI's text response (proposal/clarification)
+      const content = getContent(data);
+      return { response: content || 'Vilket konto och belopp vill du registrera som ingående balans?', action_taken: 'proposed' };
+    } catch (error) {
+      if (error instanceof AIProviderError) {
+        if (error.status === 429) return { response: '⚠️ AI-tjänsten är tillfälligt överbelastad. Försök igen om en stund.', action_taken: 'error' };
+      }
+      return { response: 'Ett fel uppstod. Försök igen.', action_taken: 'error' };
+    }
   }
 
   private async handleConfirmation(ctx: AgentContext): Promise<AgentResult> {
