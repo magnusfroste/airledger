@@ -1,4 +1,5 @@
 import { ConversationMessage, RequiredField, FieldAnalysisResult } from './types.ts';
+import { calculateEntryAmount } from '../_shared/vat-calculator.ts';
 
 /**
  * Analyze a template's required_fields against extracted data and conversation history.
@@ -272,58 +273,5 @@ function parseAmountFromText(text: string): number | null {
   return null;
 }
 
-function calculateLegacyEntryAmount(entry: any, baseAmount: number): number {
-  if (entry.vat_calculation) {
-    // Handle exclude_vat: calculate net from gross (baseAmount / 1.25 for 25% VAT)
-    if (entry.vat_calculation === 'exclude_vat') {
-      return Math.round(baseAmount / 1.25 * 100) / 100;
-    }
-    if (entry.vat_calculation === 'exclude_vat_12') {
-      return Math.round(baseAmount / 1.12 * 100) / 100;
-    }
-    if (entry.vat_calculation === 'exclude_vat_6') {
-      return Math.round(baseAmount / 1.06 * 100) / 100;
-    }
-    // Handle vat_only: calculate VAT amount (baseAmount - net)
-    if (entry.vat_calculation === 'vat_only') {
-      return Math.round((baseAmount - baseAmount / 1.25) * 100) / 100;
-    }
-    if (entry.vat_calculation === 'vat_only_12') {
-      return Math.round((baseAmount - baseAmount / 1.12) * 100) / 100;
-    }
-    if (entry.vat_calculation === 'vat_only_6') {
-      return Math.round((baseAmount - baseAmount / 1.06) * 100) / 100;
-    }
-    // Handle total_amount: return unchanged
-    if (entry.vat_calculation === 'total_amount') {
-      return baseAmount;
-    }
-    // Legacy: extract rate from string like "vat_25"
-    const vatMatch = entry.vat_calculation.match(/(\d+)/);
-    if (vatMatch) {
-      const vatRate = parseInt(vatMatch[1]) / 100;
-      return Math.round(baseAmount * vatRate * 100) / 100;
-    }
-  }
-
-  if (entry.amount_type === 'vat') {
-    const vatRate = entry.vat_rate || 0.25;
-    return Math.round(baseAmount * vatRate * 100) / 100;
-  }
-
-  if (entry.amount_type === 'total_with_vat') {
-    const vatRate = entry.vat_rate || 0.25;
-    return Math.round(baseAmount * (1 + vatRate) * 100) / 100;
-  }
-
-  // Use template entry ratios as multipliers (e.g. 0.8 = 80%, 1.0 = 100%)
-  const debitRatio = parseFloat(entry.debit_amount) || 0;
-  const creditRatio = parseFloat(entry.credit_amount) || 0;
-  const ratio = debitRatio > 0 ? debitRatio : creditRatio;
-
-  if (ratio > 0 && ratio !== 1) {
-    return Math.round(baseAmount * ratio * 100) / 100;
-  }
-
-  return baseAmount;
-}
+// Use shared calculateEntryAmount as legacy fallback
+const calculateLegacyEntryAmount = calculateEntryAmount;

@@ -192,6 +192,9 @@ function collectCandidates(
 
     if (categories.some(cat => t.category.toLowerCase().includes(cat))) score += 3;
 
+    // Recency bonus: templates used in the last 30 days get a small boost
+    score += recencyBonus(t.last_used_at);
+
     if (score > 0) scored.push({ template: t, score });
   }
 
@@ -302,6 +305,9 @@ function keywordMatch(templates: any[], searchTerms: string[]): TemplateMatch | 
       }
     }
 
+    // Recency bonus
+    score += recencyBonus(template.last_used_at);
+
     if (score > bestScore) {
       bestScore = score;
       bestCandidate = template;
@@ -316,6 +322,18 @@ function keywordMatch(templates: any[], searchTerms: string[]): TemplateMatch | 
     };
   }
   return null;
+}
+
+/**
+ * Recency bonus: templates used recently get a small score boost.
+ * Last 7 days → +2, last 30 days → +1, older → 0.
+ */
+function recencyBonus(lastUsedAt: string | null | undefined): number {
+  if (!lastUsedAt) return 0;
+  const daysAgo = (Date.now() - new Date(lastUsedAt).getTime()) / (1000 * 60 * 60 * 24);
+  if (daysAgo <= 7) return 2;
+  if (daysAgo <= 30) return 1;
+  return 0;
 }
 
 function applyAmountOverride(match: TemplateMatch, amount: number | undefined | null, allTemplates: any[]): TemplateMatch {
