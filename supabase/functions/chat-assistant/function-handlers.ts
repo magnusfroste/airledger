@@ -52,7 +52,7 @@ export async function handleFunctionCall(
           accountCode: args.accountCode,
           accountName: args.accountName,
           amount: args.amount,
-          userId: sessionId.split('_')[0]
+          userId: conversationId ? conversationId.split('_')[0] : undefined
         }
       });
 
