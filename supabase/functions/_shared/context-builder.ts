@@ -1,6 +1,64 @@
 import { UserData } from './types.ts';
 
 /**
+ * Situational awareness: concise summary of the user's current state.
+ * Injected at the top of every AI prompt so all agents understand context.
+ */
+export function buildSituationSummary(userData: UserData): string {
+  const companyTypeMap: Record<string, string> = {
+    'aktiebolag': 'Aktiebolag (AB)',
+    'enskild_firma': 'Enskild firma',
+    'handelsbolag': 'Handelsbolag (HB)',
+    'kommanditbolag': 'Kommanditbolag (KB)',
+  };
+
+  const monthNames = ['Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
+    'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'];
+
+  const companyType = userData.profile?.company_type || 'aktiebolag';
+  const companyLabel = companyTypeMap[companyType] || companyType;
+  const fiscalStart = userData.profile?.fiscal_year_start || 1;
+  const accountingMethod = userData.accountingMethod === 'accrual' ? 'Fakturering' : 'Kontant';
+
+  const ibCount = userData.openingBalances?.length || 0;
+  const txCount = userData.transactions?.length || 0;
+  const recentTx = userData.recentTransactions;
+  const lastTxDate = recentTx?.length ? recentTx[0]?.transaction_date : null;
+
+  const balanceCount = userData.accountBalances?.length || 0;
+
+  let summary = 'SITUATIONSANALYS:\n';
+  summary += `- Bolagsform: ${companyLabel}\n`;
+  summary += `- Antal ingående balanser: ${ibCount}${ibCount === 0 ? ' (SAKNAS — nystartat eller ej konfigurerat)' : ''}\n`;
+  summary += `- Antal bokförda transaktioner: ${txCount}${txCount === 0 ? ' (TOMT)' : ''}\n`;
+  summary += `- Kontosaldon: ${balanceCount === 0 ? 'Inga' : `${balanceCount} konton med saldo`}\n`;
+  summary += `- Räkenskapsår startar: ${monthNames[fiscalStart - 1] || 'Januari'}\n`;
+  summary += `- Redovisningsmetod: ${accountingMethod}\n`;
+
+  // Assessment
+  summary += '\nBEDÖMNING: ';
+  if (ibCount === 0 && txCount === 0) {
+    summary += 'Användaren verkar vara ny och har inte konfigurerat sin bokföring. ';
+    summary += 'Prioritera att hjälpa med ingående balanser innan transaktioner bokförs.';
+    if (companyType === 'aktiebolag') {
+      summary += ' OBS: Aktiebolag kräver aktiekapital (2081) med motkonto (vanligtvis 1930).';
+    }
+  } else if (ibCount === 0 && txCount > 0) {
+    summary += `Det finns ${txCount} transaktioner men INGA ingående balanser. `;
+    summary += 'Påminn användaren om att ingående balanser bör registreras för korrekt bokföring.';
+  } else if (txCount === 0) {
+    summary += `Ingående balanser finns (${ibCount} st) men inga transaktioner är bokförda ännu. `;
+    summary += 'Guida användaren att börja bokföra.';
+  } else {
+    summary += `Aktiv bokföring med ${txCount} transaktioner och ${ibCount} ingående balanser.`;
+    if (lastTxDate) summary += ` Senaste bokning: ${lastTxDate}.`;
+    summary += ' Var effektiv — användaren har erfarenhet.';
+  }
+
+  return summary + '\n';
+}
+
+/**
  * Light mode: Template name + category + description + keywords (~400 tokens).
  * Used for intent classification.
  */
@@ -17,7 +75,8 @@ export function buildLightContext(userData: UserData): string[] {
  * Used for ask_question / view_report intents.
  */
 export function buildBookkeepingContext(userData: UserData): string {
-  let context = '';
+  // Inject situational awareness at the top
+  let context = buildSituationSummary(userData) + '\n';
 
   if (userData.profile) {
     context += `\nFÖRETAGSINFORMATION:\n`;
