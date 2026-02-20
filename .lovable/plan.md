@@ -1,92 +1,80 @@
 
+# Situational Awareness for Air
 
-# Admin Triggers -- dynamisk hantering av deadlines och paminningar
+## Problem
+Air receives raw data lists (templates, transactions, balances) but lacks a high-level understanding of the user's situation. It doesn't know "this is a brand new company with nothing booked yet" versus "this is an active user mid-year." This means it can't reason like a bookkeeper -- it just pattern-matches words to intents.
 
-## Oversikt
+## Solution: Add a Situation Summary layer
 
-Istallet for att hardkoda svenska skattedatum skapar vi en ny **Admin Triggers**-flik i adminpanelen. Varje trigger ar en databasrad som beskriver **vad** som ska handa, **nar** det ska handa, och **vilken knapp** som visas i chatten. Systemet fungerar som en enkel cron-liknande motor -- men drivet av data i databasen, inte av kod.
+A new function `buildSituationSummary(userData)` in `_shared/context-builder.ts` that produces a concise, human-readable paragraph injected at the TOP of every AI prompt. This gives Air immediate awareness without extra AI calls.
 
-Fas 1 (denna plan) fokuserar pa CRUD i admin + att ChatQuickActions laser triggersen. Fas 2 (framtida) kan lagga till en riktig cron-edge-function som skickar notiser/push.
+### What the summary contains
 
-## Datamodell
+```text
+SITUATIONSANALYS:
+- Bolagsform: Aktiebolag
+- Antal ingående balanser: 0 (SAKNAS - nystartat eller ej konfigurerat)
+- Antal bokförda transaktioner: 0 (TOMT)
+- Kontosaldon: Inga
+- Räkenskapsår startar: Januari
+- Redovisningsmetod: Fakturering
 
-Ny tabell `air_triggers`:
+BEDÖMNING: Användaren verkar vara ny och har inte konfigurerat sin bokföring.
+Prioritera att hjälpa med ingående balanser innan transaktioner bokförs.
+```
 
-| Kolumn | Typ | Beskrivning |
-|--------|-----|-------------|
-| id | uuid PK | |
-| name | text | T.ex. "Momsdeklaration Q1" |
-| description | text | Forklaringstext |
-| trigger_type | text | `recurring_yearly` / `recurring_quarterly` / `one_time` |
-| month | int | Manad (1-12) for arlig, startmanad for kvartalsvis |
-| day | int | Dag i manaden |
-| days_before | int | Visa knappen X dagar fore deadline (default 14) |
-| quick_action_label | text | Knapptext, t.ex. "Momsrapport Q1" |
-| quick_action_message | text | Meddelandet som skickas till chatten |
-| is_active | boolean | Pa/av |
-| priority | int | Hogre = visas forst |
-| created_at | timestamptz | |
-| updated_at | timestamptz | |
+For an active user it would instead say:
+```text
+BEDÖMNING: Aktiv bokföring med 47 transaktioner.
+Senaste bokning: 2026-02-18. Inga uppenbara luckor.
+```
 
-Forpopuleras med svenska standarddatum (momsdeklarationer, inkomstdeklaration, arsredovisning) men allt ar redigerbart.
+### Key situational signals
 
-## Admin-granssnitt
+| Signal | Vad Air lär sig |
+|---|---|
+| 0 opening balances | "Fråga om IB innan vi börjar boka" |
+| 0 transactions | "Ny användare -- guida steg för steg" |
+| Company type = AB | "Aktiekapital 25000 kr krävs, motkonto 1930" |
+| Fiscal year start | "Vet vilken period vi är i" |
+| Has recent activity | "Erfaren -- var effektiv, inte pedagogisk" |
 
-Ny flik **Triggers** i adminpanelen med ikon `Clock` (lucide). Visar:
+### Where it's injected
 
-1. **Lista** over alla triggers med toggle for aktiv/inaktiv
-2. **Lagg till / redigera** -- formular med alla falt
-3. **Forhandsvisning** -- "Nasta gang denna trigger visas: [datum]"
-4. **Ta bort** med bekraftelse
+The situation summary is prepended to the bookkeeping context in `buildBookkeepingContext()`, so ALL agents (booking, advisory, reporting) automatically receive it. No changes needed per agent.
 
-## ChatQuickActions-koppling
+### Booking agent: smarter opening balance
 
-`useQuickActionContext`-hooken hamtar aktiva triggers fran `air_triggers` och beraknar vilka som ar "varma" (inom `days_before` fran nasta forekomst). Dessa injiceras i prioritetsordningen fran det tidigare forslaget, pa plats 3 (DEADLINE-DRIVEN), men nu databas-drivet.
+Instead of the current brittle `handleOpeningBalance` with hardcoded counter-account logic and HTML markers, the booking agent delegates opening balance requests to the full AI call (like advisory does) -- but with the situation summary giving the AI enough context to:
 
-## Tekniska forandringar
+1. Know account 2081 needs a counter-entry on 1930
+2. Know the user is AB (so aktiekapital = 25000 is expected)
+3. Resolve "aktiekapital" to account code 2081 via the chart of accounts in context
 
-### 1. Databasmigration
-- Skapa tabellen `air_triggers`
-- RLS: Lasbar for alla autentiserade, skrivbar for admin (via `has_role`)
-- Seed-data: 6 triggers (4 kvartalsmoms + inkomstdeklaration + arsredovisning)
+This removes the edge-case spaghetti and lets the AI reason naturally.
 
-### 2. Ny komponent: `src/components/admin/AdminTriggers.tsx`
-- CRUD-lista med inline-toggle for `is_active`
-- Dialog for lagg till / redigera
-- Berakning av "nasta forekomst" for forhandsvisning
-- Foljder samma monster som `AdminWarningRules` / `AdminAgents`
+## Technical changes
 
-### 3. Uppdatera: `src/pages/Admin.tsx`
-- Lagg till 10:e flik "Triggers" med `Clock`-ikon
-- Uppdatera grid fran `grid-cols-9` till `grid-cols-10`
+| File | Change |
+|---|---|
+| `supabase/functions/_shared/context-builder.ts` | Add `buildSituationSummary(userData)` function. Call it at the top of `buildBookkeepingContext()`. |
+| `supabase/functions/chat-assistant/agents/booking-agent.ts` | Simplify `handleOpeningBalance` -- remove HTML marker logic, use full AI call with function tools so the AI can reason about counter-accounts naturally. |
+| `supabase/functions/chat-assistant/agents/prompts/booking.ts` | Add rules for opening balances: "IB for equity/liability accounts (class 2) always need a counter-entry. For AB, aktiekapital = 2081 with counter on 1930." |
+| `supabase/functions/chat-assistant/system-prompt.ts` | Add a section about situational awareness: "Read the SITUATIONSANALYS at the top of context. Adapt your behavior accordingly." |
+| Deploy `chat-assistant` | Redeploy after changes. |
 
-### 4. Ny hook: `src/hooks/useQuickActionContext.ts`
-- Hamtar transaktionsantal, IB-antal, topp-mallar **och** aktiva triggers
-- Beraknar vilka triggers som ar "varma" (inom deadline-fonster)
-- Returnerar `{ transactionCount, hasOpeningBalances, topTemplates, activeTriggers, isLoading }`
+## Expected behavior after fix
 
-### 5. Uppdatera: `src/components/chat/ChatQuickActions.tsx`
-- Tar emot `activeTriggers` via props
-- Infogar deadline-knappar pa prioritet 3 i vattenfallet
-- `prominent: true` om deadline ar inom 7 dagar
+```text
+User: "aktiekapital 25000"
 
-### 6. Uppdatera: `src/components/chat/InputArea.tsx` och `src/components/ChatInterface.tsx`
-- Skickar ner kontextdata till ChatQuickActions
+Air (sees: AB, 0 IB, 0 transactions):
+"Du registrerar aktiekapitalet for ditt aktiebolag. Jag foreslår:
 
-## Seed-data (6 triggers)
+- 2081 Aktiekapital: 25 000 kr (kredit)  
+- 1930 Foretagskonto: 25 000 kr (debet)
 
-| Namn | Typ | Manad | Dag | Dagar fore | Knapptext |
-|------|-----|-------|-----|------------|-----------|
-| Momsdeklaration Q4 | recurring_yearly | 1 | 12 | 14 | Momsrapport Q4 |
-| Momsdeklaration Q1 | recurring_yearly | 4 | 12 | 14 | Momsrapport Q1 |
-| Momsdeklaration Q2 | recurring_yearly | 7 | 12 | 14 | Momsrapport Q2 |
-| Momsdeklaration Q3 | recurring_yearly | 10 | 12 | 14 | Momsrapport Q3 |
-| Inkomstdeklaration | recurring_yearly | 5 | 2 | 30 | Deklaration |
-| Arsredovisning | recurring_yearly | 2 | 28 | 30 | Bokslut |
+Stammer det? Svara 'ja' for att spara bada."
+```
 
-## Framtida utbyggnad (inte i denna fas)
-
-- **Cron edge function**: Kor dagligen, skickar notiser/push for triggers inom deadline-fonster
-- **Per-anvandare triggers**: Anpassade paminningar baserat pa foretag (t.ex. brutet rakenskapsar)
-- **Trigger-historik**: Logga nar en trigger "triggas" och om anvandaren agerade pa den
-
+No edge-case code needed -- the AI reasons from context.
