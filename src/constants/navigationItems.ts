@@ -7,41 +7,18 @@ export interface NavigationItem {
   badge?: string | null;
 }
 
-export const getMoreMenuItems = (): NavigationItem[] => [
-  { 
-    href: "/general-ledger", 
-    label: "Huvudbok", 
-    icon: BookOpen,
-    badge: null
-  },
-  { 
-    href: "/opening-balances", 
-    label: "Ingående balanser", 
-    icon: Calculator,
-    badge: null
-  },
-  { 
-    href: "/balance-sheet", 
-    label: "Balansrapport", 
-    icon: BarChart3,
-    badge: null
-  },
-  { 
-    href: "/templates", 
-    label: "Mallar", 
-    icon: Settings,
-    badge: null
-  },
-  { 
-    href: "/subscription", 
-    label: "Prenumeration", 
-    icon: User,
-    badge: null
-  },
-  { 
-    href: "/admin", 
-    label: "Admin", 
-    icon: Shield,
-    badge: null
-  },
-];
+export const getMoreMenuItems = (isAdmin = false): NavigationItem[] => {
+  const items: NavigationItem[] = [
+    { href: "/general-ledger", label: "Huvudbok", icon: BookOpen, badge: null },
+    { href: "/opening-balances", label: "Ingående balanser", icon: Calculator, badge: null },
+    { href: "/balance-sheet", label: "Balansrapport", icon: BarChart3, badge: null },
+    { href: "/templates", label: "Mallar", icon: Settings, badge: null },
+    { href: "/subscription", label: "Prenumeration", icon: User, badge: null },
+  ];
+
+  if (isAdmin) {
+    items.push({ href: "/admin", label: "Admin", icon: Shield, badge: null });
+  }
+
+  return items;
+};

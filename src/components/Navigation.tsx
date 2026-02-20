@@ -5,13 +5,15 @@ import MoreMenu from "@/components/navigation/MoreMenu";
 import UserProfile from "@/components/navigation/UserProfile";
 import { useNavigationData } from "@/hooks/useNavigationData";
 import { useSignOut } from "@/hooks/useSignOut";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { getMoreMenuItems } from "@/constants/navigationItems";
 
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { transactionCount } = useNavigationData();
   const { handleSignOut } = useSignOut();
-  const moreMenuItems = getMoreMenuItems();
+  const { isAdmin } = useAdminRole();
+  const moreMenuItems = getMoreMenuItems(isAdmin);
 
   const handleMenuClose = () => {
     setIsMobileMenuOpen(false);
