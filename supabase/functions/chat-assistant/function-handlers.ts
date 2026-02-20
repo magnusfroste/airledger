@@ -51,7 +51,8 @@ export async function handleFunctionCall(
         body: {
           accountCode: args.accountCode,
           accountName: args.accountName,
-          amount: args.amount
+          amount: args.amount,
+          userId: sessionId.split('_')[0]
         }
       });
 
