@@ -305,8 +305,20 @@ const LandingPage = () => {
 
       {/* Footer */}
       <footer className="py-8 px-6 border-t bg-background">
-        <div className="max-w-6xl mx-auto text-center text-muted-foreground">
+        <div className="max-w-6xl mx-auto text-center text-muted-foreground space-y-2">
           <p>© 2025 AirLedger. Underlättar för Svenska småföretagare.</p>
+          <p className="text-sm">
+            Open source ·{" "}
+            <a
+              href="https://github.com/magnusfroste/airledger"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 underline hover:text-foreground"
+            >
+              <Github className="w-3.5 h-3.5" />
+              github.com/magnusfroste/airledger
+            </a>
+          </p>
         </div>
       </footer>
 
