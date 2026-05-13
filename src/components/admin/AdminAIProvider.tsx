@@ -160,6 +160,7 @@ const AdminAIProvider = () => {
             if (p) {
               setModel(p.defaultModel);
               setVisionModel(p.defaultVisionModel);
+              setBaseUrl(p.defaultBaseUrl || '');
             }
           }}>
             <SelectTrigger>
