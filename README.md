@@ -2,6 +2,117 @@
 
 Air Ledger är en AI-assisterad bokföringsapplikation byggd för svenska småföretag. Applikationen använder avancerad AI för att automatisera bokföring, analysera kvitton och ge personlig vägledning baserat på BAS-kontoplanen 2024.
 
+## 🚀 Get Started – Self-Hosting
+
+AirLedger är open source (MIT) och kan köras helt på din egen infrastruktur. Guiden nedan utgår från:
+
+- **Backend**: en egen [Supabase Cloud](https://supabase.com)-instans (gratis tier räcker för att komma igång)
+- **Frontend**: [Vercel](https://vercel.com) (eller valfri statisk värd: Netlify, Cloudflare Pages, egen server)
+- **AI**: en OpenAI-nyckel (eller Lovable AI Gateway)
+
+### 1. Förberedelser
+
+Skapa konton och projekt:
+
+1. Skapa ett nytt projekt på [supabase.com](https://supabase.com) – välj region nära dig (t.ex. `eu-north-1`).
+2. Notera **Project Ref** (finns i URL:en `https://supabase.com/dashboard/project/<ref>`).
+3. Hämta en **OpenAI API-nyckel** från [platform.openai.com](https://platform.openai.com/api-keys).
+
+Installera CLI-verktygen lokalt:
+
+```bash
+# Supabase CLI (macOS)
+brew install supabase/tap/supabase
+
+# Eller via npm
+npm install -g supabase
+
+# Node 20+ och bun (eller npm/pnpm)
+curl -fsSL https://bun.sh/install | bash
+```
+
+### 2. Klona repot
+
+```bash
+git clone https://github.com/magnusfroste/airledger.git
+cd airledger
+bun install
+```
+
+### 3. Koppla ditt Supabase-projekt
+
+```bash
+# Logga in i Supabase
+supabase login
+
+# Länka repot till ditt nyskapade projekt
+supabase link --project-ref <DITT_PROJECT_REF>
+```
+
+### 4. Pusha databas-schema och edge functions
+
+```bash
+# Migrera databasen (skapar alla tabeller, RLS-policies, funktioner)
+supabase db push
+
+# Deploya alla edge functions (chat-assistant, orchestrator, m.fl.)
+supabase functions deploy
+```
+
+### 5. Sätt secrets för edge functions
+
+Edge functions behöver en AI-nyckel för att fungera:
+
+```bash
+supabase secrets set OPENAI_API_KEY=sk-...
+# Valfritt: använd Lovable AI Gateway istället
+# supabase secrets set LOVABLE_API_KEY=...
+```
+
+### 6. Skapa din admin-användare
+
+1. Starta appen lokalt (`bun run dev`) eller deploya frontend först (steg 7) och gå till `/auth`.
+2. Registrera ditt konto med e-post + lösenord.
+3. Öppna **Supabase Dashboard → Authentication → Users**, kopiera ditt `user_id` (UUID).
+4. Gå till **SQL Editor** och kör:
+
+```sql
+INSERT INTO public.user_roles (user_id, role)
+VALUES ('<DITT_USER_ID>', 'admin');
+```
+
+Nu har du admin-åtkomst till `/admin` i appen.
+
+### 7. Deploya frontend till Vercel
+
+1. Pusha din fork till GitHub.
+2. Importera repot i [vercel.com/new](https://vercel.com/new).
+3. Lägg in följande **Environment Variables** (från Supabase Dashboard → Project Settings → API):
+
+| Variabel | Värde | Var hittar jag den? |
+|---|---|---|
+| `VITE_SUPABASE_URL` | `https://<ref>.supabase.co` | Project Settings → API → Project URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | `eyJhbGciOi...` | Project Settings → API → `anon` / `publishable` key |
+| `VITE_SUPABASE_PROJECT_ID` | `<ditt-project-ref>` | URL:en på dashboard |
+
+4. Klicka **Deploy**. Klart! Din instans körs på `https://<ditt-projekt>.vercel.app`.
+
+### 8. (Valfritt) Konfigurera Auth-providers
+
+I Supabase Dashboard → **Authentication → Providers**:
+- Aktivera **Email** (på som standard).
+- Lägg till **Google OAuth** om du vill ha social login.
+- Sätt **Site URL** och **Redirect URLs** till din Vercel-domän.
+
+### Felsökning
+
+- **`supabase db push` failar** → kontrollera att du är länkad till rätt projekt med `supabase projects list`.
+- **Edge functions returnerar 500** → kolla `supabase functions logs <function-name>`, säkerställ att `OPENAI_API_KEY` är satt.
+- **Frontend visar tom sida efter login** → dubbelkolla att `VITE_SUPABASE_URL` och `VITE_SUPABASE_PUBLISHABLE_KEY` matchar ditt projekt i Vercel.
+- **Admin-vyn nekar åtkomst** → verifiera att din rad finns i `user_roles` med `role = 'admin'`.
+
+---
+
 ## 📖 Komplett Dokumentation
 
 För fullständig dokumentation, se **[MASTER.md](./MASTER.md)** som innehåller:
