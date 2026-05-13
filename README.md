@@ -97,7 +97,40 @@ Nu har du admin-åtkomst till `/admin` i appen.
 
 4. Klicka **Deploy**. Klart! Din instans körs på `https://<ditt-projekt>.vercel.app`.
 
-### 8. (Valfritt) Konfigurera Auth-providers
+### 8. (Valfritt) Välj AI-provider – inkl. privat/lokal LLM
+
+AirLedger stödjer flera AI-providers, inklusive **din egen privata LLM-endpoint** (OpenAI-kompatibelt API). Perfekt för full datakontroll – ingen data lämnar din server.
+
+Gå till `/admin` → **AI-provider** och välj något av:
+
+| Provider | Användning | Miljövariabel |
+|---|---|---|
+| Lovable AI (standard) | Snabbast att komma igång | `LOVABLE_API_KEY` |
+| OpenAI | Officiella GPT-modeller | `OPENAI_API_KEY` |
+| **Privat LLM (OpenAI-kompatibel)** | Ollama, LM Studio, vLLM, llama.cpp m.fl. | `OPENAI_COMPATIBLE_API_KEY` |
+| Anthropic (Claude) | Claude-modeller | `ANTHROPIC_API_KEY` |
+| Google Gemini (direkt) | Gemini direkt | `GEMINI_API_KEY` |
+
+**Exempel – kör en lokal LLM med Ollama:**
+
+```bash
+ollama serve
+ollama pull llama3.1:8b-instruct
+```
+
+I `/admin` → AI-provider:
+- Välj **Privat LLM (OpenAI-kompatibel)**
+- Bas-URL: `http://localhost:11434/v1` (eller din serveradress, måste sluta med `/v1`)
+- Modell: `llama-3.1-8b-instruct`
+- Sätt `OPENAI_COMPATIBLE_API_KEY` som secret (valfri sträng om endpointen är auth-fri)
+
+```bash
+supabase secrets set OPENAI_COMPATIBLE_API_KEY=ollama
+```
+
+Saknas konfigurationen faller systemet automatiskt tillbaka till Lovable AI.
+
+### 9. (Valfritt) Konfigurera Auth-providers
 
 I Supabase Dashboard → **Authentication → Providers**:
 - Aktivera **Email** (på som standard).
