@@ -17,6 +17,8 @@ interface ProviderInfo {
   defaultVisionModel: string;
   models: string[];
   docsUrl: string;
+  requiresBaseUrl?: boolean;
+  defaultBaseUrl?: string;
 }
 
 const PROVIDERS: ProviderInfo[] = [
@@ -37,6 +39,17 @@ const PROVIDERS: ProviderInfo[] = [
     defaultVisionModel: 'gpt-4o',
     models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o1-mini'],
     docsUrl: 'https://platform.openai.com/docs',
+  },
+  {
+    id: 'openai_compatible',
+    name: 'Privat LLM (OpenAI-kompatibel)',
+    envKey: 'OPENAI_COMPATIBLE_API_KEY',
+    defaultModel: 'llama-3.1-8b-instruct',
+    defaultVisionModel: 'llama-3.2-11b-vision',
+    models: ['llama-3.1-8b-instruct', 'llama-3.1-70b-instruct', 'llama-3.2-11b-vision', 'mistral-7b-instruct', 'qwen2.5-7b-instruct'],
+    docsUrl: 'https://platform.openai.com/docs/api-reference/chat',
+    requiresBaseUrl: true,
+    defaultBaseUrl: 'http://localhost:11434/v1',
   },
   {
     id: 'anthropic',
