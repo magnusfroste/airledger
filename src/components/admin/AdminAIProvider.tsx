@@ -75,6 +75,7 @@ const AdminAIProvider = () => {
   const [provider, setProvider] = useState('lovable');
   const [model, setModel] = useState('');
   const [visionModel, setVisionModel] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
