@@ -82,7 +82,7 @@ const MessageList = ({
     msg.sender === 'ai' ? i : last, -1
   );
   return (
-    <div className="h-full overflow-y-auto px-4 py-4">
+    <div className="h-full overflow-y-auto px-4 pt-4 pb-32 sm:pb-4 [scroll-padding-bottom:8rem] sm:[scroll-padding-bottom:1rem]">
       {/* Load Older Messages Button */}
       {hasMoreMessages && (
         <div className="flex justify-center mb-4">
