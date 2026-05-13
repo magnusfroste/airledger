@@ -27,6 +27,7 @@ interface AICompletionOptions {
 const PROVIDER_ENDPOINTS: Record<string, string> = {
   lovable: 'https://ai.gateway.lovable.dev/v1/chat/completions',
   openai: 'https://api.openai.com/v1/chat/completions',
+  openai_compatible: '', // resolved per-config from baseUrl
   anthropic: 'https://api.anthropic.com/v1/messages',
   gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
 };
@@ -34,6 +35,7 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
 const DEFAULT_MODELS: Record<string, { chat: string; vision: string }> = {
   lovable: { chat: 'google/gemini-3-flash-preview', vision: 'google/gemini-2.5-flash' },
   openai: { chat: 'gpt-4o', vision: 'gpt-4o' },
+  openai_compatible: { chat: 'llama-3.1-8b-instruct', vision: 'llama-3.2-11b-vision' },
   anthropic: { chat: 'claude-sonnet-4-20250514', vision: 'claude-sonnet-4-20250514' },
   gemini: { chat: 'gemini-2.5-flash', vision: 'gemini-2.5-flash' },
 };
@@ -41,6 +43,7 @@ const DEFAULT_MODELS: Record<string, { chat: string; vision: string }> = {
 const ENV_KEY_MAP: Record<string, string> = {
   lovable: 'LOVABLE_API_KEY',
   openai: 'OPENAI_API_KEY',
+  openai_compatible: 'OPENAI_COMPATIBLE_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
   gemini: 'GEMINI_API_KEY',
 };
