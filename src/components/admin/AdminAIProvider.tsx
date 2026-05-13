@@ -88,7 +88,7 @@ const AdminAIProvider = () => {
       const { data } = await supabase
         .from('system_settings')
         .select('key, value')
-        .in('key', ['ai_provider', 'ai_model', 'ai_vision_model']);
+        .in('key', ['ai_provider', 'ai_model', 'ai_vision_model', 'ai_base_url']);
 
       if (data) {
         const settings: Record<string, string> = {};
@@ -96,6 +96,7 @@ const AdminAIProvider = () => {
         if (settings.ai_provider) setProvider(settings.ai_provider);
         if (settings.ai_model) setModel(settings.ai_model);
         if (settings.ai_vision_model) setVisionModel(settings.ai_vision_model);
+        if (settings.ai_base_url) setBaseUrl(settings.ai_base_url);
       }
     } catch (e) {
       console.error('Failed to load AI settings:', e);
