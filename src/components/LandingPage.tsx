@@ -265,6 +265,9 @@ const LandingPage = () => {
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             AirLedger är open source och enkelt att self-hosta. Klona koden, kör den på din egen server och behåll full kontroll över din bokföring.
           </p>
+          <p className="text-base text-muted-foreground max-w-2xl mx-auto">
+            Vid self-hosting kan du välja AI-motor fritt – inklusive din <strong>egen privata/lokala LLM-endpoint</strong> (OpenAI-kompatibelt API som Ollama, LM Studio eller vLLM). All data stannar på din server.
+          </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button asChild size="lg" variant="outline" className="text-lg px-8 py-6">
               <a href="https://github.com/magnusfroste/airledger" target="_blank" rel="noopener noreferrer">
