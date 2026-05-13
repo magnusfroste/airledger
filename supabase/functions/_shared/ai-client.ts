@@ -57,7 +57,7 @@ export async function getAIConfig(supabase: any): Promise<AIProviderConfig> {
     const { data } = await supabase
       .from('system_settings')
       .select('key, value')
-      .in('key', ['ai_provider', 'ai_model', 'ai_vision_model']);
+      .in('key', ['ai_provider', 'ai_model', 'ai_vision_model', 'ai_base_url']);
 
     const settings: Record<string, string> = {};
     (data || []).forEach((r: { key: string; value: string }) => {
@@ -67,7 +67,21 @@ export async function getAIConfig(supabase: any): Promise<AIProviderConfig> {
     const provider = (settings.ai_provider || 'lovable') as AIProviderConfig['provider'];
     const defaults = DEFAULT_MODELS[provider] || DEFAULT_MODELS.lovable;
     const envKey = ENV_KEY_MAP[provider] || 'LOVABLE_API_KEY';
-    const apiKey = Deno.env.get(envKey) || '';
+    // For openai_compatible, allow a placeholder key (some local endpoints don't require auth)
+    const apiKey = Deno.env.get(envKey) || (provider === 'openai_compatible' ? 'not-needed' : '');
+    const baseUrl = settings.ai_base_url || '';
+
+    if (provider === 'openai_compatible' && !baseUrl) {
+      console.warn('openai_compatible selected but no ai_base_url configured, falling back to Lovable AI');
+      const lovableKey = Deno.env.get('LOVABLE_API_KEY');
+      if (!lovableKey) throw new Error('No AI API key configured');
+      return {
+        provider: 'lovable',
+        model: DEFAULT_MODELS.lovable.chat,
+        visionModel: DEFAULT_MODELS.lovable.vision,
+        apiKey: lovableKey,
+      };
+    }
 
     if (!apiKey) {
       // Fallback to Lovable if provider key is missing
@@ -87,6 +101,7 @@ export async function getAIConfig(supabase: any): Promise<AIProviderConfig> {
       model: settings.ai_model || defaults.chat,
       visionModel: settings.ai_vision_model || defaults.vision,
       apiKey,
+      baseUrl: baseUrl || undefined,
     };
   } catch (error) {
     console.error('Failed to load AI config, using Lovable fallback:', error);
