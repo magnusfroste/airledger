@@ -7,10 +7,11 @@
  */
 
 export interface AIProviderConfig {
-  provider: 'lovable' | 'openai' | 'anthropic' | 'gemini';
+  provider: 'lovable' | 'openai' | 'openai_compatible' | 'anthropic' | 'gemini';
   model: string;
   visionModel: string;
   apiKey: string;
+  baseUrl?: string;
 }
 
 interface AICompletionOptions {
