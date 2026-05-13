@@ -1,0 +1,10 @@
+# AirLedger
+
+> AI-driven bokföringsassistent för svenska småföretag. Fotografera kvitton, prata svenska och få automatisk bokföring enligt BAS 2026.
+
+AirLedger gör bokföring enkelt: en konversationsbaserad AI-assistent hjälper användaren att bokföra transaktioner, tolka kvitton, hantera ingående balanser och följa upp resultat enligt svensk standard (BAS 2026).
+
+## Pages
+
+- [Start](/): Översikt och introduktion till AirLedger.
+- [Logga in / Skapa konto](/auth): Autentisering för befintliga och nya användare.

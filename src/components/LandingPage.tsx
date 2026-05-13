@@ -96,6 +96,7 @@ const LandingPage = () => {
         </div>
       </nav>
 
+      <main>
       {/* Hero Section */}
       <section className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
@@ -270,6 +271,7 @@ const LandingPage = () => {
           </Button>
         </div>
       </section>
+      </main>
 
       {/* Footer */}
       <footer className="py-8 px-6 border-t bg-background">
