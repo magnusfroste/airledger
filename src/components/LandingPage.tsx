@@ -252,6 +252,36 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Open Source Section */}
+      <section className="py-20 px-6">
+        <div className="max-w-4xl mx-auto text-center space-y-6">
+          <Badge variant="secondary" className="w-fit mx-auto">
+            <Github className="w-4 h-4 mr-2" />
+            Open Source
+          </Badge>
+          <h2 className="text-3xl lg:text-4xl font-bold">
+            Fri kod – din data, din kontroll
+          </h2>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            AirLedger är open source och enkelt att self-hosta. Klona koden, kör den på din egen server och behåll full kontroll över din bokföring.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button asChild size="lg" variant="outline" className="text-lg px-8 py-6">
+              <a href="https://github.com/magnusfroste/airledger" target="_blank" rel="noopener noreferrer">
+                <Github className="w-5 h-5 mr-2" />
+                Ladda ned på GitHub
+              </a>
+            </Button>
+            <Button asChild size="lg" variant="ghost" className="text-lg px-8 py-6">
+              <a href="https://docs.lovable.dev/tips-tricks/self-hosting" target="_blank" rel="noopener noreferrer">
+                <Server className="w-5 h-5 mr-2" />
+                Guide till self-hosting
+              </a>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20 px-6 bg-primary text-primary-foreground">
         <div className="max-w-4xl mx-auto text-center space-y-8">
