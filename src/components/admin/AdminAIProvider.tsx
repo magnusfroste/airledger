@@ -190,12 +190,28 @@ const AdminAIProvider = () => {
           </div>
         </div>
 
+        {selectedProvider.requiresBaseUrl && (
+          <div className="space-y-1.5">
+            <Label>Bas-URL för API</Label>
+            <Input
+              value={baseUrl}
+              onChange={e => setBaseUrl(e.target.value)}
+              placeholder={selectedProvider.defaultBaseUrl}
+              className="font-mono text-xs"
+            />
+            <p className="text-xs text-muted-foreground">
+              T.ex. <code>http://localhost:11434/v1</code> (Ollama), <code>http://localhost:1234/v1</code> (LM Studio) eller annan OpenAI-kompatibel endpoint. Måste sluta med <code>/v1</code>.
+            </p>
+          </div>
+        )}
+
         {provider !== 'lovable' && (
           <div className="flex items-start gap-2 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
             <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0 mt-0.5" />
             <p className="text-xs text-yellow-700">
               Vid byte till extern provider behöver du konfigurera API-nyckeln som 
-              miljövariabel (<code>{selectedProvider.envKey}</code>) i din hosting-miljö. 
+              miljövariabel (<code>{selectedProvider.envKey}</code>) i din hosting-miljö.
+              {selectedProvider.requiresBaseUrl && ' Lokala endpoints utan auth kan använda valfri sträng som nyckel.'} 
               Systemet faller automatiskt tillbaka till Lovable AI om nyckeln saknas.
             </p>
           </div>
