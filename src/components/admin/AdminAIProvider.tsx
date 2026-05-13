@@ -114,6 +114,7 @@ const AdminAIProvider = () => {
         { key: 'ai_provider', value: provider },
         { key: 'ai_model', value: model || selectedProvider.defaultModel },
         { key: 'ai_vision_model', value: visionModel || selectedProvider.defaultVisionModel },
+        { key: 'ai_base_url', value: selectedProvider.requiresBaseUrl ? (baseUrl || selectedProvider.defaultBaseUrl || '') : '' },
       ];
 
       for (const entry of entries) {
