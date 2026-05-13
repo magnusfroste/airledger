@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Check, Receipt, BarChart3 } from "lucide-react";
+import { Bot, Check, Receipt, BarChart3, Github, Server } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import DemoChat from "@/components/DemoChat";
 
@@ -252,6 +252,36 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Open Source Section */}
+      <section className="py-20 px-6">
+        <div className="max-w-4xl mx-auto text-center space-y-6">
+          <Badge variant="secondary" className="w-fit mx-auto">
+            <Github className="w-4 h-4 mr-2" />
+            Open Source
+          </Badge>
+          <h2 className="text-3xl lg:text-4xl font-bold">
+            Fri kod – din data, din kontroll
+          </h2>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            AirLedger är open source och enkelt att self-hosta. Klona koden, kör den på din egen server och behåll full kontroll över din bokföring.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button asChild size="lg" variant="outline" className="text-lg px-8 py-6">
+              <a href="https://github.com/magnusfroste/airledger" target="_blank" rel="noopener noreferrer">
+                <Github className="w-5 h-5 mr-2" />
+                Ladda ned på GitHub
+              </a>
+            </Button>
+            <Button asChild size="lg" variant="ghost" className="text-lg px-8 py-6">
+              <a href="https://docs.lovable.dev/tips-tricks/self-hosting" target="_blank" rel="noopener noreferrer">
+                <Server className="w-5 h-5 mr-2" />
+                Guide till self-hosting
+              </a>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20 px-6 bg-primary text-primary-foreground">
         <div className="max-w-4xl mx-auto text-center space-y-8">
@@ -275,8 +305,20 @@ const LandingPage = () => {
 
       {/* Footer */}
       <footer className="py-8 px-6 border-t bg-background">
-        <div className="max-w-6xl mx-auto text-center text-muted-foreground">
+        <div className="max-w-6xl mx-auto text-center text-muted-foreground space-y-2">
           <p>© 2025 AirLedger. Underlättar för Svenska småföretagare.</p>
+          <p className="text-sm">
+            Open source ·{" "}
+            <a
+              href="https://github.com/magnusfroste/airledger"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 underline hover:text-foreground"
+            >
+              <Github className="w-3.5 h-3.5" />
+              github.com/magnusfroste/airledger
+            </a>
+          </p>
         </div>
       </footer>
 
