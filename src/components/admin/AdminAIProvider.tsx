@@ -17,6 +17,8 @@ interface ProviderInfo {
   defaultVisionModel: string;
   models: string[];
   docsUrl: string;
+  requiresBaseUrl?: boolean;
+  defaultBaseUrl?: string;
 }
 
 const PROVIDERS: ProviderInfo[] = [
@@ -37,6 +39,17 @@ const PROVIDERS: ProviderInfo[] = [
     defaultVisionModel: 'gpt-4o',
     models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o1-mini'],
     docsUrl: 'https://platform.openai.com/docs',
+  },
+  {
+    id: 'openai_compatible',
+    name: 'Privat LLM (OpenAI-kompatibel)',
+    envKey: 'OPENAI_COMPATIBLE_API_KEY',
+    defaultModel: 'llama-3.1-8b-instruct',
+    defaultVisionModel: 'llama-3.2-11b-vision',
+    models: ['llama-3.1-8b-instruct', 'llama-3.1-70b-instruct', 'llama-3.2-11b-vision', 'mistral-7b-instruct', 'qwen2.5-7b-instruct'],
+    docsUrl: 'https://platform.openai.com/docs/api-reference/chat',
+    requiresBaseUrl: true,
+    defaultBaseUrl: 'http://localhost:11434/v1',
   },
   {
     id: 'anthropic',
@@ -62,6 +75,7 @@ const AdminAIProvider = () => {
   const [provider, setProvider] = useState('lovable');
   const [model, setModel] = useState('');
   const [visionModel, setVisionModel] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -74,7 +88,7 @@ const AdminAIProvider = () => {
       const { data } = await supabase
         .from('system_settings')
         .select('key, value')
-        .in('key', ['ai_provider', 'ai_model', 'ai_vision_model']);
+        .in('key', ['ai_provider', 'ai_model', 'ai_vision_model', 'ai_base_url']);
 
       if (data) {
         const settings: Record<string, string> = {};
@@ -82,6 +96,7 @@ const AdminAIProvider = () => {
         if (settings.ai_provider) setProvider(settings.ai_provider);
         if (settings.ai_model) setModel(settings.ai_model);
         if (settings.ai_vision_model) setVisionModel(settings.ai_vision_model);
+        if (settings.ai_base_url) setBaseUrl(settings.ai_base_url);
       }
     } catch (e) {
       console.error('Failed to load AI settings:', e);
@@ -99,6 +114,7 @@ const AdminAIProvider = () => {
         { key: 'ai_provider', value: provider },
         { key: 'ai_model', value: model || selectedProvider.defaultModel },
         { key: 'ai_vision_model', value: visionModel || selectedProvider.defaultVisionModel },
+        { key: 'ai_base_url', value: selectedProvider.requiresBaseUrl ? (baseUrl || selectedProvider.defaultBaseUrl || '') : '' },
       ];
 
       for (const entry of entries) {
@@ -144,6 +160,7 @@ const AdminAIProvider = () => {
             if (p) {
               setModel(p.defaultModel);
               setVisionModel(p.defaultVisionModel);
+              setBaseUrl(p.defaultBaseUrl || '');
             }
           }}>
             <SelectTrigger>
@@ -173,12 +190,28 @@ const AdminAIProvider = () => {
           </div>
         </div>
 
+        {selectedProvider.requiresBaseUrl && (
+          <div className="space-y-1.5">
+            <Label>Bas-URL för API</Label>
+            <Input
+              value={baseUrl}
+              onChange={e => setBaseUrl(e.target.value)}
+              placeholder={selectedProvider.defaultBaseUrl}
+              className="font-mono text-xs"
+            />
+            <p className="text-xs text-muted-foreground">
+              T.ex. <code>http://localhost:11434/v1</code> (Ollama), <code>http://localhost:1234/v1</code> (LM Studio) eller annan OpenAI-kompatibel endpoint. Måste sluta med <code>/v1</code>.
+            </p>
+          </div>
+        )}
+
         {provider !== 'lovable' && (
           <div className="flex items-start gap-2 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
             <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0 mt-0.5" />
             <p className="text-xs text-yellow-700">
               Vid byte till extern provider behöver du konfigurera API-nyckeln som 
-              miljövariabel (<code>{selectedProvider.envKey}</code>) i din hosting-miljö. 
+              miljövariabel (<code>{selectedProvider.envKey}</code>) i din hosting-miljö.
+              {selectedProvider.requiresBaseUrl && ' Lokala endpoints utan auth kan använda valfri sträng som nyckel.'} 
               Systemet faller automatiskt tillbaka till Lovable AI om nyckeln saknas.
             </p>
           </div>

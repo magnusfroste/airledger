@@ -7,10 +7,11 @@
  */
 
 export interface AIProviderConfig {
-  provider: 'lovable' | 'openai' | 'anthropic' | 'gemini';
+  provider: 'lovable' | 'openai' | 'openai_compatible' | 'anthropic' | 'gemini';
   model: string;
   visionModel: string;
   apiKey: string;
+  baseUrl?: string;
 }
 
 interface AICompletionOptions {
@@ -26,6 +27,7 @@ interface AICompletionOptions {
 const PROVIDER_ENDPOINTS: Record<string, string> = {
   lovable: 'https://ai.gateway.lovable.dev/v1/chat/completions',
   openai: 'https://api.openai.com/v1/chat/completions',
+  openai_compatible: '', // resolved per-config from baseUrl
   anthropic: 'https://api.anthropic.com/v1/messages',
   gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
 };
@@ -33,6 +35,7 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
 const DEFAULT_MODELS: Record<string, { chat: string; vision: string }> = {
   lovable: { chat: 'google/gemini-3-flash-preview', vision: 'google/gemini-2.5-flash' },
   openai: { chat: 'gpt-4o', vision: 'gpt-4o' },
+  openai_compatible: { chat: 'llama-3.1-8b-instruct', vision: 'llama-3.2-11b-vision' },
   anthropic: { chat: 'claude-sonnet-4-20250514', vision: 'claude-sonnet-4-20250514' },
   gemini: { chat: 'gemini-2.5-flash', vision: 'gemini-2.5-flash' },
 };
@@ -40,6 +43,7 @@ const DEFAULT_MODELS: Record<string, { chat: string; vision: string }> = {
 const ENV_KEY_MAP: Record<string, string> = {
   lovable: 'LOVABLE_API_KEY',
   openai: 'OPENAI_API_KEY',
+  openai_compatible: 'OPENAI_COMPATIBLE_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
   gemini: 'GEMINI_API_KEY',
 };
@@ -53,7 +57,7 @@ export async function getAIConfig(supabase: any): Promise<AIProviderConfig> {
     const { data } = await supabase
       .from('system_settings')
       .select('key, value')
-      .in('key', ['ai_provider', 'ai_model', 'ai_vision_model']);
+      .in('key', ['ai_provider', 'ai_model', 'ai_vision_model', 'ai_base_url']);
 
     const settings: Record<string, string> = {};
     (data || []).forEach((r: { key: string; value: string }) => {
@@ -63,7 +67,21 @@ export async function getAIConfig(supabase: any): Promise<AIProviderConfig> {
     const provider = (settings.ai_provider || 'lovable') as AIProviderConfig['provider'];
     const defaults = DEFAULT_MODELS[provider] || DEFAULT_MODELS.lovable;
     const envKey = ENV_KEY_MAP[provider] || 'LOVABLE_API_KEY';
-    const apiKey = Deno.env.get(envKey) || '';
+    // For openai_compatible, allow a placeholder key (some local endpoints don't require auth)
+    const apiKey = Deno.env.get(envKey) || (provider === 'openai_compatible' ? 'not-needed' : '');
+    const baseUrl = settings.ai_base_url || '';
+
+    if (provider === 'openai_compatible' && !baseUrl) {
+      console.warn('openai_compatible selected but no ai_base_url configured, falling back to Lovable AI');
+      const lovableKey = Deno.env.get('LOVABLE_API_KEY');
+      if (!lovableKey) throw new Error('No AI API key configured');
+      return {
+        provider: 'lovable',
+        model: DEFAULT_MODELS.lovable.chat,
+        visionModel: DEFAULT_MODELS.lovable.vision,
+        apiKey: lovableKey,
+      };
+    }
 
     if (!apiKey) {
       // Fallback to Lovable if provider key is missing
@@ -83,6 +101,7 @@ export async function getAIConfig(supabase: any): Promise<AIProviderConfig> {
       model: settings.ai_model || defaults.chat,
       visionModel: settings.ai_vision_model || defaults.vision,
       apiKey,
+      baseUrl: baseUrl || undefined,
     };
   } catch (error) {
     console.error('Failed to load AI config, using Lovable fallback:', error);
@@ -106,7 +125,12 @@ export async function aiComplete(
   options: AICompletionOptions
 ): Promise<any> {
   const model = options.model || config.model;
-  const endpoint = PROVIDER_ENDPOINTS[config.provider];
+  let endpoint = PROVIDER_ENDPOINTS[config.provider];
+  if (config.provider === 'openai_compatible') {
+    const base = (config.baseUrl || '').replace(/\/+$/, '');
+    if (!base) throw new Error('openai_compatible provider requires ai_base_url');
+    endpoint = `${base}/chat/completions`;
+  }
 
   if (config.provider === 'anthropic') {
     return anthropicComplete(config, options, model);
