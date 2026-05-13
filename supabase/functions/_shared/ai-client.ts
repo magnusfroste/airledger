@@ -125,7 +125,12 @@ export async function aiComplete(
   options: AICompletionOptions
 ): Promise<any> {
   const model = options.model || config.model;
-  const endpoint = PROVIDER_ENDPOINTS[config.provider];
+  let endpoint = PROVIDER_ENDPOINTS[config.provider];
+  if (config.provider === 'openai_compatible') {
+    const base = (config.baseUrl || '').replace(/\/+$/, '');
+    if (!base) throw new Error('openai_compatible provider requires ai_base_url');
+    endpoint = `${base}/chat/completions`;
+  }
 
   if (config.provider === 'anthropic') {
     return anthropicComplete(config, options, model);
