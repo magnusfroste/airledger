@@ -359,7 +359,7 @@ export class BookingAgent implements Agent {
     const tableRows = proposalContent.match(/\|\s*(\d{4})\s+(.+?)\s*\|\s*([\d\s]*(?:kr)?)\s*\|\s*([\d\s]*(?:kr)?)\s*\|/g);
     if (!tableRows) return entries;
     for (const row of tableRows) {
-      const match = row.match(/\|\s*(\d{4})\s+(.+?)\s*\|\s*([\d\s,\.]*(?:kr)?)\s*\|\s*([\d\s,\.]*(?:kr)?)\s*\|/);
+      const match = row.match(/\|\s*(\d{4})\s+(.+?)\s*\|\s*([\d\s,.]*(?:kr)?)\s*\|\s*([\d\s,.]*(?:kr)?)\s*\|/);
       if (!match) continue;
       const debitStr = match[3].replace(/\s/g, '').replace(/kr$/i, '').replace(',', '.').trim();
       const creditStr = match[4].replace(/\s/g, '').replace(/kr$/i, '').replace(',', '.').trim();

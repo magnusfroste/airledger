@@ -23,7 +23,9 @@ export const useBankStatementAnalysis = () => {
         if (data?.error) {
           specificError = data.error;
         }
-      } catch {}
+      } catch {
+        // ignorera – faller tillbaka på standardfelmeddelandet
+      }
 
       const errorMsg: Message = {
         id: (Date.now() + Math.random()).toString(),

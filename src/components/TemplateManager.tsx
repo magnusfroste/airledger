@@ -157,7 +157,7 @@ const TemplateManager = () => {
       } = await supabase.from('airledger_template_usage').select('*').order('used_at', {
         ascending: false
       }).limit(20);
-      let processedUsageData: TemplateUsage[] = [];
+      const processedUsageData: TemplateUsage[] = [];
       if (usageData && !usageError) {
         // Manually fetch template names and transaction descriptions
         for (const usage of usageData) {

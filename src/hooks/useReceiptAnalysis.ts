@@ -104,29 +104,25 @@ export const useReceiptAnalysis = () => {
     onMessage: (message: Message) => void,
     saveMessage: (message: Message) => Promise<void>
   ) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('save-transaction', {
-        body: { analysis, entries, paymentMethod }
-      });
+    const { data, error } = await supabase.functions.invoke('save-transaction', {
+      body: { analysis, entries, paymentMethod }
+    });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to save transaction');
-      }
+    if (error) {
+      throw new Error(error.message || 'Failed to save transaction');
+    }
 
-      if (data?.success && data?.transaction) {
-        const aiResponse: Message = {
-          id: (Date.now() + Math.random()).toString(),
-          content: `✅ **Transaktion bokförd!**\n\n**${analysis.vendor}** - ${analysis.date}\n**Belopp:** ${analysis.total_amount} kr\n**Betalning:** ${paymentMethod}\n\n**Bokföringsposter:**\n${entries.map((entry: any) => `• ${entry.account_code} ${entry.account_name}: ${entry.debit_amount > 0 ? `Debet ${entry.debit_amount} kr` : `Kredit ${entry.credit_amount} kr`}`).join('\n')}\n\n📋 Transaktionen är nu bokförd i systemet.`,
-          sender: 'ai',
-          timestamp: new Date(),
-          type: 'text'
-        };
+    if (data?.success && data?.transaction) {
+      const aiResponse: Message = {
+        id: (Date.now() + Math.random()).toString(),
+        content: `✅ **Transaktion bokförd!**\n\n**${analysis.vendor}** - ${analysis.date}\n**Belopp:** ${analysis.total_amount} kr\n**Betalning:** ${paymentMethod}\n\n**Bokföringsposter:**\n${entries.map((entry: any) => `• ${entry.account_code} ${entry.account_name}: ${entry.debit_amount > 0 ? `Debet ${entry.debit_amount} kr` : `Kredit ${entry.credit_amount} kr`}`).join('\n')}\n\n📋 Transaktionen är nu bokförd i systemet.`,
+        sender: 'ai',
+        timestamp: new Date(),
+        type: 'text'
+      };
 
-        onMessage(aiResponse);
-        await saveMessage(aiResponse);
-      }
-    } catch (error) {
-      throw error;
+      onMessage(aiResponse);
+      await saveMessage(aiResponse);
     }
   };
 

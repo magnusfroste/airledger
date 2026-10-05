@@ -215,7 +215,7 @@ const LandingPage = () => {
               <Card key={index} className={`relative ${plan.popular ? 'border-primary shadow-lg scale-105' : ''}`}>
                 {plan.popular && (
                   <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    Populärast
+                    Rekommenderas
                   </Badge>
                 )}
                 <CardHeader className="text-center">
@@ -292,7 +292,7 @@ const LandingPage = () => {
             Redo att förenkla din bokföring?
           </h2>
           <p className="text-xl opacity-90 max-w-2xl mx-auto">
-            Börja prata Svenska med din AI-assistent redan idag. Gör som 1000-tals Svenska småföretagare, få en bättre koll med AI assistans! 
+            Börja prata Svenska med din AI-assistent redan idag. Fotografera kvitton, få förslag på konteringar enligt BAS-kontoplanen och få resultat- och balansrapporter direkt i appen.
           </p>
           <Button 
             onClick={handleGetStarted}
