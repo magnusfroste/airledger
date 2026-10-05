@@ -26,6 +26,19 @@ serve(async (req) => {
   }
 
   try {
+    // Admins only: this overwrites the shared chart of accounts and fetches a URL server-side
+    const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '')
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const { data: userData } = token ? await admin.auth.getUser(token) : { data: { user: null } }
+    const { data: isAdmin } = userData.user
+      ? await admin.rpc('has_role', { _user_id: userData.user.id, _role: 'admin' })
+      : { data: false }
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const { csvUrl } = await req.json()
     if (!csvUrl) throw new Error('csvUrl is required')
 

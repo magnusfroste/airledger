@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +12,16 @@ serve(async (req) => {
   }
 
   try {
+    // Signed-in users only: each call spends AI credits
+    const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
+    const auth = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!);
+    const { data: userData } = token ? await auth.auth.getUser(token) : { data: { user: null } };
+    if (!userData.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { imageBase64 } = await req.json();
     if (!imageBase64) throw new Error('Image data is required');
 
