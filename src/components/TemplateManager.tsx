@@ -209,8 +209,7 @@ const TemplateManager = () => {
         category: newTemplate.category,
         keywords: newTemplate.keywords.split(',').map(k => k.trim()),
         template_entries: newTemplate.template_entries.filter(entry => entry.account_code && entry.account_name),
-        is_system_template: isDeveloper ? newTemplate.is_system_template : false,
-        is_recurring: false
+        is_system_template: isDeveloper ? newTemplate.is_system_template : false
       });
       if (error) throw error;
       toast({

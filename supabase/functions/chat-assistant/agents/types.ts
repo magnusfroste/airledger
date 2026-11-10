@@ -6,7 +6,7 @@ import { AIProviderConfig } from '../../_shared/ai-client.ts';
  */
 export interface AgentResult {
   response: string;
-  action_taken?: 'booked' | 'proposed' | 'answered' | 'guided' | 'clarified';
+  action_taken?: 'booked' | 'proposed' | 'answered' | 'guided' | 'clarified' | 'error';
   data?: Record<string, any>;
   follow_up_agent?: string;
   context_markers?: string[];
