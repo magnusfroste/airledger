@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
+import typography from "@tailwindcss/typography";
 
 export default {
 	darkMode: ["class"],
@@ -125,11 +126,55 @@ export default {
 					}
 				}
 			},
+			typography: {
+				DEFAULT: {
+					css: {
+						'--tw-prose-body': 'currentColor',
+						'--tw-prose-invert-body': 'currentColor',
+						'--tw-prose-headings': 'currentColor',
+						'--tw-prose-invert-headings': 'currentColor',
+						'--tw-prose-lead': 'currentColor',
+						'--tw-prose-invert-lead': 'currentColor',
+						'--tw-prose-links': 'currentColor',
+						'--tw-prose-invert-links': 'currentColor',
+						'--tw-prose-bold': 'currentColor',
+						'--tw-prose-invert-bold': 'currentColor',
+						'--tw-prose-counters': 'currentColor',
+						'--tw-prose-invert-counters': 'currentColor',
+						'--tw-prose-bullets': 'currentColor',
+						'--tw-prose-invert-bullets': 'currentColor',
+						'--tw-prose-quotes': 'currentColor',
+						'--tw-prose-invert-quotes': 'currentColor',
+						'--tw-prose-code': 'currentColor',
+						'--tw-prose-invert-code': 'currentColor',
+						'--tw-prose-captions': 'currentColor',
+						'--tw-prose-invert-captions': 'currentColor',
+						'--tw-prose-th-borders': 'hsl(var(--border))',
+						'--tw-prose-invert-th-borders': 'hsl(var(--border))',
+						'--tw-prose-td-borders': 'hsl(var(--border))',
+						'--tw-prose-invert-td-borders': 'hsl(var(--border))',
+						'--tw-prose-hr': 'hsl(var(--border))',
+						'--tw-prose-invert-hr': 'hsl(var(--border))',
+						'--tw-prose-quote-borders': 'hsl(var(--border))',
+						'--tw-prose-invert-quote-borders': 'hsl(var(--border))',
+						'--tw-prose-kbd': 'currentColor',
+						'--tw-prose-invert-kbd': 'currentColor',
+						'--tw-prose-pre-code': 'hsl(var(--foreground))',
+						'--tw-prose-invert-pre-code': 'hsl(var(--foreground))',
+						'--tw-prose-pre-bg': 'hsl(var(--background))',
+						'--tw-prose-invert-pre-bg': 'hsl(var(--background))',
+						'code::before': { content: 'none' },
+						'code::after': { content: 'none' },
+						'blockquote p:first-of-type::before': { content: 'none' },
+						'blockquote p:last-of-type::after': { content: 'none' },
+					}
+				}
+			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out'
 			}
 		}
 	},
-	plugins: [tailwindcssAnimate],
+	plugins: [tailwindcssAnimate, typography],
 } satisfies Config;
