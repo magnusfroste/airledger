@@ -27,8 +27,7 @@ brew install supabase/tap/supabase
 # Eller via npm
 npm install -g supabase
 
-# Node 20+ och bun (eller npm/pnpm)
-curl -fsSL https://bun.sh/install | bash
+# Node 20+ (npm ingår): https://nodejs.org
 ```
 
 ### 2. Klona repot
@@ -36,7 +35,7 @@ curl -fsSL https://bun.sh/install | bash
 ```bash
 git clone https://github.com/magnusfroste/airledger.git
 cd airledger
-bun install
+npm install
 ```
 
 ### 3. Koppla ditt Supabase-projekt
@@ -71,7 +70,7 @@ supabase secrets set OPENAI_API_KEY=sk-...
 
 ### 6. Skapa din admin-användare
 
-1. Starta appen lokalt (`bun run dev`) eller deploya frontend först (steg 7) och gå till `/auth`.
+1. Starta appen lokalt (`npm run dev`) eller deploya frontend först (steg 7) och gå till `/auth`.
 2. Registrera ditt konto med e-post + lösenord.
 3. Öppna **Supabase Dashboard → Authentication → Users**, kopiera ditt `user_id` (UUID).
 4. Gå till **SQL Editor** och kör:
